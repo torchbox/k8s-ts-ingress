@@ -24,7 +24,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: trafficserver
-        image: docker.io/torchbox/trafficserver:7.0
+        image: docker.io/torchbox/trafficserver-ingress-controller:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
