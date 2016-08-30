@@ -47,18 +47,18 @@ foreach my $namespace (@{$ret->{'items'}}) {
           my $backend = $path->{'backend'};
           my $backhost = $backend->{'serviceName'} . '.' . $nsname;
           my $backport = $backend->{'servicePort'};
-          my $service = "http://".$backhost.'.'.$ENV{'CLUSTER_DNS_SUFFIX'}.':'.$backport.'/';
+          my $service = $backhost.'.'.$ENV{'CLUSTER_DNS_SUFFIX'}.':'.$backpor;
 
           my $this_extra = $remap_extra;
 
           if (defined $host) {
             $this_extra =~ s/<hostname>/$host/g;
-            print "map http://$host$prefix $service $this_extra\n";
-            print "map ws://$host$prefix $service $this_extra\n";
+            print "map http://$host$prefix http://$service$prefix $this_extra\n";
+            print "map ws://$host$prefix ws://$service$prefix $this_extra\n";
           } else {
             $this_extra =~ s/<hostname>/__ANY__/g;
-            print "regex_map http://[A-Za-z0-9-]+$prefix $service $this_extra\n";
-            print "regex_map ws://[A-Za-z0-9-]+$prefix $service $this_extra\n";
+            print "regex_map http://[A-Za-z0-9-]+$prefix http://$service$prefix $this_extra\n";
+            print "regex_map ws://[A-Za-z0-9-]+$prefix ws://$service$prefix $this_extra\n";
           }
         }
       }
