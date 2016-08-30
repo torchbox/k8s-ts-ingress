@@ -45,7 +45,7 @@ foreach my $namespace (@{$ret->{'items'}}) {
           my $backend = $path->{'backend'};
           my $backhost = $backend->{'serviceName'} . '.' . $nsname;
           my $backport = $backend->{'servicePort'};
-          my $service = "http://".$backhost.'.'.$ENV{'CLUSTER_DNS_SUFFIX'}.':'.$backport.'/';
+          my $service = "http://".$backhost.':'.$backport.'/';
 
           if (defined $host) {
             print "map http://$host$prefix $service\n";
