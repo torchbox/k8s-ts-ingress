@@ -10,7 +10,7 @@ mkdir -p /var/lib/trafficserver
 # Default to 128MB cache size.
 CACHEFILE=/var/lib/trafficserver/cache.db
 : ${TS_CACHE_SIZE=128}
-if [ ! -f $CACHEFILE -o $(stat -c%s $CACHEFILE) != $(expr $TS_CACHE_SIZE '*' 1024 '*' 1024) ]; then
+if [ \( ! -f $CACHEFILE \) -o $(stat -c%s $CACHEFILE) != $(expr $TS_CACHE_SIZE '*' 1024 '*' 1024) ]; then
 	echo 'init.sh: initialising cache file'
 	rm -f $CACHEFILE
 	dd if=/dev/zero of=$CACHEFILE bs=1M count=128

@@ -8,7 +8,7 @@ use LWP::UserAgent;
 use JSON qw/decode_json/;
 use Data::Dumper;
 
-my $remap_extra = "@plugin=remap_purge.so @pparam=--state-file=/var/lib/trafficserver/genid_<hostname>.kch @pparam=--secret=__domain_purge__";
+my $remap_extra = "\@plugin=remap_purge.so \@pparam=--state-file=/var/lib/trafficserver/genid_<hostname>.kch \@pparam=--secret=__domain_purge__";
 
 my $certfile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 my $tokenfile = "/var/run/secrets/kubernetes.io/serviceaccount/token";
