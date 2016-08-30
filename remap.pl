@@ -50,12 +50,13 @@ foreach my $namespace (@{$ret->{'items'}}) {
           my $service = "http://".$backhost.'.'.$ENV{'CLUSTER_DNS_SUFFIX'}.':'.$backport.'/';
 
           my $this_extra = $remap_extra;
-          $this_extra =~ s/<hostname>/$host/g;
 
           if (defined $host) {
+            $this_extra =~ s/<hostname>/$host/g;
             print "map http://$host$prefix $service $this_extra\n";
             print "map ws://$host$prefix $service $this_extra\n";
           } else {
+            $this_extra =~ s/<hostname>/__ANY__/g;
             print "regex_map http://[A-Za-z0-9-]+$prefix $service $this_extra\n";
             print "regex_map ws://[A-Za-z0-9-]+$prefix $service $this_extra\n";
           }
