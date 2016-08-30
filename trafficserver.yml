@@ -1,0 +1,31 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: trafficserver
+  namespace: kube-system
+  labels:
+    app: trafficserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trafficserver
+  strategy:                                                                                                                                                            
+    rollingUpdate:                                                                                                                                                     
+      maxSurge: 1                                                                                                                                                      
+      maxUnavailable: 1                                                                                                                                                
+    type: RollingUpdate                                                                                                                                                
+  template:
+    metadata:
+      namespace: kube-system
+      labels:
+        app: trafficserver
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: trafficserver
+        image: docker.io/torchbox/trafficserver:7.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          hostPort: 81
