@@ -8,6 +8,8 @@ use LWP::UserAgent;
 use JSON qw/decode_json/;
 use Data::Dumper;
 
+my $remap_extra = "@plugin=remap_purge.so @pparam=--state-file=/var/lib/trafficserver/genid_<hostname>.kch @pparam=--secret=__domain_purge__";
+
 my $certfile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 my $tokenfile = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 
@@ -47,10 +49,15 @@ foreach my $namespace (@{$ret->{'items'}}) {
           my $backport = $backend->{'servicePort'};
           my $service = "http://".$backhost.'.'.$ENV{'CLUSTER_DNS_SUFFIX'}.':'.$backport.'/';
 
+          my $this_extra = $remap_extra;
+          $this_extra =~ s/<hostname>/$host/g;
+
           if (defined $host) {
-            print "map http://$host$prefix $service\n";
+            print "map http://$host$prefix $service $this_extra\n";
+            print "map ws://$host$prefix $service $this_extra\n";
           } else {
-            print "regex_map http://[A-Za-z0-9-]+$prefix $service\n";
+            print "regex_map http://[A-Za-z0-9-]+$prefix $service $this_extra\n";
+            print "regex_map ws://[A-Za-z0-9-]+$prefix $service $this_extra\n";
           }
         }
       }

@@ -28,4 +28,10 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
-          hostPort: 81
+          hostPort: 80
+        volumeMounts:
+        - name: ts-storage
+          mountPath: /var/lib/trafficserver
+      volumes:
+      - name: ts-storage
+        emptyDir: {}
