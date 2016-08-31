@@ -24,10 +24,15 @@ Configuration
 
 Environment variables:
 
-    * `TS_CACHE_SIZE`: Size of the cache file to create, in megabytes.
+* `TS_CACHE_SIZE`: Size of the cache file to create, in megabytes.
 
 In addition, any TS configuration (records.config) setting can be
 overridden in the environment:
 
 	https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides
 
+SSL
+---
+
+SSL is supported via `tls` attributes on the ingress.  This supports
+automatic certificate issuance when used with a service like `kube-lego`.

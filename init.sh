@@ -24,21 +24,17 @@ __EOF__
 
 chown -R nobody:nogroup /var/log/trafficserver /var/lib/trafficserver
 
-/remap.pl >/usr/local/etc/trafficserver/remap.config
+/remap.pl
 
 (
 	while true; do
 		sleep 30
-
-		/remap.pl >/usr/local/etc/trafficserver/remap.config.tmp
-		if ! cmp /usr/local/etc/trafficserver/remap.config.tmp /usr/local/etc/trafficserver/remap.config; then
-			mv /usr/local/etc/trafficserver/remap.config.tmp /usr/local/etc/trafficserver/remap.config
-			/usr/local/bin/traffic_ctl config reload
-		fi
+		/remap.pl
 	done
 ) &
 
 # We are running.
 touch /run/ts-alive
 
-exec /usr/local/bin/traffic_cop -o
+#exec su --preserve-environment -s /bin/sh nobody -c "exec /usr/local/bin/traffic_cop -o --debug"
+exec /usr/local/bin/traffic_manager 
