@@ -54,6 +54,16 @@ my $ret = decode_json $nsresp->content;
 my @remaps;
 my @tls;
 
+sub get_service_ip {
+  my $nsname = shift;
+  my $service = shift;
+  my $svcresp = $ua->get($apiroot . "/api/v1/namespaces/${nsname}/services/${service}");
+  my $svcret = decode_json $svcresp->content;
+
+  print Dumper($svcret);
+  return $svcret->{'spec'}->{'clusterIP'};
+}
+
 foreach my $namespace (@{$ret->{'items'}}) {
   my $nsname = $namespace->{'metadata'}->{'name'};
   my $ingresp = $ua->get($apiroot . "/apis/extensions/v1beta1/namespaces/${nsname}/ingresses/");
@@ -83,9 +93,10 @@ foreach my $namespace (@{$ret->{'items'}}) {
         foreach my $path (sort { length($a->{'path'}) <=> length($b->{'path'}) }  @paths) {
           my $prefix = $path->{'path'};
           my $backend = $path->{'backend'};
-          my $backhost = $backend->{'serviceName'} . '.' . $nsname;
+          my $backhost = $backend->{'serviceName'};
           my $backport = $backend->{'servicePort'};
-          my $service = $backhost.'.'.$ENV{'CLUSTER_DNS_SUFFIX'}.':'.$backport;
+          my $backip = get_service_ip($nsname, $backhost);
+          my $service = "$backip:$backport";
 
           push @remaps, { host => $host, prefix => $prefix, service => $service };
         }
