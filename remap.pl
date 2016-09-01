@@ -17,7 +17,9 @@ my $testmode = 0;
 my $ssldir = '/usr/local/etc/trafficserver/ssl';
 my $must_reload = 0;
 my $remap_file = '/usr/local/etc/trafficserver/remap.config';
-my $multicert_file = '/usr/local/etc/trafficserver/remap.config';
+my $multicert_file = '/usr/local/etc/trafficserver/ssl_multicert.config';
+
+my $route_deis = defined($ENV{'ROUTE_DEIS'});
 
 if (@ARGV > 0 and $ARGV[0] eq '--test') {
   print STDERR "test mode\n";
@@ -45,8 +47,19 @@ if (@ARGV > 0 and $ARGV[0] eq '--test') {
   $ua->ssl_opts('SSL_ca_file' => $cacertfile);
 }
 
+my $default_ssl_cert = "$ssldir/ssl.cert";
+my $default_ssl_key = "$ssldir/ssl.key";
+my $default_ssl_csr = "$ssldir/ssl.csr";
+
 if (!-d $ssldir) {
   mkdir($ssldir);
+}
+
+if (!-f $default_ssl_cert or !-f $default_ssl_key) {
+  print "remap.pl: generating ssl certificate\n";
+  system("openssl genrsa -out $default_ssl_key 2048");
+  system("printf 'GB\nOxfordshire\nCharlbury\nTorchbox Ltd.\n\n\$(hostname)\n\n\n\n' | openssl req -new -key $default_ssl_key -out $default_ssl_csr");
+  system("openssl x509 -req -days 3650 -in $default_ssl_csr -signkey $default_ssl_key -out $default_ssl_cert");
 }
 
 my $remap_extra = "\@plugin=remap_purge.so \@pparam=--state-file=/var/lib/trafficserver/genid_<hostname>.kch \@pparam=--secret=purge-domain-cache \@pparam=--header=x-cache-action \@pparam=--allow-get \@plugin=cachekey.so \@pparam=--sort-params=true \@pparam=--include-headers=X-Forwarded-Proto \@pparam=--static-prefix=<protocol> \@pparam=--capture-prefix=(.*):(.*) \@pparam=--exclude-match-params=^utm_.*";
@@ -56,6 +69,16 @@ my $ret = decode_json $nsresp->content;
 
 my @remaps;
 my @tls;
+
+my $deisdomain;
+
+if ($route_deis) {
+  my $deisresp = $ua->get($apiroot . "/api/v1/namespaces/deis/replicationcontrollers/deis-router");
+  if ($deisresp->is_success) {
+    my $deisret = decode_json $deisresp->content;
+    $deisdomain = $deisret->{'metadata'}->{'annotations'}->{'router.deis.io/nginx.platformDomain'};
+  }
+}
 
 sub check_file_changed {
   my $file = shift;
@@ -151,14 +174,10 @@ foreach my $namespace (@{$ret->{'items'}}) {
     }
   }
 
-  my $svcsresp = $ua->get($apiroot . "/api/v1/namespaces/${nsname}/services/");
-  if ($svcsresp->is_success) {
-    my $svcsret = decode_json $svcsresp->content;
-
-    my $deisresp = $ua->get($apiroot . "/api/v1/namespaces/${nsname}/replicationcontrollers/deis-router");
-    if ($deisresp->is_success) {
-      my $deisret = decode_json $deisresp->content;
-      my $deisdomain = $deisret->{'metadata'}->{'annotations'}->{'router.deis.io/nginx.platformDomain'};
+  if (defined $deisdomain) {
+    my $svcsresp = $ua->get($apiroot . "/api/v1/namespaces/${nsname}/services/");
+    if ($svcsresp->is_success) {
+      my $svcsret = decode_json $svcsresp->content;
 
       foreach my $service (@{$svcsret->{'items'}}) {
         if (defined($service->{'metadata'}->{'labels'}->{'router.deis.io/routable'}) and

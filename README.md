@@ -25,11 +25,13 @@ Configuration
 Environment variables:
 
 * `TS_CACHE_SIZE`: Size of the cache file to create, in megabytes.
+* `ROUTE_DEIS`: If set, Traffic Server will router Deis applications,
+replacing the Deis router.
 
 In addition, any TS configuration (records.config) setting can be
 overridden in the environment:
 
-	https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides
+https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides
 
 SSL
 ---
