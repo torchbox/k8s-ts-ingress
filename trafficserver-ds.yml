@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: trafficserver
+  namespace: kube-system
+spec:
+  selector:
+    app: trafficserver
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: 8443
+
+---
+
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: trafficserver
+  namespace: kube-system
+  labels:
+    app: trafficserver
+spec:
+  selector:
+    matchLabels:
+      app: trafficserver
+  template:
+    metadata:
+      namespace: kube-system
+      labels:
+        app: trafficserver
+    spec:
+      nodeSelector:
+        type: head
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: trafficserver
+        image: docker.io/torchbox/trafficserver-ingress-controller:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          hostPort: 80
+        - containerPort: 8443
+          hostPort: 443
+        volumeMounts:
+        - name: ts-storage
+          mountPath: /var/lib/trafficserver
+      volumes:
+      - name: ts-storage
+        emptyDir: {}

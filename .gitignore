@@ -1,3 +1,4 @@
 *.swp
 /certs
 /remap.config
+/ssl_multicert.config
