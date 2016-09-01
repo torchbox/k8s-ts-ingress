@@ -104,10 +104,10 @@ foreach my $namespace (@{$ret->{'items'}}) {
   }
 }
 
-foreach my $remap (sort { length($b->{'prefix'}) <=> length($a->{'prefix'}) } @remaps) {
+foreach my $remap (sort { length($b->{'prefix'} || '/') <=> length($a->{'prefix'} || '/') } @remaps) {
   my $host = $remap->{'host'};
   my $service = $remap->{'service'};
-  my $prefix = $remap->{'prefix'};
+  my $prefix = $remap->{'prefix'} || '/';
 
 	if (defined $host) {
 		my $this_extra = $remap_extra;
@@ -159,6 +159,7 @@ foreach my $tls (@tls) {
   my $secret = $tls->{'secret'};
 
   my $secresp = $ua->get($apiroot . "/api/v1/namespaces/${nsname}/secrets/$secret");
+  next if $secresp->status_code == 404;
   my $secrt = decode_json $secresp->content;
 
   my $certfile = $ssldir."/$nsname-$secret.crt";
