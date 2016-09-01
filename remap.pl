@@ -60,7 +60,6 @@ sub get_service_ip {
   my $svcresp = $ua->get($apiroot . "/api/v1/namespaces/${nsname}/services/${service}");
   my $svcret = decode_json $svcresp->content;
 
-  print Dumper($svcret);
   return $svcret->{'spec'}->{'clusterIP'};
 }
 
@@ -159,10 +158,8 @@ foreach my $tls (@tls) {
   my $nsname = $tls->{'namespace'};
   my $secret = $tls->{'secret'};
 
-  print "processing tls secret $nsname/$secret\n";
   my $secresp = $ua->get($apiroot . "/api/v1/namespaces/${nsname}/secrets/$secret");
   my $secrt = decode_json $secresp->content;
-  #print Dumper($secrt);
 
   my $certfile = $ssldir."/$nsname-$secret.crt";
 
@@ -186,12 +183,10 @@ foreach my $tls (@tls) {
     my $cur_hash = md5_hex($current);
 
     if ($new_hash eq $cur_hash) {
-      print "$secret: hash unchanged, skipping\n";
       next;
     }
   }
 
-  print "updating cert $secret\n";
   open CERT, ">$certfile";
   print CERT $combined;
   close CERT;
@@ -208,7 +203,6 @@ my $multicert_current;
 }
 
 if (md5_hex($multicert_current) ne md5_hex($multicert_new)) {
-  print "remap.pl: updating ssl_multicert.config\n";
   open MC, ">/usr/local/etc/trafficserver/ssl_multicert.config";
   binmode MC;
   print MC $multicert_new;
