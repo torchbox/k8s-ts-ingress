@@ -1,0 +1,3 @@
+/remap.pl eol=lf
+/init.sh eol=lf
+/*.config
