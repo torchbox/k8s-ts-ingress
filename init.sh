@@ -26,7 +26,7 @@ chown -R nobody:nogroup /var/log/trafficserver /var/lib/trafficserver
 (
 	while true; do
 		sleep 30
-		/remap.pl
+		/remap.pl || true
 	done
 ) &
 
