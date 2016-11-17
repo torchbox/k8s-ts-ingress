@@ -9,6 +9,7 @@ use JSON qw/decode_json/;
 use Data::Dumper;
 use Digest::MD5 qw/md5_hex/;
 use MIME::Base64 qw/decode_base64/;
+use Sys::Hostname;
 
 my $ua = LWP::UserAgent->new();
 
@@ -57,8 +58,9 @@ if (!-d $ssldir) {
 
 if (!-f $default_ssl_cert or !-f $default_ssl_key) {
   print "remap.pl: generating ssl certificate\n";
+  my $hostname = hostname;
   system("openssl genrsa -out $default_ssl_key 2048");
-  system("printf 'GB\nOxfordshire\nCharlbury\nTorchbox Ltd.\n\n\$(hostname)\n\n\n\n' | openssl req -new -key $default_ssl_key -out $default_ssl_csr");
+  system("printf 'GB\nOxfordshire\nCharlbury\nTorchbox Ltd.\n\n$hostname\n\n\n\n' | openssl req -new -key $default_ssl_key -out $default_ssl_csr");
   system("openssl x509 -req -days 3650 -in $default_ssl_csr -signkey $default_ssl_key -out $default_ssl_cert");
 }
 
