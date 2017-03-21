@@ -1,3 +1,5 @@
+# vim:set sw=2 ts=2 et
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -6,15 +8,18 @@ metadata:
 spec:
   selector:
     app: trafficserver
+  type: NodePort
   ports:
   - name: http
     protocol: TCP
     port: 80
-    targetPort: 8080
+    nodePort: 30080
+    targetPort: http
   - name: https
     protocol: TCP
     port: 443
-    targetPort: 8443
+    nodePort: 30443
+    targetPort: https
 
 ---
 
@@ -26,34 +31,78 @@ metadata:
   labels:
     app: trafficserver
 spec:
-  replicas: 1
+  replicas: 2
+
   selector:
     matchLabels:
       app: trafficserver
-  strategy:                                                                                                                                                            
-    rollingUpdate:                                                                                                                                                     
-      maxSurge: 1                                                                                                                                                      
-      maxUnavailable: 1                                                                                                                                                
-    type: RollingUpdate                                                                                                                                                
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
   template:
     metadata:
       namespace: kube-system
       labels:
         app: trafficserver
+
     spec:
-      terminationGracePeriodSeconds: 60
-      containers:
-      - name: trafficserver
-        image: docker.io/torchbox/trafficserver-ingress-controller:latest
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 8080
-          hostPort: 80
-        - containerPort: 8443
-          hostPort: 443
-        volumeMounts:
-        - name: ts-storage
-          mountPath: /var/lib/trafficserver
+
       volumes:
       - name: ts-storage
         emptyDir: {}
+
+      containers:
+      - name: trafficserver
+
+        image: docker.io/torchbox/trafficserver-ingress-controller:latest
+        imagePullPolicy: Always
+
+        ports:
+        - name: http
+          protocol: TCP
+          containerPort: 8080
+        - name: https
+          protocol: TCP
+          containerPort: 8443
+
+        volumeMounts:
+        - name: ts-storage
+          mountPath: /var/lib/trafficserver
+
+        resources:
+          limits:
+            cpu: "1"
+            memory: 196Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+        livenessProbe:
+          httpGet:
+            path: /__trafficserver_alive
+            port: http
+            httpHeaders:
+            - name: Host
+              value: localhost
+          initialDelaySeconds: 3
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+          periodSeconds: 3
+
+        readinessProbe:
+          httpGet:
+            path: /__trafficserver_alive
+            port: http
+            httpHeaders:
+            - name: Host
+              value: localhost
+          initialDelaySeconds: 3
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+          periodSeconds: 3
