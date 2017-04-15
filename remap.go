@@ -114,6 +114,11 @@ func TSRemapDoRemap(instance unsafe.Pointer, txn C.TSHttpTxn, rri *C.TSRemapRequ
 	}
 
 	C.TSUrlPortSet(rri.requestBufp, rri.requestUrl, C.int(port))
+
+	cscheme := C.CString("http")
+	C.TSUrlSchemeSet(rri.requestBufp, rri.requestUrl, cscheme, C.int(4))
+	C.free(unsafe.Pointer(cscheme))
+
 	return C.TSREMAP_DID_REMAP
 }
 

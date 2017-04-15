@@ -1,4 +1,6 @@
 *.swp
-/kubernetes.so
-/kubernetes.h
+/kubernetes_ssl.so
+/kubernetes_remap.so
+/kubernetes_ssl.h
+/kubernetes_remap.h
 .kube
