@@ -6,7 +6,7 @@ RUN	set -ex									\
 			libjson-perl						\
 	&& rm -rf /var/cache/apt /var/lib/apt/lists/*
 
-COPY	init.sh remap.pl /
-COPY	records.config plugin.config healthchecks.config header_rewrite.config ip_allow.config /usr/local/etc/trafficserver/
+COPY	init.sh /
+COPY	remap.config records.config plugin.config healthchecks.config header_rewrite.config ip_allow.config /usr/local/etc/trafficserver/
 
 CMD	[ "/init.sh" ]

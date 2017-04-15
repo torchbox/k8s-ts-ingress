@@ -1,5 +1,4 @@
 *.swp
-/certs
-/remap.config
-/ssl_multicert.config
+/kubernetes.so
+/kubernetes.h
 .kube

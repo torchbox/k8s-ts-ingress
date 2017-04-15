@@ -19,19 +19,11 @@ cat >/usr/local/etc/trafficserver/storage.config <<__EOF__
 ${CACHEFILE} ${TS_CACHE_SIZE}M
 __EOF__
 
+echo "CONFIG proxy.config.proxy_name STRING $(hostname)" >>/usr/local/etc/trafficserver/records.config
+
 chown -R nobody:nogroup /var/log/trafficserver /var/lib/trafficserver
-
-/remap.pl
-
-(
-	while true; do
-		sleep 30
-		/remap.pl || true
-	done
-) &
 
 # We are running.
 touch /run/ts-alive
 
-#exec su --preserve-environment -s /bin/sh nobody -c "exec /usr/local/bin/traffic_cop -o --debug"
-exec /usr/local/bin/traffic_manager 
+exec /usr/local/bin/traffic_cop -o
