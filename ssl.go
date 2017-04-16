@@ -77,10 +77,12 @@ func ssl_ctx_from_secret(secret *v1.Secret) (*C.SSL_CTX, error) {
 
 	certificate := C.PEM_read_bio_X509_AUX(cert_bio, nil, nil, nil)
 	if certificate == nil {
+		C.SSL_CTX_free(ctx)
 		return nil, errors.New("PEM_read_bio_X509 failed")
 	}
 
 	if C.SSL_CTX_use_certificate(ctx, certificate) < 1 {
+		C.SSL_CTX_free(ctx)
 		return nil, errors.New("SSL_CTX_use_certificate failed")
 	}
 
@@ -91,6 +93,7 @@ func ssl_ctx_from_secret(secret *v1.Secret) (*C.SSL_CTX, error) {
 		}
 
 		if C.SSL_CTX_ctrl(ctx, C.SSL_CTRL_EXTRA_CHAIN_CERT, 0, unsafe.Pointer(chain)) < 1 {
+			C.SSL_CTX_free(ctx)
 			return nil, errors.New("SSL_CTX_add0_chain_cert failed")
 		}
 	}
@@ -101,13 +104,73 @@ func ssl_ctx_from_secret(secret *v1.Secret) (*C.SSL_CTX, error) {
 
 	private_key := C.PEM_read_bio_PrivateKey(key_bio, nil, nil, nil)
 	if private_key == nil {
+		C.SSL_CTX_free(ctx)
 		return nil, errors.New("PEM_read_bio_PrivateKey failed")
 	}
 
 	if C.SSL_CTX_use_PrivateKey(ctx, private_key) < 1 {
+		C.SSL_CTX_free(ctx)
 		return nil, errors.New("SSL_CTX_use_PrivateKey failed")
 	}
 
+	var cypher_list C.TSMgmtString
+	option_name := C.CString("proxy.config.ssl.server.cipher_suite")
+	ret := C.TSMgmtStringGet(option_name, &cypher_list)
+	C.free(unsafe.Pointer(option_name))
+
+	if ret != C.TS_SUCCESS {
+		return nil, errors.New("Could not fetch TS cypher list")
+	}
+
+	if C.SSL_CTX_set_cipher_list(ctx, (*C.char)(cypher_list)) != 1 {
+		return nil, errors.New("Could not set ctx cypher list")
+	}
+
+	ssl_options := C.SSL_CTX_ctrl(ctx, C.SSL_CTRL_OPTIONS, 0, nil)
+	var v C.TSMgmtInt
+
+	ssl_versions := map[string]C.long{
+		"TLSv1":	C.SSL_OP_NO_TLSv1,
+		"TLSv1_1":	C.SSL_OP_NO_TLSv1_1,
+		"TLSv1_2":	C.SSL_OP_NO_TLSv1_2,
+	}
+
+	for name, flag := range ssl_versions {
+		option_name := C.CString("proxy.config.ssl." + name)
+		ret = C.TSMgmtIntGet(option_name, &v)
+		C.free(unsafe.Pointer(option_name))
+
+		if ret != C.TS_SUCCESS {
+			return nil, errors.New("failed TSMgmtIntGet "+name)
+		}
+		if v != 0 {
+			ssl_options &= ^flag
+		} else {
+			ssl_options |= flag
+		}
+	}
+
+	option_name = C.CString("proxy.config.ssl.server.honor_cipher_order")
+	ret = C.TSMgmtIntGet(option_name, &v)
+	C.free(unsafe.Pointer(option_name))
+	if ret != C.TS_SUCCESS {
+		return nil, errors.New("failed TSMgmtIntGet server.honor_cipher_order")
+	}
+
+	if v != 0 {
+		ssl_options |= C.SSL_OP_CIPHER_SERVER_PREFERENCE
+	} else {
+		ssl_options &= ^C.SSL_OP_CIPHER_SERVER_PREFERENCE
+	}
+
+	ssl_options |= C.SSL_OP_SINGLE_DH_USE
+	ssl_options |= C.SSL_OP_SINGLE_ECDH_USE
+	ssl_options |= C.SSL_OP_NO_COMPRESSION
+	ssl_options |= C.SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION
+	ssl_options |= C.SSL_OP_ALL
+
+	C.SSL_CTX_ctrl(ctx, C.SSL_CTRL_CLEAR_OPTIONS, ^ssl_options, nil)
+	C.SSL_CTX_ctrl(ctx, C.SSL_CTRL_OPTIONS, ssl_options, nil)
 	return ctx, nil
 }
 
