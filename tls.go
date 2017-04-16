@@ -1,9 +1,24 @@
 /* vim:set sw=8 ts=8 noet: */
+/*
+ * Copyright (c) 2016-2017 Torchbox Ltd.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 package main
 
 import (
-	"log"
+	"fmt"
 	"strings"
 	"time"
 	"sync"
@@ -32,6 +47,15 @@ extern int k8s_sni_callback(TSCont, TSEvent, void*);
 extern void TSPluginInit_impl(int, char **);
 extern int k8s_sni_callback_wrapper(TSCont contn, TSEvent evt, void *edata);
 
+static inline void
+ts_error_wrapper(const char *s) {
+	TSError("[kubernetes_tls] %s", s);
+}
+
+static inline void
+ts_debug_wrapper(const char *s) {
+	TSDebug("kubernetes_tls", "%s", s);
+}
 */
 import "C"
 
@@ -57,6 +81,22 @@ type Controller struct {
 }
 
 var cllr *Controller
+
+func ts_error(s string, args ...interface{}) {
+	str := fmt.Sprintf(s, args...)
+	cstr := C.CString(str)
+	defer C.free(unsafe.Pointer(cstr))
+
+	C.ts_error_wrapper(cstr)
+}
+
+func ts_debug(s string, args ...interface{}) {
+	str := fmt.Sprintf(s, args...)
+	cstr := C.CString(str)
+	defer C.free(unsafe.Pointer(cstr))
+
+	C.ts_debug_wrapper(cstr)
+}
 
 func ssl_ctx_from_secret(secret *v1.Secret) (*C.SSL_CTX, error) {
 	cert, ok := secret.Data["tls.crt"]
@@ -189,8 +229,8 @@ func (cllr *Controller) rebuild() {
 
 				ctx, err := ssl_ctx_from_secret(secret)
 				if err != nil {
-					log.Printf("ingress %s/%s: ssl ctx failed: %s",
-						   ingress.Namespace, ingress.Name, err)
+					ts_error("ingress %s/%s: SSL_CTX failed: %s",
+						 ingress.Namespace, ingress.Name, err)
 					continue
 				}
 
@@ -304,7 +344,7 @@ func (cllr *Controller) Run() {
 
 		case <-time.After(time.Second * 1):
 			if cllr.changed {
-				log.Printf("[kubernetes] rebuilding SSL host map\n")
+				ts_debug("rebuilding SSL host map")
 				cllr.rebuild()
 				cllr.changed = false
 			}
@@ -319,18 +359,18 @@ func k8s_sni_callback (contn C.TSCont, evt C.TSEvent, edata unsafe.Pointer) C.in
 	c_servername := C.SSL_get_servername((*C.SSL) (ssl), C.TLSEXT_NAMETYPE_host_name)
 	servername := C.GoString(c_servername)
 
-	log.Printf("doing SNI map for [%s]\n", servername)
+	ts_debug("doing SNI map for [%s]", servername)
 
 	cllr.map_lock.RLock()
 	defer cllr.map_lock.RUnlock()
 
 	ctx, ok := cllr.active_map[servername]
 	if !ok {
-		log.Printf("[kubernetes_ssl] for host %s, no ctx\n", servername)
+		ts_debug("for host %s, no ctx", servername)
 		return C.int(0)
 	}
 
-	log.Printf("set own ctx\n")
+	ts_debug("set own ctx")
 	C.SSL_set_SSL_CTX((*C.SSL)(ssl), ctx)
 	C.TSVConnReenable(ssl_vc)
 	return C.TS_SUCCESS
@@ -346,13 +386,13 @@ func TSPluginInit_impl(argc C.int, argv **C.char) {
 	info.support_email = C.CString("sysadmin@torchbox.com")
 
 	if C.TSPluginRegister(&info) != C.TS_SUCCESS {
-		log.Printf("[kubernetes_ssl] Plugin registration failed.\n")
+		ts_error("Plugin registration failed.")
 		return
 	}
 
 	cb_sni := C.TSContCreate((*[0]byte)(C.k8s_sni_callback_wrapper), C.TSMutexCreate())
 	if cb_sni == nil {
-		log.Printf("[kubernetes_ssl] Failed to create continuation\n")
+		ts_error("Failed to create continuation")
 		return
 	}
 
@@ -367,14 +407,14 @@ func TSPluginInit_impl(argc C.int, argv **C.char) {
 		switch bits[0] {
 		case "--kubeconfig":
 			if len(bits) < 2 {
-				log.Printf("[kubernetes] --kubeconfig requires an argument\n")
+				ts_error("--kubeconfig requires an argument")
 				return
 			}
 
 			kubeconfig = bits[1]
 
 		default:
-			log.Printf("[kubernetes] unknown argument %s\n", bits[0])
+			ts_error("unknown argument %s", bits[0])
 			return
 		}
 	}
@@ -382,7 +422,7 @@ func TSPluginInit_impl(argc C.int, argv **C.char) {
 	var err error
 	cllr, err = makeController(kubeconfig)
 	if err != nil {
-		log.Printf("[kubernetes] failed to create controller: %s", err)
+		ts_error("failed to create controller: %s", err)
 		return
 	}
 

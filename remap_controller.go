@@ -1,9 +1,23 @@
 /* vim:set sw=8 ts=8 noet: */
+/*
+ * Copyright (c) 2016-2017 Torchbox Ltd.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 package main
 
 import (
-	"log"
 	"fmt"
 	"strings"
 	"errors"
@@ -67,13 +81,13 @@ func (cllr *Controller) getDestinations(
 
 	endpoints, ok := namespace.endpoints[serviceName]
 	if !ok {
-		log.Printf("didn't find endpoint called [%s]\n", serviceName)
+		ts_debug("didn't find endpoint called [%s]", serviceName)
 		return destinations
 	}
 
 	service, ok := namespace.services[serviceName]
 	if !ok {
-		log.Printf("didn't find service called [%s]\n", serviceName)
+		ts_debug("didn't find service called [%s]", serviceName)
 		return destinations
 	}
 
@@ -99,13 +113,13 @@ func (cllr *Controller) getDestinations(
 			}
 		}
 
-		log.Printf("for [%s], targetPort is [%d]\n", serviceName, targetPort)
+		ts_debug("for [%s], targetPort is [%d]", serviceName, targetPort)
 		if targetPort == 0 {
 			continue
 		}
 
 		for _, addr := range subset.Addresses {
-			log.Printf("found a destination address [%s]\n", addr.IP)
+			ts_debug("found a destination address [%s]", addr.IP)
 			destinations = append(destinations,
 				fmt.Sprintf("%s:%d", addr.IP, targetPort))
 		}
@@ -122,7 +136,8 @@ func (cllr *Controller) rebuild() {
 	for nsname, namespace := range cllr.namespaces {
 		for _, ingress := range namespace.ingresses {
 			for _, rule := range ingress.Spec.Rules {
-				log.Printf("processing rule for host <%+v> for ingress <%s/%s>", rule, nsname, ingress.Name)
+				ts_debug("processing rule for host <%+v> for ingress <%s/%s>",
+					 rule, nsname, ingress.Name)
 
 				hostroute := rm.hosts[rule.Host]
 				if hostroute == nil {
@@ -263,7 +278,7 @@ func (cllr *Controller) Run() {
 
 		case <-time.After(time.Second * 1):
 			if cllr.changed {
-				log.Printf("[kubernetes] rebuilding route map\n")
+				ts_debug("rebuilding route map")
 				cllr.rebuild()
 				cllr.changed = false
 			}

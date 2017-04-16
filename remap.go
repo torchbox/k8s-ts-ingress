@@ -1,10 +1,25 @@
 /* vim:set sw=8 ts=8 noet: */
+/*
+ * Copyright (c) 2016-2017 Torchbox Ltd.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 package main
 
 import (
 	"os"
-	"log"
+	"fmt"
 	"strings"
 	"strconv"
 	"unsafe"
@@ -17,8 +32,34 @@ import (
 #include <ts/ts.h>
 #include <ts/apidefs.h>
 #include <ts/remap.h>
+
+static inline void
+ts_error_wrapper(const char *s) {
+	TSError("[kubernetes_remap] %s", s);
+}
+
+static inline void
+ts_debug_wrapper(const char *s) {
+	TSDebug("kubernetes_remap", "%s", s);
+}
 */
 import "C"
+
+func ts_error(s string, args ...interface{}) {
+	str := fmt.Sprintf(s, args...)
+	cstr := C.CString(str)
+	defer C.free(unsafe.Pointer(cstr))
+
+	C.ts_error_wrapper(cstr)
+}
+
+func ts_debug(s string, args ...interface{}) {
+	str := fmt.Sprintf(s, args...)
+	cstr := C.CString(str)
+	defer C.free(unsafe.Pointer(cstr))
+
+	C.ts_debug_wrapper(cstr)
+}
 
 //export TSRemapInit
 func TSRemapInit(api *C.TSRemapInterface, errbuf *C.char, bufsz C.int) C.TSReturnCode {
@@ -41,21 +82,21 @@ func TSRemapNewInstance(argc C.int, argv **C.char, instance *unsafe.Pointer,
 		switch bits[0] {
 		case "--kubeconfig":
 			if len(bits) < 2 {
-				log.Printf("[kubernetes] --kubeconfig requires an argument\n")
+				ts_error("--kubeconfig requires an argument")
 				return C.TS_ERROR
 			}
 
 			kubeconfig = bits[1]
 
 		default:
-			log.Printf("[kubernetes] unknown argument %s\n", bits[0])
+			ts_error("unknown argument %s", bits[0])
 			return C.TS_ERROR
 		}
 	}
 
 	controller, err := makeController(kubeconfig)
 	if err != nil {
-		log.Printf("[kubernetes] failed to create controller: %s", err)
+		ts_error("failed to create controller: %s", err)
 		return C.TS_ERROR
 	}
 
@@ -72,7 +113,7 @@ func TSRemapDeleteInstance(instance unsafe.Pointer) {
 	 * So when trafficserver tries to reload or shutdown, we just exit.
 	 * traffic_manager will restart us if necessary.
 	 */
-	log.Printf("[kubernetes] This plugin cannot be unloaded -- will exit now")
+	ts_error("This plugin cannot be unloaded -- will exit now")
 	os.Exit(0)
 }
 
@@ -86,21 +127,20 @@ func TSRemapDoRemap(instance unsafe.Pointer, txn C.TSHttpTxn, rri *C.TSRemapRequ
 	curl = C.TSHttpTxnEffectiveUrlStringGet(txn, &curllen);
 	surl := C.GoStringN(curl, curllen)
 
-	log.Printf("[kubernetes] remapping URL <%s>\n", surl)
+	ts_debug("remapping URL <%s>", surl)
 	url, err := url.Parse(surl)
 	if err != nil {
-		log.Printf("[kubernetes] cannot parse URL: <%s>\n", surl)
+		ts_debug("cannot parse URL: <%s>", surl)
 		return C.TSREMAP_NO_REMAP
 	}
 
 	host, err := cllr.remap(url)
 	if err != nil {
-		log.Printf("[kubernetes] remap for <%s> failed: %s",
-			   surl, err)
+		ts_debug("remap for <%s> failed: %s", surl, err)
 		return C.TSREMAP_NO_REMAP
 	}
 
-	log.Printf("[kubernetes] remapped <%s> to <%s>\n", surl, host)
+	ts_debug("remapped <%s> to <%s>", surl, host)
 	hostbits := strings.Split(host, ":")
 	cremap := C.CString(hostbits[0])
 	C.TSUrlHostSet(rri.requestBufp, rri.requestUrl, cremap, C.int(len(hostbits[0])))
@@ -108,8 +148,7 @@ func TSRemapDoRemap(instance unsafe.Pointer, txn C.TSHttpTxn, rri *C.TSRemapRequ
 
 	port, err := strconv.Atoi(hostbits[1])
 	if err != nil {
-		log.Printf("[kubernetes] invalid port in destination? <%s>\n",
-			   hostbits[1])
+		ts_error("invalid port in destination? <%s>", hostbits[1])
 		return C.TSREMAP_NO_REMAP
 	}
 
