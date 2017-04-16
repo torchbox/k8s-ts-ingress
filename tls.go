@@ -203,6 +203,7 @@ func ssl_ctx_from_secret(secret *v1.Secret) (*C.SSL_CTX, error) {
 		ssl_options &= ^C.SSL_OP_CIPHER_SERVER_PREFERENCE
 	}
 
+	ssl_options |= C.SSL_OP_NO_SSLv3
 	ssl_options |= C.SSL_OP_SINGLE_DH_USE
 	ssl_options |= C.SSL_OP_SINGLE_ECDH_USE
 	ssl_options |= C.SSL_OP_NO_COMPRESSION

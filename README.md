@@ -74,6 +74,13 @@ arguments; the plugin will use the pod's service account instead.
 TLS
 ---
 
+TLS keys and certificates are taken from Kubernetes Secret resources according
+to the Ingress controller specification.  TLS Server Name Indication support is
+required; clients without SNI support will not work.  This is not considered
+a deficiency, since all current TLS clients support SNI.
+
+SSLv3 (and earlier) is not supported.
+
 TLS support currently has several limitations:
 
 * Specifying custom Diffie-Hellman parameters (dhparams) is not supported.
@@ -84,12 +91,19 @@ TLS support currently has several limitations:
 * TLS client certification authentication is not supported.
 * HTTP Strict Transport Security is not supported (although applications which
   send their own HSTS headers will work fine).
+* TLS connections to origin servers (pods) is not supported.
 * The following Traffic Server TLS configuration options are supported; all
   other TLS configuration is ignored.
     * `proxy.config.ssl.TLSv1`
     * `proxy.config.ssl.TLSv1_1`
     * `proxy.config.ssl.TLSv1_2`
     * `proxy.config.ssl.server.honor_cipher_order`
+    * `proxy.config.ssl.server.cipher_suite`
+
+If you don't want to use Kubernetes for TLS, you can configure your own TLS
+certificates in `ssl_multicert.config` or though some other mechanism (e.g.
+the `ssl-cert-loader` plugin).  In that case, TLS works exactly as it would
+if Kubernetes was not involved.
 
 Debugging
 ---------
