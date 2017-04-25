@@ -101,7 +101,7 @@ size_t		 i, j;
 		endpoints_address_t *addr = &es->es_addrs[j];
 		char		     buf[512];
 
-			TSDebug("kubernetes_remap", "        add host %s:%d",
+			TSDebug("kubernetes", "        add host %s:%d",
 				addr->ea_ip, epp->et_port);
 
 			snprintf(buf, sizeof(buf), "%s:%d",
@@ -130,7 +130,7 @@ size_t			 i;
 		if (svc == NULL)
 			continue;
 
-		TSDebug("kubernetes_remap", "      path <%s> -> service <%s/%s>",
+		TSDebug("kubernetes", "      path <%s> -> service <%s/%s>",
 			path->ip_path, svc->sv_namespace, svc->sv_name);
 
 		if (path->ip_path) {
@@ -150,7 +150,7 @@ size_t			 i;
 				continue;
 			}
 
-			rh->rh_paths = realloc(rh->rh_paths, 
+			rh->rh_paths = realloc(rh->rh_paths,
 				       sizeof(struct remap_path)
 				         * (rh->rh_npaths + 1));
 			rp = &rh->rh_paths[rh->rh_npaths];
@@ -245,7 +245,6 @@ size_t			 i;
 
 		rebuild_make_host(ctx, rh, &ing->in_rules[i]);
 	}
-	
 }
 
 static void
@@ -254,7 +253,7 @@ rebuild_namespace(hash_t hs, const char *nsname, void *value, void *data)
 struct rebuild_ctx	*ctx = data;
 namespace_t		*ns = value;
 
-	TSDebug("kubernetes_remap", "namespace %s:", nsname);
+	TSDebug("kubernetes", "namespace %s:", nsname);
 	ctx->ns = ns;
 	hash_foreach(ns->ns_ingresses, rebuild_ingress, ctx);
 }
@@ -350,7 +349,7 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 
 	/* fetch the remap_host for this host */
 	if ((rh = hash_get(state->map, hbuf)) == NULL) {
-		TSDebug("kubernetes_remap", "host <%s> map not found", hbuf);
+		TSDebug("kubernetes", "host <%s> map not found", hbuf);
 		goto cleanup;
 	}
 
@@ -366,7 +365,7 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 
 	/* find the route_path that matches this path */
 	if ((rp = find_path(rh, pbuf)) == NULL) {
-		TSDebug("kubernetes_remap", "host <%s>, path <%s> not found",
+		TSDebug("kubernetes", "host <%s>, path <%s> not found",
 			hbuf, pbuf);
 		goto cleanup;
 	}
@@ -379,26 +378,21 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 	hostn = rand() / (RAND_MAX / rp->rp_naddrs + 1);
 
 	pod_host = strdup(rp->rp_addrs[hostn]);
-	TSDebug("kubernetes_remap", "remapped to %s", pod_host);
+	TSDebug("kubernetes", "remapped to %s", pod_host);
 
-	if (host_hdr) {
-		TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
-					     pod_host, strlen(pod_host));
-	} else {
-		if ((s = strchr(pod_host, ':')) != NULL) {
-			*s++ = 0;
-			pod_port = atoi(s);
-		} else goto cleanup;
+	if ((s = strchr(pod_host, ':')) != NULL) {
+		*s++ = 0;
+		pod_port = atoi(s);
+	} else goto cleanup;
 
-		if (TSUrlHostSet(reqp, url_loc, pod_host, strlen(pod_host)) != TS_SUCCESS) {
-			TSError("[kubernetes] <%s>: could not set request host", requrl);
-			goto cleanup;
-		}
+	if (TSUrlHostSet(reqp, url_loc, pod_host, strlen(pod_host)) != TS_SUCCESS) {
+		TSError("[kubernetes] <%s>: could not set request host", requrl);
+		goto cleanup;
+	}
 
-		if (TSUrlPortSet(reqp, url_loc, pod_port) != TS_SUCCESS) {
-			TSError("[kubernetes] <%s>: could not set request port", requrl);
-			goto cleanup;
-		}
+	if (TSUrlPortSet(reqp, url_loc, pod_port) != TS_SUCCESS) {
+		TSError("[kubernetes] <%s>: could not set request port", requrl);
+		goto cleanup;
 	}
 
 	if (TSUrlSchemeSet(reqp, url_loc, "http", 4) != TS_SUCCESS) {
@@ -406,16 +400,17 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 		goto cleanup;
 	}
 
+
 cleanup:
+	TSMutexUnlock(state->map_lock);
 	if (url_loc)
 		TSHandleMLocRelease(reqp, hdr_loc, url_loc);
 	if (hdr_loc)
 		TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdr_loc);
-	TSMutexUnlock(state->map_lock);
 	free(pod_host);
 	free(pbuf);
 	free(hbuf);
-	TSSkipRemappingSet(txnp, 1);
 	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
+	TSSkipRemappingSet(txnp, 1);
 	return TS_SUCCESS;
 }

@@ -63,3 +63,9 @@ depend:
 	echo '# ADDED BY MAKE DEPEND -- DO NOT DELETE' >> Makefile.tmp
 	cc -MM *.c >> Makefile.tmp
 	mv Makefile.tmp Makefile
+
+hashtest:
+	${CC} -DTEST hash.c -o hashtest
+	./hashtest
+
+.PHONY: hashtest

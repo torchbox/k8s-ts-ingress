@@ -123,6 +123,42 @@ size_t	i;
 	}
 }
 
+int
+hash_iterate(hash_t hs, struct hash_iter_state *state,
+	     const char **key, void **value)
+{
+struct hashbucket	*b = state->p;
+
+	assert(hs);
+
+	if (state->i >= hs->hs_size)
+		return 0;
+
+	if (b) {
+		if (b->hb_next) {
+			state->p = b = b->hb_next;
+			*key = b->hb_key;
+			*value = b->hb_value;
+			return 1;
+		}
+
+		state->i++;
+		state->p = NULL;
+	}
+
+	for (; state->i < hs->hs_size; state->i++) {
+		if (!hs->hs_buckets[state->i])
+			continue;
+
+		state->p = b = hs->hs_buckets[state->i];
+		*key = b->hb_key;
+		*value = b->hb_value;
+		return 1;
+	}
+
+	return 0;
+}
+
 void *
 hash_find(hash_t hs, hash_find_fn fn, void *data)
 {
@@ -226,7 +262,7 @@ struct hashbucket	*hb, *prev = NULL;
 void
 foreach_print(hash_t hs, const char *key, void *value, void *data)
 {
-	printf("[%s]=[%s]\n", key, value);
+	printf("[%s]=[%s]\n", key, (const char *)value);
 }
 
 int
@@ -234,6 +270,10 @@ main(int argc, char **argv)
 {
 	{
 	hash_t	hs;
+	struct hash_iter_state iterstate;
+	const char *k;
+	char *v;
+
 		hs = hash_new(1, NULL);
 
 		hash_set(hs, "foo", "key foo");
@@ -251,6 +291,15 @@ main(int argc, char **argv)
 		assert(hash_get(hs, "bar") == NULL);
 		assert(strcmp(hash_get(hs, "quux"), "quux key") == 0);
 		hash_foreach(hs, foreach_print, NULL);
+
+		bzero(&iterstate, sizeof(iterstate));
+		assert(hash_iterate(hs, &iterstate, &k, (void **)&v) == 1);
+		assert(strcmp(k, "quux") == 0);
+		assert(strcmp(v, "quux key") == 0);
+		assert(hash_iterate(hs, &iterstate, &k, (void **)&v) == 1);
+		assert(strcmp(k, "foo") == 0);
+		assert(strcmp(v, "key foo") == 0);
+		assert(hash_iterate(hs, &iterstate, &k, (void **)&v) == 0);
 	}
 
 	{

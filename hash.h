@@ -74,4 +74,21 @@ void	 hash_foreach(hash_t, hash_foreach_fn, void *data);
 typedef int (*hash_find_fn) (hash_t, const char *key, void *value, void *data);
 void	*hash_find(hash_t, hash_find_fn, void *data);
 
+/*
+ * Iterate through each element of the hash; iteration context is stored in
+ * iterstate, which the caller must allocate and zero prior to calling hash_iter.
+ *
+ * hash_iter is not re-entrant, and the hash must not be modified while iterating.
+ *
+ * Returns 1 for each object; 0 indicates the end was reached and no object was
+ * returned.
+ */
+struct hash_iter_state {
+	size_t i;
+	void *p;
+};
+
+int	hash_iterate(hash_t, struct hash_iter_state *iterstate,
+		     const char **key, void **value);
+
 #endif  /* !HASH_H */

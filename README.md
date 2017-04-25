@@ -36,16 +36,16 @@ $ make
 Configuration
 -------------
 
-Copy the plugin (`kubernetes.so`) to the Traffic Server plugin directory (e.g.
-`/usr/local/trafficserver/libexec/trafficserver`), or run `make install` which
-will do this for you.
+Run `make install` to install the plugin, or copy the `kubernetes.so` to the
+Traffic Server plugin directory (e.g.
+`/usr/local/trafficserver/libexec/trafficserver`).  Edit `plugin.config` to
+load the plugin.
 
-If Traffic Server is not running inside the cluster, copy `kubernetes.config.example`
-to the Traffic Server configuration directory as `kubernetes.config` and edit it
-for your site.  If TS is running in-cluster, then it will pick up its service
-account details automatically, and a configuration file is not required.
+If Traffic Server is running inside the cluster, no configuration is required;
+it will pick up its service account details automatically.
 
-Edit `plugin.config` and add `kubernetes.so` to load the plugin.
+Otherwise, copy `kubernetes.config.example` to the Traffic Server configuration
+directory as `kubernetes.config` and edit it for your site. 
 
 TLS
 ---
