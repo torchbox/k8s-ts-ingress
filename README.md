@@ -21,7 +21,6 @@ Building
 
 Requirements:
 
-* Apache Traffic Server (tested with 7.0).
 * A working C compiler and `make` utility.
 * json-c library
 * OpenSSL (or a compatible TLS library, e.g. LibreSSL)
@@ -37,47 +36,16 @@ $ make
 Configuration
 -------------
 
-The plugin comes in two parts:
-
-* `kubernetes_remap.so` handles remapping incoming requests to the Kubernetes
-  pods based on Ingress rules.
-* `kubernetes_tls.so` handles certificates for incoming TLS connections based
-  on Kubernetes secrets referenced from Ingress rules.
-
-You need both parts to have a fully functional Ingress controller, although you
-can omit `kubernetes_tls.so` if you don't want to use Ingress for TLS, or you're
-doing TLS offloading somewhere else.
-
-Copy both plugins to the Traffic Server plugin directory (e.g.
+Copy the plugin (`kubernetes.so`) to the Traffic Server plugin directory (e.g.
 `/usr/local/trafficserver/libexec/trafficserver`), or run `make install` which
 will do this for you.
 
 If Traffic Server is not running inside the cluster, copy `kubernetes.config.example`
-to `<TS config directory>/kubernetes.config` and edit it for your site.  If
-TS is running in-cluster, then it will pick up its service account details
-automatically, and a configuration file is not required.
+to the Traffic Server configuration directory as `kubernetes.config` and edit it
+for your site.  If TS is running in-cluster, then it will pick up its service
+account details automatically, and a configuration file is not required.
 
-Configure the remap plugin in `remap.config`:
-
-```
-map / http://localhost @plugin=kubernetes_remap.so
-```
-
-The remap source URL can be set to whatever you want; using `/` causes the plugin
-to handle all URLs, but you could also restrict it to a particular domain:
-
-```
-regex_map http://[a-z0-9-]*\.kube\.mydomain\.com http://localhost @plugin=kubernetes_remap.so
-```
-
-The remap destination doesn't matter; any request handled by `kubernetes_remap.so`
-which doesn't remap to an ingress resource will be served a 404 error.
-
-For TLS support, configure `kubernetes_tls.so` in `plugin.config`:
-
-```
-kubernetes_tls.so
-```
+Edit `plugin.config` and add `kubernetes.so` to load the plugin.
 
 TLS
 ---
@@ -116,8 +84,8 @@ if Kubernetes was not involved.
 Debugging
 ---------
 
-To debug problems with the plugins, enable the debug tags `kubernetes_tls` or
-`kubernetes_remap`.
+To debug problems with the plugin, enable the debug tags `kubernetes` (for the
+plugin itself) or `watcher` (for the Kubernetes API code).
 
 Docker configuration
 --------------------

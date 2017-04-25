@@ -52,28 +52,28 @@ json_object_iter	 iter;
 		return NULL;
 
 	if (!json_object_object_get_ex(obj, "metadata", &metadata)
-	    || !json_object_is_type(tmp, json_type_object)) {
-		TSError("[kubernetes_api] Service has no metadata?");
+	    || !json_object_is_type(metadata, json_type_object)) {
+		TSError("[kubernetes] Service has no metadata?");
 		goto error;
 	}
 
 	if (!json_object_object_get_ex(metadata, "namespace", &tmp)
 	    || !json_object_is_type(tmp, json_type_string)) {
-		TSError("[kubernetes_api] Service has no namespace?");
+		TSError("[kubernetes] Service has no namespace?");
 		goto error;
 	}
 	svc->sv_namespace = strdup(json_object_get_string(tmp));
 
 	if (!json_object_object_get_ex(metadata, "name", &tmp)
 	    || !json_object_is_type(tmp, json_type_string)) {
-		TSError("[kubernetes_api] Service has no name?");
+		TSError("[kubernetes] Service has no name?");
 		goto error;
 	}
 	svc->sv_name = strdup(json_object_get_string(tmp));
 
 	if (!json_object_object_get_ex(obj, "spec", &spec)
 	    || !json_object_is_type(spec, json_type_object)) {
-		TSError("[kubernetes_api] %s/%s: Service has no spec",
+		TSError("[kubernetes] %s/%s: Service has no spec",
 			svc->sv_namespace, svc->sv_name);
 		return svc;
 	}

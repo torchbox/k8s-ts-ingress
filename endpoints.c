@@ -57,7 +57,7 @@ size_t			 i, j;
 
 	/* Endpoints.metadata */
 	if (!json_object_object_get_ex(obj, "metadata", &metadata)
-	    || !json_object_is_type(tmp, json_type_object))
+	    || !json_object_is_type(metadata, json_type_object))
 		goto error;
 
 	/* Endpoints.metadata.namespace */

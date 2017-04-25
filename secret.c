@@ -44,8 +44,9 @@ json_object_iter iter;
 	secret->se_data = hash_new(127, free);
 
 	if (!json_object_object_get_ex(obj, "metadata", &metadata)
-	    || !json_object_is_type(tmp, json_type_object)) {
-		TSDebug("kubernetes_api", "secret_make: no metadata!");
+	    || !json_object_is_type(metadata, json_type_object)) {
+		TSDebug("kubernetes_api", "secret_make: no metadata! (obj: [%s]",
+			json_object_get_string(obj));
 		goto error;
 	}
 
