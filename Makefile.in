@@ -1,0 +1,80 @@
+# vim:set sw=8 ts=8 noet:
+#
+# Copyright (c) 2016-2017 Torchbox Ltd.
+#
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+TS_INCDIR?=	@TS_INCDIR@
+TS_PLUGINDIR?=	@TS_PLUGINDIR@
+
+CC?=		@CC@
+CPPFLAGS?=	@CPPFLAGS@ -I${TS_INCDIR}
+CFLAGS?=	@CFLAGS@ @TS_CFLAGS@ @JSON_CFLAGS@
+LIBS?=		@LIBS@ @LDFLAGS@ @JSON_LIBS@
+
+HASH_OBJS=	hash.o
+API_OBJS=	config.o	\
+		cluster.o	\
+		ingress.o	\
+		secret.o	\
+		service.o	\
+		endpoints.o	\
+		namespace.o	\
+		watcher.o	\
+		${HASH_OBJS}
+
+TLS_OBJS=	tls.o ${API_OBJS}
+REMAP_OBJS=	remap.o ${API_OBJS}
+
+all: kubernetes_tls.so kubernetes_remap.so
+
+kubernetes_tls.so: ${TLS_OBJS}
+	${CC} ${CFLAGS} ${LDFLAGS} -shared -o $@ ${TLS_OBJS} ${LIBS}
+
+kubernetes_remap.so: ${REMAP_OBJS}
+	${CC} ${CFLAGS} ${LDFLAGS} -shared -o $@ ${REMAP_OBJS} ${LIBS}
+
+install: all
+	install -d -m 0755 ${TS_PLUGINDIR}
+	install -c -m 0755 kubernetes_tls.so ${TS_PLUGINDIR}
+	install -c -m 0755 kubernetes_remap.so ${TS_PLUGINDIR}
+
+.c.o:
+	${CC} ${CPPFLAGS} ${CFLAGS} -c $<
+
+clean:
+	rm -f kubernetes_tls.so ${TLS_OBJS} ${API_OBJS} ${HASH_OBJS} 
+
+build:
+	#docker build --pull -t torchbox/trafficserver-ingress-controller:latest .
+
+push:
+	docker push torchbox/trafficserver-ingress-controller:latest
+
+depend:
+	sed -e '/^# ADDED BY MAKE DEPEND -- DO NOT DELETE/,$$ d' < Makefile > Makefile.tmp
+	echo '# ADDED BY MAKE DEPEND -- DO NOT DELETE' >> Makefile.tmp
+	cc -MM *.c >> Makefile.tmp
+	mv Makefile.tmp Makefile
+
+# ADDED BY MAKE DEPEND -- DO NOT DELETE
+cluster.o: cluster.c api.h hash.h
+endpoints.o: endpoints.c api.h hash.h
+hash.o: hash.c hash.h
+ingress.o: ingress.c api.h hash.h
+namespace.o: namespace.c api.h hash.h
+remap.o: remap.c watcher.h api.h hash.h
+secret.o: secret.c api.h hash.h
+service.o: service.c api.h hash.h
+tls.o: tls.c hash.h api.h watcher.h tls.h
+watcher.o: watcher.c watcher.h

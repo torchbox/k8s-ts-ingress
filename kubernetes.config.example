@@ -1,0 +1,17 @@
+# Example configuration file for TS Kubernetes plugins.
+
+# Set the hostname and port of the API server to connect to.  Only TLS (https)
+# connections are supported.
+server: apiserver.mycluster.com:8443
+
+# Optional (but recommended): configure the certificate authority to verify the
+# API server connection.
+cafile: /mnt/c/Users/ft/.kube/kube-prod.ca
+
+# Optional: configure the TLS certificate and key to authenticate to the
+# API server.
+certfile: /mnt/c/Users/ft/.kube/kube-prod.crt
+keyfile: /mnt/c/Users/ft/.kube/kube-prod.key
+
+# Optional: configure the bearer token to authenticate to the API server.
+#token: ABCD1234
