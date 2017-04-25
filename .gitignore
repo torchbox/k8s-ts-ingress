@@ -1,6 +1,13 @@
 *.swp
 /kubernetes_tls.so
 /kubernetes_remap.so
-/kubernetes_tls.h
-/kubernetes_remap.h
 .kube
+*.o
+*.so
+/aclocal.m4
+/Makefile
+/autom4te.cache
+/autoconf.h
+/config.log
+/config.status
+/kubernetes.config

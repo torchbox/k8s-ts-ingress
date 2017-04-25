@@ -14,23 +14,28 @@ which generated TS `remap.config` configuration using an external script.
 
 The plugin is only supported with Traffic Server 7.0.  It may work with 6.x
 versions, but has not been tested.  It definitely won't work with 5.x or older
-versions, as the plugin API has changed.
+versions without modifications, as the plugin API has changed.
 
 Building
 --------
 
-Building the plugin isn't necessary if you use the pre-built Docker image.
+Requirements:
 
-Build the plugin:
+* Apache Traffic Server (tested with 7.0).
+* A working C compiler and `make` utility.
+* json-c library
+* OpenSSL (or a compatible TLS library, e.g. LibreSSL)
+
+Build and install the plugin:
 
 ```
+$ ./configure [--with-tsxs=/path/to/trafficserver/bin/tsxs]
 $ make
+# make install
 ```
 
-Installation
-------------
-
-Installing the plugin isn't necessary if you use the pre-built Docker image.
+Configuration
+-------------
 
 The plugin comes in two parts:
 
@@ -44,12 +49,18 @@ can omit `kubernetes_tls.so` if you don't want to use Ingress for TLS, or you're
 doing TLS offloading somewhere else.
 
 Copy both plugins to the Traffic Server plugin directory (e.g.
-`/usr/local/trafficserver/libexec/trafficserver`).
+`/usr/local/trafficserver/libexec/trafficserver`), or run `make install` which
+will do this for you.
 
-For ingress routing, configure `kubernetes_remap.so` as a remap plugin:
+If Traffic Server is not running inside the cluster, copy `kubernetes.config.example`
+to `<TS config directory>/kubernetes.config` and edit it for your site.  If
+TS is running in-cluster, then it will pick up its service account details
+automatically, and a configuration file is not required.
+
+Configure the remap plugin in `remap.config`:
 
 ```
-map / http://localhost @plugin=kubernetes_remap.so @pparam=--kubeconfig=/path/to/my/kubeconfig
+map / http://localhost @plugin=kubernetes_remap.so
 ```
 
 The remap source URL can be set to whatever you want; using `/` causes the plugin
@@ -65,11 +76,8 @@ which doesn't remap to an ingress resource will be served a 404 error.
 For TLS support, configure `kubernetes_tls.so` in `plugin.config`:
 
 ```
-kubernetes_tls.so --kubeconfig=/path/to/my/kubeconfig
+kubernetes_tls.so
 ```
-
-If Traffic Server is running in-cluster, you can omit the `--kubeconfig`
-arguments; the plugin will use the pod's service account instead.
 
 TLS
 ---
@@ -111,8 +119,8 @@ Debugging
 To debug problems with the plugins, enable the debug tags `kubernetes_tls` or
 `kubernetes_remap`.
 
-Configuration
--------------
+Docker configuration
+--------------------
 
 If you're using the pre-built Docker image, you can set the following environment
 variables to configure Traffic Server:
@@ -124,9 +132,9 @@ overridden in the environment:
 
 https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides
 
-For persistent cache storage, mount a volume on /var/lib/trafficserver.
-This can be a persistent volume or an emptyDir; any missig necessary files will
-be created at startup.
+For persistent cache storage, mount a volume on `/var/lib/trafficserver`.
+This can be a persistent volume or an emptyDir; any missing necessary files,
+including the cache store, will be created at startup.
 
 Support
 -------

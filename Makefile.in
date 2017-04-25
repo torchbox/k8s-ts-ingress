@@ -66,15 +66,3 @@ depend:
 	echo '# ADDED BY MAKE DEPEND -- DO NOT DELETE' >> Makefile.tmp
 	cc -MM *.c >> Makefile.tmp
 	mv Makefile.tmp Makefile
-
-# ADDED BY MAKE DEPEND -- DO NOT DELETE
-cluster.o: cluster.c api.h hash.h
-endpoints.o: endpoints.c api.h hash.h
-hash.o: hash.c hash.h
-ingress.o: ingress.c api.h hash.h
-namespace.o: namespace.c api.h hash.h
-remap.o: remap.c watcher.h api.h hash.h
-secret.o: secret.c api.h hash.h
-service.o: service.c api.h hash.h
-tls.o: tls.c hash.h api.h watcher.h tls.h
-watcher.o: watcher.c watcher.h
