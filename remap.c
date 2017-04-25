@@ -395,11 +395,19 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 		goto cleanup;
 	}
 
-	if (TSUrlSchemeSet(reqp, url_loc, "http", 4) != TS_SUCCESS) {
-		TSError("[kubernetes] <%s>: could not set request URL scheme", requrl);
-		goto cleanup;
+	if ((cs = TSUrlSchemeGet(reqp, url_loc, &len)) != NULL) {
+	const char	*newp = NULL;
+
+		if (len == 5 && !memcmp(cs, "https", 5))
+			newp = "http";
+		else if (len == 3 && !memcmp(cs, "wss", 3))
+			newp = "ws";
+
+		if (newp)
+			TSUrlSchemeSet(reqp, url_loc, newp, strlen(newp));
 	}
 
+	TSSkipRemappingSet(txnp, 1);
 
 cleanup:
 	TSMutexUnlock(state->map_lock);
@@ -411,6 +419,5 @@ cleanup:
 	free(pbuf);
 	free(hbuf);
 	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
-	TSSkipRemappingSet(txnp, 1);
 	return TS_SUCCESS;
 }
