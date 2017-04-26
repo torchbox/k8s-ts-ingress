@@ -15,6 +15,12 @@
  * SOFTWARE.
  */
 
+/*
+ * synth: allow sending synthetic (intercept) responses which are generated
+ * in the server instead of by an origin.  Because this is intended for
+ * redirects, errors, etc., the response size is limited to 16 kilobytes.
+ */
+
 #include	<stdarg.h>
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -43,11 +49,15 @@ sy_printf(synth_t *sy, const char *fmt, ...)
 {
 va_list	args;
 int	n;
+size_t	left = SY_BUFSZ - sy->sy_bufpos;
+
 	va_start(args, fmt);
-	n = vsnprintf(sy->sy_buf + sy->sy_bufpos,
-		      SY_BUFSZ - sy->sy_bufpos,
-		      fmt, args);
+
+	n = vsnprintf(sy->sy_buf + sy->sy_bufpos, left, fmt, args);
+	if ((size_t) n > left)
+		n = left;
 	sy->sy_bufpos += n;
+
 	va_end(args);
 	return n;
 }
@@ -122,7 +132,8 @@ synth_t	*sy = TSContDataGet(contn);
 		return TS_SUCCESS;
 
 	case TS_EVENT_VCONN_WRITE_READY:
-		TSDebug("kubernetes", "synth: write_ready");
+		TSDebug("kubernetes", "synth: write_ready: writing %d",
+			(int) sy->sy_bufpos);
 		TSIOBufferWrite(sy->sy_resp_buffer, sy->sy_buf, sy->sy_bufpos);
 		TSVIONBytesSet(sy->sy_write_vio, sy->sy_bufpos);
 		TSVIOReenable(sy->sy_write_vio);
