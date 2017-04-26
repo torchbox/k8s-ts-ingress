@@ -57,7 +57,7 @@ void
 TSPluginInit(int argc, const char **argv)
 {
 TSPluginRegistrationInfo	 info;
-k8s_config_t			*conf;
+k8s_config_t			*conf = NULL;
 size_t				 i;
 struct {
 	const char *resource;
@@ -72,14 +72,16 @@ struct {
 	SSL_library_init();
 	SSL_load_error_strings();
 
-	if (argc < 2) {
-		TSError("[kubernetes] configuration file not specified");
-		return;
-	}
-
-	if ((conf = k8s_config_load(argv[1])) == NULL) {
-		TSError("[kubernetes] failed to load configuration");
-		return;
+	if (argc >= 2) {
+		if ((conf = k8s_config_load(argv[1])) == NULL) {
+			TSError("[kubernetes] failed to load configuration");
+			return;
+		}
+	} else {
+		if ((conf = k8s_incluster_config()) == NULL) {
+			TSError("[kubernetes] failed to load configuration");
+			return;
+		}
 	}
 
 	if ((state = calloc(1, sizeof(*state))) == NULL) {
@@ -248,10 +250,26 @@ struct hash_iter_state isa, isb;
 		for (j = 0; j < as->es_naddrs; j++) {
 		endpoints_address_t	*aa = &as->es_addrs[j],
 					*ba = &bs->es_addrs[j];
-			if (strcmp(aa->ea_ip, ba->ea_ip))
+
+			if (aa->ea_ip == NULL) {
+				if (ba->ea_ip != NULL)
+					return 0;
+			} else if (ba->ea_ip == NULL) {
 				return 0;
-			if (strcmp(aa->ea_nodename, ba->ea_nodename))
+			} else {
+				if (strcmp(aa->ea_ip, ba->ea_ip))
+					return 0;
+			}
+
+			if (aa->ea_nodename == NULL) {
+				if (ba->ea_nodename != NULL)
+					return 0;
+			} else if (ba->ea_nodename == NULL) {
 				return 0;
+			} else {
+				if (strcmp(aa->ea_nodename, ba->ea_nodename))
+					return 0;
+			}
 		}
 
 		bzero(&isa, sizeof(isa));

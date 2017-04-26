@@ -108,7 +108,46 @@ int		 lineno = 0;
 
 	return ret;
 error:
-	free(f);
+	if (f)
+		fclose(f);
+	k8s_config_free(ret);
+	return NULL;
+}
+
+k8s_config_t *
+k8s_incluster_config(void)
+{
+char		 line[2048];
+FILE		*f = NULL;
+k8s_config_t	*ret = NULL;
+
+	if ((ret = calloc(1, sizeof(*ret))) == NULL) {
+		TSError("calloc: %s", strerror(errno));
+		goto error;
+	}
+
+	if ((f = fopen(SA_TOKEN_FILE, "r")) == NULL) {
+		TSError("%s: %s", SA_TOKEN_FILE, strerror(errno));
+		goto error;
+	}
+
+	if (fgets(line, sizeof(line), f) == NULL) {
+		TSError("%s: %s", SA_TOKEN_FILE, strerror(errno));
+		goto error;
+	}
+
+	while (strchr("\r\n", line[strlen(line) - 1]))
+		line[strlen(line) - 1] = '\0';
+
+	ret->co_token = strdup(line);
+	ret->co_port = 443;
+	ret->co_host = strdup("kubernetes.default.svc");
+
+	return ret;
+
+error:
+	if (f)
+		fclose(f);
 	k8s_config_free(ret);
 	return NULL;
 }

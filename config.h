@@ -20,6 +20,12 @@
 
 #include	"hash.h"
 
+/*
+ * Service account credential files.
+ */
+#define SA_TOKEN_FILE	"/var/run/secrets/kubernetes.io/serviceaccount/token"
+#define SA_CACERT_FILE	"/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
 typedef struct k8s_config {
 	char	*co_host;
 	int	 co_port;
@@ -30,6 +36,7 @@ typedef struct k8s_config {
 } k8s_config_t;
 
 k8s_config_t	*k8s_config_load(const char *file);
+k8s_config_t	*k8s_incluster_config(void);
 void		 k8s_config_free(k8s_config_t *);
 
 #endif	/* !CONFIG_H */
