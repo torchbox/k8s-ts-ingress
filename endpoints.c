@@ -27,18 +27,24 @@ endpoints_port_free(endpoints_port_t *et)
 {
 	free(et->et_name);
 	free(et->et_protocol);
+	free(et);
 }
 
 void
 endpoints_free(endpoints_t *eps)
 {
-size_t	i;
+size_t	i, j;
 	free(eps->ep_name);
 	free(eps->ep_namespace);
 
 	for (i = 0; i < eps->ep_nsubsets; i++) {
-		hash_free(eps->ep_subsets[i].es_ports);
+		for (j = 0; j < eps->ep_subsets[i].es_naddrs; j++) {
+			free(eps->ep_subsets[i].es_addrs[j].ea_ip);
+			free(eps->ep_subsets[i].es_addrs[j].ea_nodename);
+		}
+
 		free(eps->ep_subsets[i].es_addrs);
+		hash_free(eps->ep_subsets[i].es_ports);
 	}
 
 	free(eps->ep_subsets);

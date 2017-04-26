@@ -106,6 +106,7 @@ size_t	i;
 	}
 
 	free(hs->hs_buckets);
+	free(hs);
 }
 
 void
@@ -249,8 +250,12 @@ struct hashbucket	*hb, *prev = NULL;
 			prev->hb_next = hb->hb_next;
 		else
 			hs->hs_buckets[bn] = NULL;
+
 		ret = hb->hb_value;
+
+		free(hb->hb_key);
 		free(hb);
+
 		return ret;
 	}
 

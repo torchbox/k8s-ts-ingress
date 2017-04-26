@@ -156,7 +156,7 @@ struct {
 static void
 ingress_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
-ingress_t	*ing;
+ingress_t	*ing, *old;
 namespace_t	*ns;
 
 	if ((ing = ingress_make(obj)) == NULL) {
@@ -171,9 +171,11 @@ namespace_t	*ns;
 	TSMutexLock(state->cluster_lock);
 
 	ns = cluster_get_namespace(state->cluster, ing->in_namespace);
-	if (ev == WT_DELETED)
-		namespace_del_ingress(ns, ing->in_name);
-	else
+	if (ev == WT_DELETED) {
+		if ((old = namespace_del_ingress(ns, ing->in_name)) != NULL)
+			ingress_free(old);
+		ingress_free(ing);
+	} else
 		namespace_put_ingress(ns, ing);
 
 	if (!state->changed) {
@@ -187,7 +189,7 @@ namespace_t	*ns;
 static void
 secret_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
-secret_t		*secret;
+secret_t		*secret, *old;
 namespace_t		*ns;
 
 	if ((secret = secret_make(obj)) == NULL) {
@@ -202,9 +204,11 @@ namespace_t		*ns;
 	TSMutexLock(state->cluster_lock);
 
 	ns = cluster_get_namespace(state->cluster, secret->se_namespace);
-	if (ev == WT_DELETED)
-		namespace_del_secret(ns, secret->se_name);
-	else
+	if (ev == WT_DELETED) {
+		if ((old = namespace_del_secret(ns, secret->se_name)) != NULL)
+			secret_free(old);
+		secret_free(secret);
+	} else
 		namespace_put_secret(ns, secret);
 
 	if (!state->changed) {
@@ -282,7 +286,7 @@ struct hash_iter_state isa, isb;
 static void
 endpoints_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
-endpoints_t		*endpoints, *eps2;
+endpoints_t		*endpoints, *eps2, *old;
 namespace_t		*ns;
 
 	if ((endpoints = endpoints_make(obj)) == NULL) {
@@ -295,19 +299,24 @@ namespace_t		*ns;
 
 	ns = cluster_get_namespace(state->cluster, endpoints->ep_namespace);
 
-	if ((eps2 = namespace_get_endpoints(ns, endpoints->ep_name)) != NULL) {
-		if (endpoints_equal(endpoints, eps2)) {
-			TSMutexUnlock(state->cluster_lock);
-			return;
+	if (ev == WT_UPDATED) {
+		if ((eps2 = namespace_get_endpoints(ns, endpoints->ep_name)) != NULL) {
+			if (endpoints_equal(endpoints, eps2)) {
+				endpoints_free(endpoints);
+				TSMutexUnlock(state->cluster_lock);
+				return;
+			}
 		}
 	}
 
 	TSDebug("kubernetes", "something happened with a endpoints: %s/%s",
 		endpoints->ep_namespace, endpoints->ep_name);
 
-	if (ev == WT_DELETED)
-		namespace_del_endpoints(ns, endpoints->ep_name);
-	else
+	if (ev == WT_DELETED) {
+		if ((old = namespace_del_endpoints(ns, endpoints->ep_name)) != NULL)
+			endpoints_free(old);
+		endpoints_free(endpoints);
+	} else
 		namespace_put_endpoints(ns, endpoints);
 
 	if (!state->changed) {
@@ -321,7 +330,7 @@ namespace_t		*ns;
 static void
 service_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
-service_t		*service;
+service_t		*service, *old;
 namespace_t		*ns;
 
 	if ((service = service_make(obj)) == NULL) {
@@ -336,9 +345,11 @@ namespace_t		*ns;
 	TSMutexLock(state->cluster_lock);
 
 	ns = cluster_get_namespace(state->cluster, service->sv_namespace);
-	if (ev == WT_DELETED)
-		namespace_del_service(ns, service->sv_name);
-	else
+	if (ev == WT_DELETED) {
+		if ((old = namespace_del_service(ns, service->sv_name)) != NULL)
+			service_free(old);
+		service_free(service);
+	} else
 		namespace_put_service(ns, service);
 
 	if (!state->changed) {

@@ -204,6 +204,8 @@ int		 n;
 		goto error;
 	}
 
+	TSfree(mstr);
+
 	if (TSMgmtIntGet("proxy.config.ssl.TLSv1", &mint) == TS_SUCCESS && !mint)
 		SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1);
 	if (TSMgmtIntGet("proxy.config.ssl.TLSv1_1", &mint) == TS_SUCCESS && !mint)

@@ -62,9 +62,8 @@ void
 namespace_put_ingress(namespace_t *ns, ingress_t *ing)
 {
 ingress_t	*old;
-	if ((old = hash_del(ns->ns_ingresses, ing->in_name)) != NULL) {
+	if ((old = hash_del(ns->ns_ingresses, ing->in_name)) != NULL)
 		ingress_free(old);
-	}
 	hash_set(ns->ns_ingresses, ing->in_name, ing);
 }
 
@@ -84,9 +83,8 @@ void
 namespace_put_secret(namespace_t *ns, secret_t *sec)
 {
 secret_t	*old;
-	if ((old = hash_del(ns->ns_secrets, sec->se_name)) != NULL) {
+	if ((old = hash_del(ns->ns_secrets, sec->se_name)) != NULL)
 		secret_free(old);
-	}
 	hash_set(ns->ns_secrets, sec->se_name, sec);
 }
 
@@ -106,9 +104,8 @@ void
 namespace_put_service(namespace_t *ns, service_t *svc)
 {
 service_t	*old;
-	if ((old = hash_del(ns->ns_services, svc->sv_name)) != NULL) {
+	if ((old = hash_del(ns->ns_services, svc->sv_name)) != NULL)
 		service_free(old);
-	}
 	hash_set(ns->ns_services, svc->sv_name, svc);
 }
 
@@ -128,9 +125,8 @@ void
 namespace_put_endpoints(namespace_t *ns, endpoints_t *eps)
 {
 endpoints_t	*old;
-	if ((old = hash_del(ns->ns_endpointses, eps->ep_name)) != NULL) {
+	if ((old = hash_del(ns->ns_endpointses, eps->ep_name)) != NULL)
 		endpoints_free(old);
-	}
 	hash_set(ns->ns_endpointses, eps->ep_name, eps);
 }
 

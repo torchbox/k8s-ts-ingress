@@ -32,6 +32,7 @@ service_free(service_t *svc)
 	free(svc->sv_session_affinity);
 	hash_free(svc->sv_selector);
 	hash_free(svc->sv_ports);
+	free(svc);
 }
 
 void

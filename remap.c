@@ -34,17 +34,27 @@
 static void
 remap_host_free(struct remap_host *host)
 {
-size_t	i;
+size_t	i, j;
 	for (i = 0; i < host->rh_npaths; i++) {
+		for (j = 0; j < host->rh_paths[i].rp_naddrs; j++)
+			free(host->rh_paths[i].rp_addrs[j]);
+
 		free(host->rh_paths[i].rp_prefix);
 		free(host->rh_paths[i].rp_addrs);
 		regfree(&host->rh_paths[i].rp_regex);
 	}
+	free(host->rh_paths);
 
+	for (j = 0; j < host->rh_default.rp_naddrs; j++)
+		free(host->rh_default.rp_addrs[j]);
 	free(host->rh_default.rp_addrs);
+
 	regfree(&host->rh_default.rp_regex);
+
 	if (host->rh_ctx)
 		SSL_CTX_free(host->rh_ctx);
+
+	free(host);
 }
 
 static int
@@ -140,7 +150,7 @@ size_t			 i;
 			if (path->ip_path[0] != '/')
 				continue;
 
-			if ((pregex = malloc(strlen(path->ip_path) + 1)) == NULL)
+			if ((pregex = malloc(strlen(path->ip_path) + 2)) == NULL)
 				continue;
 			sprintf(pregex, "^%s", path->ip_path);
 			rerr = regcomp(&regex, pregex, REG_NOSUB | REG_EXTENDED);
@@ -151,8 +161,8 @@ size_t			 i;
 			}
 
 			rh->rh_paths = realloc(rh->rh_paths,
-				       sizeof(struct remap_path)
-				         * (rh->rh_npaths + 1));
+					       sizeof(struct remap_path)
+						 * (rh->rh_npaths + 1));
 			rp = &rh->rh_paths[rh->rh_npaths];
 			++rh->rh_npaths;
 

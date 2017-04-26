@@ -26,6 +26,18 @@ void
 ingress_free(ingress_t *ing)
 {
 size_t	i, j;
+
+	for (i = 0; i < ing->in_nrules; i++) {
+		for (j = 0; j < ing->in_rules[i].ir_npaths; j++) {
+			free(ing->in_rules[i].ir_paths[j].ip_path);
+			free(ing->in_rules[i].ir_paths[j].ip_service_name);
+			free(ing->in_rules[i].ir_paths[j].ip_service_port);
+		}
+		free(ing->in_rules[i].ir_paths);
+		free(ing->in_rules[i].ir_host);
+	}
+	free(ing->in_rules);
+
 	for (i = 0; i < ing->in_ntls; i++) {
 	ingress_tls_t	*itls = &ing->in_tls[i];
 		free(itls->it_secret_name);
@@ -38,6 +50,7 @@ size_t	i, j;
 
 	free(ing->in_name);
 	free(ing->in_namespace);
+	free(ing);
 }
 
 static void
