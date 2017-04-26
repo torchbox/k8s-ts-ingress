@@ -44,6 +44,7 @@ const char		*host = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
 struct remap_host	*rh;
 TSConfig		 map_cfg;
 hash_t			 map;
+struct state		*state = TSContDataGet(contn);
 
 	TSDebug("kubernetes_tls", "doing SNI map for [%s]", host);
 

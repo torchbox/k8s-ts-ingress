@@ -45,12 +45,6 @@ static void endpoints_cb(watcher_t, wt_event_type_t, json_object *, void *);
 static int handle_rebuild(TSCont, TSEvent, void *);
 
 /*
- * Store state as a global, since a continutation can't have data without a
- * mutex.
- */
-struct state *state;
-
-/*
  * Initialise plugin, load configuration and start our watchers.
  */
 void
@@ -59,6 +53,7 @@ TSPluginInit(int argc, const char **argv)
 TSPluginRegistrationInfo	 info;
 k8s_config_t			*conf = NULL;
 size_t				 i;
+struct state			*state;
 struct {
 	const char *resource;
 	watcher_callback_t callback;
@@ -83,7 +78,7 @@ struct {
 	}
 
 	if ((state = calloc(1, sizeof(*state))) == NULL) {
-		TSError("[kubernetes] Cannot create tls_state: %s",
+		TSError("[kubernetes] cannot create state: %s",
 			strerror(errno));
 		return;
 	}
@@ -107,7 +102,7 @@ struct {
 
 		TSDebug("kubernetes", "created watcher for %s",
 			watchers[i].resource);
-		watcher_set_callback(wt, watchers[i].callback, NULL);
+		watcher_set_callback(wt, watchers[i].callback, state);
 		watcher_run(wt, 0);
 	}
 
@@ -127,6 +122,7 @@ struct {
 	 */
 	if (conf->co_tls) {
 		state->tls_cont = TSContCreate(handle_tls, NULL);
+		TSContDataSet(state->tls_cont, state);
 		TSHttpHookAdd(TS_SSL_SNI_HOOK, state->tls_cont);
 	}
 
@@ -135,6 +131,7 @@ struct {
 	 */
 	if (conf->co_remap) {
 		state->remap_cont = TSContCreate(handle_remap, NULL);
+		TSContDataSet(state->remap_cont, state);
 		TSHttpHookAdd(TS_HTTP_READ_REQUEST_HDR_HOOK, state->remap_cont);
 	}
 
@@ -162,6 +159,7 @@ ingress_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
 ingress_t	*ing, *old;
 namespace_t	*ns;
+struct state	*state = data;
 
 	if ((ing = ingress_make(obj)) == NULL) {
 		TSError("[kubernetes] Could not parse Ingress object: %s",
@@ -195,6 +193,7 @@ secret_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
 secret_t		*secret, *old;
 namespace_t		*ns;
+struct state	*state = data;
 
 	if ((secret = secret_make(obj)) == NULL) {
 		TSError("[kubernetes] Could not parse Secret object: %s",
@@ -232,8 +231,8 @@ namespace_t		*ns;
 static int
 endpoints_equal(endpoints_t *a, endpoints_t *b)
 {
-size_t		 i, j;
-struct hash_iter_state isa, isb;
+size_t			 i, j;
+struct hash_iter_state	 isa, isb;
 
 	if (strcmp(a->ep_name, b->ep_name))
 		return 0;
@@ -308,6 +307,7 @@ endpoints_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
 endpoints_t		*endpoints, *eps2, *old;
 namespace_t		*ns;
+struct state		*state = data;
 
 	if ((endpoints = endpoints_make(obj)) == NULL) {
 		TSError("[kubernetes] Could not parse Endpoints object: %s",
@@ -352,6 +352,7 @@ service_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
 service_t		*service, *old;
 namespace_t		*ns;
+struct state		*state = data;
 
 	if ((service = service_make(obj)) == NULL) {
 		TSError("[kubernetes] Could not parse Service object: %s",
@@ -387,10 +388,12 @@ namespace_t		*ns;
 static int
 handle_rebuild(TSCont contn, TSEvent evt, void *edata)
 {
+struct state	*state = TSContDataGet(contn);
+
 	switch (evt) {
 	case TS_EVENT_TIMEOUT:
 		TSDebug("kubernetes", "timeout event; rebuilding");
-		rebuild_maps();
+		rebuild_maps(state);
 		return TS_SUCCESS;
 
 	default:

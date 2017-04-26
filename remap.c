@@ -381,7 +381,7 @@ namespace_t		*ns = value;
 }
 
 void
-rebuild_maps(void)
+rebuild_maps(struct state *state)
 {
 struct rebuild_ctx	ctx;
 
@@ -459,6 +459,7 @@ TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr;
 TSHttpTxn		 txnp = (TSHttpTxn) edata;
 TSConfig		 map_cfg = NULL;
 hash_t			 map;
+struct state		*state = TSContDataGet(contn);
 
 	map_cfg = TSConfigGet(state->cfg_slot);
 	map = TSConfigDataGet(map_cfg);

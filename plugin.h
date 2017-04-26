@@ -96,11 +96,9 @@ struct state {
 	int		 cfg_slot;
 };
 
-extern struct state *state;
-
 int handle_remap(TSCont, TSEvent, void *);
 int handle_tls(TSCont, TSEvent, void *);
 
-void rebuild_maps(void);
+void rebuild_maps(struct state *);
 
 #endif  /* !KUBERNETES_PLUGIN_H */
