@@ -20,13 +20,13 @@ COPY	. /usr/src/k8s-ts-ingress
 
 RUN	set -ex									\
 	&& apt-get update							\
-	&& apt-get -y install libssl-dev libjson-c2 libjson-c-dev libc-dev	\
+	&& apt-get -y install libssl-dev libjson-c2 libjson-c-dev libc6-dev	\
 		make gcc pkgconf						\
 	&& cd /usr/src/k8s-ts-ingress						\
 	&& ./configure --with-tsxs=/usr/local/bin/tsxs				\
 	&& make									\
 	&& make install								\
-	&& dpkg -P libjson-c-dev libc-dev gcc make pkgconf			\
+	&& apt-get -y remove libjson-c-dev libc6-dev gcc make pkgconf		\
 	&& apt-get -y autoremove						\
 	&& cd /									\
 	&& rm -rf /var/cache/apt /var/lib/apt/lists/* /usr/src/k8s-ts-ingress

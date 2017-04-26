@@ -86,6 +86,7 @@ typedef struct {
 	char	*sv_type;
 	char	*sv_cluster_ip;
 	char	*sv_session_affinity;
+	char	*sv_external_name;
 	hash_t	 sv_selector;
 	hash_t	 sv_ports;
 } service_t;

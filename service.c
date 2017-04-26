@@ -85,6 +85,8 @@ json_object_iter	 iter;
 		svc->sv_cluster_ip = strdup(json_object_get_string(tmp));
 	if (json_object_object_get_ex(spec, "sessionAffinity", &tmp))
 		svc->sv_session_affinity = strdup(json_object_get_string(tmp));
+	if (json_object_object_get_ex(spec, "externalName", &tmp))
+		svc->sv_external_name = strdup(json_object_get_string(tmp));
 
 	svc->sv_selector = hash_new(127, free);
 	if (json_object_object_get_ex(spec, "selector", &tmp)) {

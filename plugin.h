@@ -31,6 +31,7 @@
  */
 struct rebuild_ctx {
 	namespace_t	*ns;
+	ingress_t	*ingress;
 	hash_t		 map;
 };
 
@@ -42,6 +43,16 @@ struct remap_path {
 	regex_t	  rp_regex;
 	char	**rp_addrs;
 	size_t	  rp_naddrs;
+
+	int	  rp_cache:1;
+	int	  rp_follow_redirects:1;
+	int	  rp_hsts_subdomains:1;
+	int	  rp_secure_backends:1;
+	int	  rp_preserve_host:1;
+	int	  rp_cache_gen;
+	int	  rp_hsts_max_age;
+	char	 *rp_app_root;
+	char	 *rp_rewrite_target;
 };
 
 /*
@@ -52,8 +63,9 @@ struct remap_host {
 	struct remap_path	*rh_paths;
 	size_t			 rh_npaths;
 	struct remap_path	 rh_default;
-	int			 rh_no_ssl_redirect;
 	SSL_CTX			*rh_ctx;
+	int			 rh_no_ssl_redirect:1;
+	int			 rh_force_ssl_redirect:1;
 };
 
 /*

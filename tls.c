@@ -46,6 +46,13 @@ struct remap_host	*rh;
 	TSDebug("kubernetes_tls", "doing SNI map for [%s]", host);
 
 	TSMutexLock(state->map_lock);
+
+	/* Not ready yet? */
+	if (!state->map) {
+		TSMutexUnlock(state->map_lock);
+		return TS_SUCCESS;
+	}
+
 	if ((rh = hash_get(state->map, host)) == NULL) {
 		TSDebug("kubernetes", "[%s] TLS SNI: host not found", host);
 		TSMutexUnlock(state->map_lock);

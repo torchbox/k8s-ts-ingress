@@ -59,11 +59,17 @@ int		 lineno = 0;
 	 */
 	if ((f = fopen(SA_TOKEN_FILE, "r")) != NULL) {
 		if (fgets(line, sizeof(line), f) != NULL) {
+		char	*e;
 			while (strchr("\r\n", line[strlen(line) - 1]))
 				line[strlen(line) - 1] = '\0';
 
 			ret->co_token = strdup(line);
-			ret->co_host = strdup("kubernetes.default.svc");
+			if ((e = getenv("KUBERNETES_SERVICE_HOST")) != NULL)
+				ret->co_host = strdup(e);
+			else
+				ret->co_host = strdup("kubernetes.default.svc");
+			if ((e = getenv("KUBERNETES_SERVICE_PORT")) != NULL)
+				ret->co_port = atoi(e);
 		}
 
 		fclose(f);

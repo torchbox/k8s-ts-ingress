@@ -43,6 +43,8 @@ size_t	i, j;
 
 		free(host->rh_paths[i].rp_prefix);
 		free(host->rh_paths[i].rp_addrs);
+		free(host->rh_paths[i].rp_app_root);
+		free(host->rh_paths[i].rp_rewrite_target);
 		regfree(&host->rh_paths[i].rp_regex);
 	}
 	free(host->rh_paths);
@@ -90,12 +92,25 @@ service_port_t	*port;
 endpoints_t	*eps;
 size_t		 i, j;
 
-	eps = namespace_get_endpoints(ctx->ns, svc->sv_name);
-	if (eps == NULL)
+	if (strcmp(svc->sv_type, "ExternalName") == 0) {
+	char	abuf[512];
+
+		snprintf(abuf, sizeof(abuf), "%s:%s", svc->sv_external_name,
+			 port_name);
+		TSDebug("kubernetes", "        found an ExternalName: %s",
+			abuf);
+		rp->rp_naddrs = 1;
+		rp->rp_addrs = calloc(1, sizeof(char *));
+		rp->rp_addrs[0] = strdup(abuf);
 		return;
+	}
 
 	if ((port = hash_find(svc->sv_ports, find_port_name,
 			      (void *)port_name)) == NULL)
+		return;
+
+	eps = namespace_get_endpoints(ctx->ns, svc->sv_name);
+	if (eps == NULL)
 		return;
 
 	for (i = 0; i < eps->ep_nsubsets; i++) {
@@ -130,8 +145,9 @@ rebuild_make_host(struct rebuild_ctx *ctx,
 		  struct remap_host *rh,
 		  ingress_rule_t *rule)
 {
-size_t			 i;
-
+size_t		 i;
+char		*s;
+	
 	for (i = 0; i < rule->ir_npaths; i++) {
 	ingress_path_t		*path = &rule->ir_paths[i];
 	struct remap_path	*rp;
@@ -176,6 +192,79 @@ size_t			 i;
 			rp = &rh->rh_default;
 		}
 
+		bzero(rp, sizeof(*rp));
+
+		/*
+		 * Set configuration on this rp from annotations.
+		 */
+
+		/* cache-generation: set TS cache generation */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/cache-generation");
+		if (s)
+			rp->rp_cache_gen = atoi(s);
+
+		/* cache-enable: if false, disable caching entirely */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/cache-enable");
+		if (s && !strcmp(s, "false"))
+			rp->rp_cache = 0;
+		else
+			rp->rp_cache = 1;
+
+		/* hsts-max-age: enable hsts */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/hsts-max-age");
+		if (s)
+			rp->rp_hsts_max_age = atoi(s);
+
+		/* hsts-include-subdomains: if set, hsts includes subdomains */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/hsts-include-subdomains");
+		if (s && !strcmp(s, "true"))
+			rp->rp_hsts_subdomains = 1;
+		else
+			rp->rp_hsts_subdomains = 0;
+
+		/* follow-redirects: if set, TS will resolve 3xx responses itself */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/follow-redirects");
+		if (s && !strcmp(s, "true"))
+			rp->rp_follow_redirects = 1;
+		else
+			rp->rp_follow_redirects = 0;
+
+		/* secure-backends: use TLS for backend connections */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.kubernetes.io/secure-backends");
+		if (s && !strcmp(s, "true"))
+			rp->rp_secure_backends = 1;
+		else
+			rp->rp_secure_backends = 0;
+
+		/* preserve-host: use origin request host header */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/preserve-host");
+		if (s && !strcmp(s, "false"))
+			rp->rp_preserve_host = 0;
+		else
+			rp->rp_preserve_host = 1;
+
+		/* app-root: enforce url prefix */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.kubernetes.io/app-root");
+		if (s)
+			rp->rp_app_root = strdup(s);
+
+		/* rewrite-target: rewrite URL path */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.kubernetes.io/rewrite-target");
+		if (s)
+			rp->rp_rewrite_target = strdup(s);
+
+		/*
+		 * Add the endpoints for this service's backends.
+		 */
 		rebuild_add_endpoints(ctx, svc, rp,
 				      path->ip_service_port);
 	}
@@ -222,6 +311,11 @@ size_t			 i;
 			     "ingress.kubernetes.io/ssl-redirect");
 		if (s && !strcmp(s, "false"))
 			rh->rh_no_ssl_redirect = 1;
+
+		s = hash_get(ing->in_annotations,
+			     "ingress.kubernetes.io/force-ssl-redirect");
+		if (s && !strcmp(s, "true"))
+			rh->rh_force_ssl_redirect = 1;
 	}
 }
 
@@ -233,6 +327,7 @@ ingress_t		*ing = value;
 size_t			 i;
 
 	TSDebug("kubernetes", "  ingress %s:", ingname);
+	ctx->ingress = ing;
 
 	/*
 	 * Rebuild TLS state.
@@ -321,6 +416,16 @@ size_t	i = 0;
 	return &rh->rh_default;
 }
 
+/*
+ * handle_remap: called in READ_REQUEST_HDR_HOOK.  Match the incoming request
+ * to an Ingress path (remap_path), apply any configurations from annotations,
+ * and either set the host to proxy the request to the backend, or return
+ * our own error or redirect response.
+ *
+ * This function takes the map lock on every request, so it is a contention
+ * point.  The map could be made refcounted to reduce the amount of time we
+ * have to hold the map lock.
+ */
 int
 handle_remap(TSCont contn, TSEvent event, void *edata)
 {
@@ -334,17 +439,27 @@ TSMBuffer		 reqp;
 TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr;
 TSHttpTxn		 txnp = (TSHttpTxn) edata;
 
-	/* Fetch the request */
-	if (TSHttpTxnClientReqGet(txnp, &reqp, &hdr_loc) != TS_SUCCESS)
+	/* Not initialised yet? */
+	if (!state->map)
 		goto cleanup;
-	if (TSHttpHdrUrlGet(reqp, hdr_loc, &url_loc) != TS_SUCCESS)
-		goto cleanup;
+
+	/* Fetch the request and the URL. */
+	TSHttpTxnClientReqGet(txnp, &reqp, &hdr_loc);
+	TSHttpHdrUrlGet(reqp, hdr_loc, &url_loc);
 
 	TSMutexLock(state->map_lock);
 
-	/* fetch url host */
+	/*
+	 * Fetch the host header, which could either be in the Host: header,
+	 * or in the request path for a proxy-style request (GET http://).
+	 * We need to handle both cases.
+	 */
 	host_hdr = TSMimeHdrFieldFind(reqp, hdr_loc, "Host", 4);
 	if (host_hdr) {
+		/*
+		 * TS fails a request for too many host headers anymore, but
+		 * check here just to be sure.
+		 */
 		if (TSMimeHdrFieldValuesCount(reqp, hdr_loc, host_hdr) != 1) {
 			TSDebug("kubernetes", "too many hosts in request?");
 			goto cleanup;
@@ -354,24 +469,35 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 	} else {
 		cs = TSHttpHdrHostGet(reqp, hdr_loc, &len);
 		if (cs == NULL) {
+			/*
+			 * If there's no host in the URL and no host header
+			 * either, we can't do anything with this request.
+			 * Let TS fail it.
+			 */
 			TSDebug("kubernetes", "cannot get request host");
 			goto cleanup;
 		}
 	}
 
+	/* create a mutable, nul-terminated copy of the host */
 	hbuf = malloc(len + 1);
 	bcopy(cs, hbuf, len);
 	hbuf[len] = 0;
 	if ((s = strchr(hbuf, ':')) != NULL)
 		*s = '\0';
 
-	/* fetch the remap_host for this host */
+	/*
+	 * Look for a remap_host for this hostname.  If there isn't one, we
+	 * have no configuration for this host and there's nothing more to do.
+	 */
 	if ((rh = hash_get(state->map, hbuf)) == NULL) {
 		TSDebug("kubernetes", "host <%s> map not found", hbuf);
 		goto cleanup;
 	}
 
-	/* fetch url path */
+	/*
+	 * Fetch the URL path.
+	 */
 	cs = TSUrlPathGet(reqp, url_loc, &len);
 	if (cs) {
 		pbuf = malloc(len + 1);
@@ -381,15 +507,28 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 		pbuf = strdup("/");
 	}
 
-	/* find the route_path that matches this path */
+	/*
+	 * Find a remap_path for this host that matches the request path;
+	 * if no path is found, pass on this request and let the default
+	 * backend return a 404.
+	 */
 	if ((rp = find_path(rh, pbuf)) == NULL) {
 		TSDebug("kubernetes", "host <%s>, path <%s> not found",
 			hbuf, pbuf);
 		goto cleanup;
 	}
 
+	/*
+	 * If the ingress has no backends, return an error.
+	 */
 	if (rp->rp_naddrs == 0) {
+	synth_t	*sy;
 		TSDebug("kubernetes", "host <%s>: no addrs", hbuf);
+		sy = synth_new(503, "Service unavailable");
+		synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
+		synth_set_body(sy, "No backends are available to service this "
+				"request.  Please try again later.\r\n");
+		synth_intercept(sy, txnp);
 		goto cleanup;
 	}
 
@@ -399,12 +538,15 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 	}
 
 	/*
-	 * If the request host has a TLS certificate, but the connection did
-	 * not use TLS, then redirect, unless the Ingress was configured with
-	 * ssl-redirect: false.
+	 * If the Ingress has TLS configured, then redirect to TLS unless
+	 * ssl-redirect is set to false.
+	 *
+	 * If the Ingress does not have TLS configured, redirect to TLS if
+	 * force-ssl-redirect is set to true.
 	 */
-	if (rh->rh_ctx && !rh->rh_no_ssl_redirect &&
-	    !TSHttpTxnClientProtocolStackContains(txnp, "tls")) {
+	if (!TSHttpTxnClientProtocolStackContains(txnp, "tls") &&
+	    ((rh->rh_ctx && !rh->rh_no_ssl_redirect)
+	     || rh->rh_force_ssl_redirect)) {
 	const char	*newp;
 	synth_t		*sy;
 	TSMBuffer	 newurl;
@@ -443,11 +585,99 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 		goto cleanup;
 	}
 
+	/*
+	 * Set cache generation if it's set on the Ingress.  If it's not set,
+	 * just set it to zero.
+	 */
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_GENERATION, rp->rp_cache_gen);
+
+	/*
+	 * Enable caching, unless it's been cached on the Ingress.
+	 */
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_HTTP, rp->rp_cache);
+
+	/*
+	 * Send HSTS headers.
+	 */
+	if (rp->rp_hsts_max_age)
+		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_MAX_AGE,
+				      rp->rp_hsts_max_age);
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS, 1);
+
+	/*
+	 * If the Ingress has app-root set, then any request not inside the
+	 * app root should be redirected.
+	 */
+	cs = TSUrlPathGet(reqp, url_loc, &len);
+	TSDebug("kubernetes", "url path is [%.*s], app_root is [%s]",
+		len, cs, rp->rp_app_root);
+	if (rp->rp_app_root && (!cs
+	    || (size_t)len < strlen(rp->rp_app_root + 1)
+	    || memcmp(cs, rp->rp_app_root + 1, strlen(rp->rp_app_root + 1)))) {
+	synth_t	*sy;
+	TSMBuffer	 newurl;
+	TSMLoc		 new_loc;
+
+		/*
+		 * Construct the URL to redirect to.
+		 */
+		newurl = TSMBufferCreate();
+		TSUrlClone(newurl, reqp, url_loc, &new_loc);
+
+		/* Strip the leading / from the path */
+		TSUrlPathSet(newurl, new_loc, rp->rp_app_root + 1,
+			     strlen(rp->rp_app_root) - 1);
+
+		s = TSUrlStringGet(newurl, new_loc, &len);
+		sy = synth_new(301, "Redirected");
+		synth_add_header(sy, "Location", s);
+		synth_add_header(sy, "Content-Type",
+				 "text/plain; charset=UTF-8");
+		synth_set_body(sy, "The requested document is found "
+				"elsewhere.\r\n");
+		synth_intercept(sy, txnp);
+
+		TSHandleMLocRelease(newurl, TS_NULL_MLOC, new_loc);
+		TSMBufferDestroy(newurl);
+		TSfree(s);
+
+		goto cleanup;
+	}
+
+	/*
+	 * Tell TS to follow redirects if configured on the Ingress.
+	 */
+	if (rp->rp_follow_redirects) {
+		TSHttpTxnConfigIntSet(txnp,
+				TS_CONFIG_HTTP_ENABLE_REDIRECTION, 1);
+		TSHttpTxnConfigIntSet(txnp,
+				TS_CONFIG_HTTP_REDIRECT_USE_ORIG_CACHE_KEY, 1);
+	}
+
+	/*
+	 * Pick a random backend endpoint to route the request to.
+	 */
 	hostn = rand() / (RAND_MAX / rp->rp_naddrs + 1);
 
 	pod_host = strdup(rp->rp_addrs[hostn]);
 	TSDebug("kubernetes", "remapped to %s", pod_host);
 
+	/*
+	 * Usually, we want to preserve the request host header so the backend
+	 * can use it.  If preserve-host is set on the Ingress, then we instead
+	 * replace any host header in the request with the backend host.
+	 */
+	if (!rp->rp_preserve_host) {
+		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_URL_REMAP_PRISTINE_HOST_HDR, 0);
+		if (host_hdr)
+			TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
+						     pod_host, strlen(pod_host));
+	}
+
+	/*
+	 * Strip the port from the host and set the backend in the URL.  This
+	 * is equivalent to remapping the request.
+	 */
 	if ((s = strchr(pod_host, ':')) != NULL) {
 		*s++ = 0;
 		pod_port = atoi(s);
@@ -463,22 +693,43 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 		goto cleanup;
 	}
 
+	/*
+	 * Decide what protocol to use to communicate with the backend.  By
+	 * default we use http or ws, even if the request was https or wss.
+	 * If the Ingress has secure-backends set, then we always use https
+	 * or wss, even if the request was http or ws.
+	 *
+	 * Currently, there's no way to indicate that the protocol from the
+	 * request should be preserved.
+	 */
 	if ((cs = TSUrlSchemeGet(reqp, url_loc, &len)) != NULL) {
 	const char	*newp = NULL;
 
-		if (len == 5 && !memcmp(cs, "https", 5))
-			newp = "http";
-		else if (len == 3 && !memcmp(cs, "wss", 3))
-			newp = "ws";
+		if (len >= 4 && !memcmp(cs, "http", 4)) {
+			if (rp->rp_secure_backends)
+				newp = "https";
+			else
+				newp = "http";
+		} else if (len >= 2 && !memcmp(cs, "ws", 2)) {
+			if (rp->rp_secure_backends)
+				newp = "wss";
+			else
+				newp = "ws";
+		}
 
 		if (newp)
 			TSUrlSchemeSet(reqp, url_loc, newp, strlen(newp));
 	}
 
+	/*
+	 * We already remapped this request, so skip any further remapping.
+	 * This also prevents TS from failing the request if remap_required
+	 * is set.
+	 */
 	TSSkipRemappingSet(txnp, 1);
-	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
 
 cleanup:
+	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
 	TSMutexUnlock(state->map_lock);
 	if (url_loc)
 		TSHandleMLocRelease(reqp, hdr_loc, url_loc);

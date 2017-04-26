@@ -105,7 +105,6 @@ TSCont	contn;
 	contn = TSContCreate(synth_handle, TSMutexCreate());
 	TSContDataSet(contn, sy);
 	TSHttpTxnIntercept(contn, txnp);
-	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
 }
 
 int
