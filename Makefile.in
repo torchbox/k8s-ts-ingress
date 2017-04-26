@@ -14,6 +14,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+DOCKER_REGISTRY?=	torchbox/k8s-ts-ingress
+DOCKER_TAG?=		1.0-dev
+DOCKER_IMAGE=		${DOCKER_REGISTRY}:${DOCKER_TAG}
+
 TS_INCDIR=	@TS_INCDIR@
 TS_PLUGINDIR=	@TS_PLUGINDIR@
 
@@ -43,8 +47,7 @@ kubernetes.so: ${OBJS}
 
 install: all
 	install -d -m 0755 ${TS_PLUGINDIR}
-	install -c -m 0755 kubernetes_tls.so ${TS_PLUGINDIR}
-	install -c -m 0755 kubernetes_remap.so ${TS_PLUGINDIR}
+	install -c -m 0755 kubernetes.so ${TS_PLUGINDIR}
 
 .c.o:
 	${CC} ${CPPFLAGS} ${CFLAGS} -c $<
@@ -52,11 +55,11 @@ install: all
 clean:
 	rm -f kubernetes_tls.so ${OBJS}
 
-build:
-	#docker build --pull -t torchbox/trafficserver-ingress-controller:latest .
+docker-build:
+	docker build --pull -t ${DOCKER_IMAGE} .
 
-push:
-	docker push torchbox/trafficserver-ingress-controller:latest
+docker-push:
+	docker push ${DOCKER_IMAGE}
 
 depend:
 	sed -e '/^# ADDED BY MAKE DEPEND -- DO NOT DELETE/,$$ d' < Makefile > Makefile.tmp
