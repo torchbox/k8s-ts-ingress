@@ -24,6 +24,25 @@ directly to the backend.
 
 Advanced HTTP/2 features like server push are not currently supported.
 
+Why Traffic Server?
+-------------------
+
+The primary reason to use TS as an Ingress controller is caching.  TS provides
+highly configurable, fast and well-tested memory- and disk-based caching of HTTP
+requests.  Using caching allows an application or cluster to serve significantly
+higher request load than it could if the application had to respond to every
+request itself.
+
+This is true even if the application has its own caching layer; with a sufficiently
+high cache hit ratio, a 12-CPU single machine running Traffic Server can serve
+requests at upwards of 40Gbps.  Traffic Server was developed by Yahoo! for use
+in high traffic environments, and is used by other large sites such as Akamai,
+LinkedIn, and Comcast.
+
+A secondary reason to use TS is its plugin support; it has a stable and
+well-developed plugin API allowing plugins (like this one) to extend its
+functionality.
+
 Building
 --------
 
@@ -52,7 +71,7 @@ If Traffic Server is running inside the cluster, no configuration is required;
 it will pick up its service account details automatically.
 
 Otherwise, copy `kubernetes.config.example` to the Traffic Server configuration
-directory as `kubernetes.config` and edit it for your site. 
+directory as `kubernetes.config` and edit it for your site.
 
 TLS
 ---
@@ -164,7 +183,8 @@ annotations supported by most Ingress controllers; those beginning with
   follow 3xx redirect responses and serve the final response to the client.
   If the redirect destination is cached, it will be cached with the cache key
   of the original request.  Redirects will only be followed to other Ingress
-  resources, not to arbitrary destinations.
+  resources, not to arbitrary destinations (but see below about proxying to
+  external resources).
 
 * `ingress.torchbox.com/preserve-host`: if `"false"`, set the `Host` header
   in the request to the backend name (e.g., the pod name), instead of the

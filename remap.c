@@ -147,7 +147,7 @@ rebuild_make_host(struct rebuild_ctx *ctx,
 {
 size_t		 i;
 char		*s;
-	
+
 	for (i = 0; i < rule->ir_npaths; i++) {
 	ingress_path_t		*path = &rule->ir_paths[i];
 	struct remap_path	*rp;
@@ -168,10 +168,16 @@ char		*s;
 			if (path->ip_path[0] != '/')
 				continue;
 
-			if ((pregex = malloc(strlen(path->ip_path) + 2)) == NULL)
+			/*
+			 * Path is required to begin with '/'.  However, when
+			 * TS provides us the request path later to match
+			 * against, the leading '/' is stripped.  Strip it here
+			 * as well to make matching the request easier.
+			 */
+			if ((pregex = malloc(strlen(path->ip_path) + 1)) == NULL)
 				continue;
-			sprintf(pregex, "^%s", path->ip_path);
-			rerr = regcomp(&regex, pregex, REG_NOSUB | REG_EXTENDED);
+			sprintf(pregex, "^%s", path->ip_path + 1);
+			rerr = regcomp(&regex, pregex, REG_EXTENDED);
 			free(pregex);
 			if (rerr != 0) {
 				regfree(&regex);
@@ -182,6 +188,7 @@ char		*s;
 					       sizeof(struct remap_path)
 						 * (rh->rh_npaths + 1));
 			rp = &rh->rh_paths[rh->rh_npaths];
+			bzero(rp, sizeof(*rp));
 			++rh->rh_npaths;
 
 			rp->rp_addrs = NULL;
@@ -191,8 +198,6 @@ char		*s;
 		} else {
 			rp = &rh->rh_default;
 		}
-
-		bzero(rp, sizeof(*rp));
 
 		/*
 		 * Set configuration on this rp from annotations.
@@ -259,8 +264,12 @@ char		*s;
 		/* rewrite-target: rewrite URL path */
 		s = hash_get(ctx->ingress->in_annotations,
 			     "ingress.kubernetes.io/rewrite-target");
-		if (s)
-			rp->rp_rewrite_target = strdup(s);
+		/*
+		 * Strip the leading '/' from rewrite-target, because it's
+		 * already there when we mangle the path later.
+		 */
+		if (s && *s == '/')
+			rp->rp_rewrite_target = strdup(s + 1);
 
 		/*
 		 * Add the endpoints for this service's backends.
@@ -402,17 +411,35 @@ struct rebuild_ctx	ctx;
 	return;
 }
 
+/*
+ * Search the list of paths in a remap_host for one that matches the provided
+ * path, and return it.  If pfxs is non-NULL, the length of the portion of the
+ * request path that was matched by the remap_path will be stored.
+ */
 static struct remap_path *
-find_path(struct remap_host *rh, const char *path)
+find_path(struct remap_host *rh, const char *path, size_t *pfxs)
 {
 size_t	i = 0;
+
 	for (i = 0; i < rh->rh_npaths; i++) {
 	struct remap_path	*rp = &rh->rh_paths[i];
+	regmatch_t		 matches[1];
 
-		if (regexec(&rp->rp_regex, path, 0, NULL, 0) == 0)
+		if (regexec(&rp->rp_regex, path, 1, matches, 0) == 0) {
+			TSDebug("kubernetes", "find_path: path [%s] matched [%s]",
+				path, rp->rp_prefix);
+
+			if (pfxs)
+				*pfxs = matches[0].rm_eo - matches[0].rm_so;
 			return rp;
+		}
+		TSDebug("kubernetes", "find_path: path [%s] did not match [%s]",
+			path, rp->rp_prefix);
 	}
 
+	if (pfxs)
+		*pfxs = 0;
+	TSDebug("kubernetes", "find_path: returning default for [%s]", path);
 	return &rh->rh_default;
 }
 
@@ -435,6 +462,7 @@ const char		*cs;
 char			*hbuf = NULL, *pbuf = NULL, *s;
 struct remap_host	*rh;
 struct remap_path	*rp;
+size_t			 poffs;
 TSMBuffer		 reqp;
 TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr;
 TSHttpTxn		 txnp = (TSHttpTxn) edata;
@@ -512,7 +540,7 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 	 * if no path is found, pass on this request and let the default
 	 * backend return a 404.
 	 */
-	if ((rp = find_path(rh, pbuf)) == NULL) {
+	if ((rp = find_path(rh, pbuf, &poffs)) == NULL) {
 		TSDebug("kubernetes", "host <%s>, path <%s> not found",
 			hbuf, pbuf);
 		goto cleanup;
@@ -609,8 +637,7 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 	 * app root should be redirected.
 	 */
 	cs = TSUrlPathGet(reqp, url_loc, &len);
-	TSDebug("kubernetes", "url path is [%.*s], app_root is [%s]",
-		len, cs, rp->rp_app_root);
+
 	if (rp->rp_app_root && (!cs
 	    || (size_t)len < strlen(rp->rp_app_root + 1)
 	    || memcmp(cs, rp->rp_app_root + 1, strlen(rp->rp_app_root + 1)))) {
@@ -672,6 +699,20 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 		if (host_hdr)
 			TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
 						     pod_host, strlen(pod_host));
+	}
+
+	/*
+	 * If the Ingress has rewrite-target set, then replace the matched
+	 * part of the path (stored in poffs by find_path()) with the target.
+	 */
+	if (rp->rp_rewrite_target) {
+	char	*newp;
+	size_t	 nlen = strlen(pbuf) + strlen(rp->rp_rewrite_target) - poffs;
+		newp = malloc(nlen + 1);
+		snprintf(newp, nlen + 1, "%s%s", rp->rp_rewrite_target,
+			 pbuf + poffs);
+		TSUrlPathSet(reqp, url_loc, newp, nlen);
+		free(newp);
 	}
 
 	/*
