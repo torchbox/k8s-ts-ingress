@@ -42,34 +42,34 @@ TSVConn			 ssl_vc = edata;
 SSL			*ssl = (SSL *)TSVConnSSLConnectionGet(ssl_vc);
 const char		*host = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
 struct remap_host	*rh;
+TSConfig		 map_cfg;
+hash_t			 map;
 
 	TSDebug("kubernetes_tls", "doing SNI map for [%s]", host);
 
-	TSMutexLock(state->map_lock);
+	map_cfg = TSConfigGet(state->cfg_slot);
+	map = TSConfigDataGet(map_cfg);
 
-	/* Not ready yet? */
-	if (!state->map) {
-		TSMutexUnlock(state->map_lock);
-		return TS_SUCCESS;
-	}
+	/* Not initialised yet? */
+	if (!map)
+		goto cleanup;
 
-	if ((rh = hash_get(state->map, host)) == NULL) {
+	if ((rh = hash_get(map, host)) == NULL) {
 		TSDebug("kubernetes", "[%s] TLS SNI: host not found", host);
-		TSMutexUnlock(state->map_lock);
-		return TS_SUCCESS;
+		goto cleanup;
 	}
 
 	if (!rh->rh_ctx) {
 		TSDebug("kubernetes", "[%s] TLS SNI: host found, but not ctx",
 			host);
-		TSMutexUnlock(state->map_lock);
-		return TS_SUCCESS;
+		goto cleanup;
 	}
 
 	SSL_set_SSL_CTX(ssl, rh->rh_ctx);
 	TSVConnReenable(ssl_vc);
-	TSMutexUnlock(state->map_lock);
 
+cleanup:
+	TSConfigRelease(state->cfg_slot, map_cfg);
 	return TS_SUCCESS;
 }
 

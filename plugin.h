@@ -88,9 +88,12 @@ struct state {
 	TSCont		 tls_cont;
 	TSCont		 remap_cont;
 
-	/* map of hostname to struct remap_host */
-	TSMutex		 map_lock;
-	hash_t		 map;
+	/*
+	 * TS config slot that our configuration is stored in.  This can be
+	 * passed to TSConfigGet() to fetch the current configuration in a
+	 * thread-safe way.
+	 */
+	int		 cfg_slot;
 };
 
 extern struct state *state;

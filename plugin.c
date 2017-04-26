@@ -88,9 +88,9 @@ struct {
 		return;
 	}
 
-	state->map_lock = TSMutexCreate();
 	state->cluster_lock = TSMutexCreate();
 	state->cluster = cluster_make();
+	state->cfg_slot = TSConfigSet(0, NULL, (TSConfigDestroyFunc) hash_free);
 
 	/*
 	 * Create watchers.

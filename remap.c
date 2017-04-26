@@ -383,7 +383,6 @@ namespace_t		*ns = value;
 void
 rebuild_maps(void)
 {
-hash_t			old_map;
 struct rebuild_ctx	ctx;
 
 	TSMutexLock(state->cluster_lock);
@@ -396,19 +395,11 @@ struct rebuild_ctx	ctx;
 	TSDebug("kubernetes", "rebuild_maps: running");
 	ctx.map = hash_new(127, (hash_free_fn) remap_host_free);
 	hash_foreach(state->cluster->cs_namespaces, rebuild_namespace, &ctx);
+
 	state->changed = 0;
-
-	TSMutexLock(state->map_lock);
-	old_map = state->map;
-	state->map = ctx.map;
-	TSMutexUnlock(state->map_lock);
-
 	TSMutexUnlock(state->cluster_lock);
 
-	if (old_map)
-		hash_free(old_map);
-
-	return;
+	TSConfigSet(state->cfg_slot, ctx.map, (TSConfigDestroyFunc)hash_free);
 }
 
 /*
@@ -466,16 +457,20 @@ size_t			 poffs;
 TSMBuffer		 reqp;
 TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr;
 TSHttpTxn		 txnp = (TSHttpTxn) edata;
+TSConfig		 map_cfg = NULL;
+hash_t			 map;
+
+	map_cfg = TSConfigGet(state->cfg_slot);
+	map = TSConfigDataGet(map_cfg);
 
 	/* Not initialised yet? */
-	if (!state->map)
+	if (!map)
 		goto cleanup;
+
 
 	/* Fetch the request and the URL. */
 	TSHttpTxnClientReqGet(txnp, &reqp, &hdr_loc);
 	TSHttpHdrUrlGet(reqp, hdr_loc, &url_loc);
-
-	TSMutexLock(state->map_lock);
 
 	/*
 	 * Fetch the host header, which could either be in the Host: header,
@@ -518,7 +513,7 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 	 * Look for a remap_host for this hostname.  If there isn't one, we
 	 * have no configuration for this host and there's nothing more to do.
 	 */
-	if ((rh = hash_get(state->map, hbuf)) == NULL) {
+	if ((rh = hash_get(map, hbuf)) == NULL) {
 		TSDebug("kubernetes", "host <%s> map not found", hbuf);
 		goto cleanup;
 	}
@@ -770,8 +765,8 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 	TSSkipRemappingSet(txnp, 1);
 
 cleanup:
+	TSConfigRelease(state->cfg_slot, map_cfg);
 	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
-	TSMutexUnlock(state->map_lock);
 	if (url_loc)
 		TSHandleMLocRelease(reqp, hdr_loc, url_loc);
 	if (hdr_loc)
