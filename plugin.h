@@ -52,6 +52,7 @@ struct remap_host {
 	struct remap_path	*rh_paths;
 	size_t			 rh_npaths;
 	struct remap_path	 rh_default;
+	int			 rh_no_ssl_redirect;
 	SSL_CTX			*rh_ctx;
 };
 

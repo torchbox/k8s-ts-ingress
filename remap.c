@@ -15,6 +15,7 @@
  * SOFTWARE.
  */
 
+#include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
 #include	<errno.h>
@@ -30,6 +31,7 @@
 #include	"api.h"
 #include	"config.h"
 #include	"plugin.h"
+#include	"synth.h"
 
 static void
 remap_host_free(struct remap_host *host)
@@ -198,6 +200,7 @@ size_t			 i;
 	for (i = 0; i < itls->it_nhosts; i++) {
 	const char		*hostname = itls->it_hosts[i];
 	struct remap_host	*rh;
+	char			*s;
 
 		if ((rh = hash_get(ctx->map, hostname)) == NULL) {
 			TSDebug("kubernetes", "      new host");
@@ -214,6 +217,11 @@ size_t			 i;
 		}
 		TSDebug("kubernetes", "      %s: added with CTX[%p]",
 			hostname, rh->rh_ctx);
+
+		s = hash_get(ing->in_annotations,
+			     "ingress.kubernetes.io/ssl-redirect");
+		if (s && !strcmp(s, "false"))
+			rh->rh_no_ssl_redirect = 1;
 	}
 }
 
@@ -385,6 +393,56 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 		goto cleanup;
 	}
 
+	if ((cs = TSUrlSchemeGet(reqp, url_loc, &len)) == NULL) {
+		TSDebug("kubernetes", "<%s>: could not get url scheme", requrl);
+		goto cleanup;
+	}
+
+	/*
+	 * If the request host has a TLS certificate, but the connection did
+	 * not use TLS, then redirect, unless the Ingress was configured with
+	 * ssl-redirect: false.
+	 */
+	if (rh->rh_ctx && !rh->rh_no_ssl_redirect &&
+	    !TSHttpTxnClientProtocolStackContains(txnp, "tls")) {
+	const char	*newp;
+	synth_t		*sy;
+	TSMBuffer	 newurl;
+	TSMLoc		 new_loc;
+
+		/*
+		 * Construct the URL to redirect to.
+		 */
+		newurl = TSMBufferCreate();
+		TSUrlClone(newurl, reqp, url_loc, &new_loc);
+		cs = TSUrlSchemeGet(newurl, new_loc, &len);
+
+		if (len == 4 && !memcmp(cs, "http", 4))
+			newp = "https";
+		else if (len == 2 && !memcmp(cs, "ws", 2))
+			newp = "wss";
+		else
+			newp = "https";
+
+		TSUrlSchemeSet(newurl, new_loc, newp, strlen(newp));
+		TSUrlHostSet(newurl, new_loc, hbuf, strlen(hbuf));
+		s = TSUrlStringGet(newurl, new_loc, &len);
+		TSHandleMLocRelease(newurl, TS_NULL_MLOC, new_loc);
+		TSMBufferDestroy(newurl);
+
+		/*
+		 * Return a synthetic response to redirect.
+		 */
+		sy = synth_new(301, "Moved");
+		synth_add_header(sy, "Location", s);
+		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
+		synth_set_body(sy, "The requested document has moved.\r\n");
+		synth_intercept(sy, txnp);
+		TSfree(s);
+
+		goto cleanup;
+	}
+
 	hostn = rand() / (RAND_MAX / rp->rp_naddrs + 1);
 
 	pod_host = strdup(rp->rp_addrs[hostn]);
@@ -418,6 +476,7 @@ TSHttpTxn		 txnp = (TSHttpTxn) edata;
 	}
 
 	TSSkipRemappingSet(txnp, 1);
+	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
 
 cleanup:
 	TSMutexUnlock(state->map_lock);
@@ -428,6 +487,5 @@ cleanup:
 	free(pod_host);
 	free(pbuf);
 	free(hbuf);
-	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
 	return TS_SUCCESS;
 }

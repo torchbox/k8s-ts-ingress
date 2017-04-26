@@ -121,6 +121,7 @@ typedef struct {
 	size_t		 in_ntls;
 	ingress_rule_t	*in_rules;
 	size_t		 in_nrules;
+	hash_t		 in_annotations;
 } ingress_t;
 
 void		 ingress_free(ingress_t *ing);

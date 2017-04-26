@@ -35,6 +35,7 @@ OBJS=		hash.o		\
 		endpoints.o	\
 		namespace.o	\
 		watcher.o	\
+		synth.o		\
 		remap.o		\
 		tls.o		\
 		plugin.o	\

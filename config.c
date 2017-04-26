@@ -50,6 +50,29 @@ int		 lineno = 0;
 		goto error;
 	}
 
+	ret->co_tls = 1;
+	ret->co_remap = 1;
+	ret->co_port = 443;
+
+	/*
+	 * Check for in-cluster service account config.
+	 */
+	if ((f = fopen(SA_TOKEN_FILE, "r")) != NULL) {
+		if (fgets(line, sizeof(line), f) != NULL) {
+			while (strchr("\r\n", line[strlen(line) - 1]))
+				line[strlen(line) - 1] = '\0';
+
+			ret->co_token = strdup(line);
+			ret->co_host = strdup("kubernetes.default.svc");
+		}
+
+		fclose(f);
+		f = NULL;
+	}
+
+	if (file == NULL)
+		return ret;
+
 	if ((f = fopen(file, "r")) == NULL) {
 		TSError("%s: %s", file, strerror(errno));
 		goto error;
@@ -99,6 +122,26 @@ int		 lineno = 0;
 		} else if (strcmp(opt, "cafile") == 0) {
 			free(ret->co_tls_cafile);
 			ret->co_tls_cafile = strdup(value);
+		} else if (strcmp(opt, "tls") == 0) {
+			if (strcmp(value, "true") == 0)
+				ret->co_tls = 1;
+			else if (strcmp(value, "false") == 0)
+				ret->co_tls = 0;
+			else {
+				TSError("%s:%d: expected \"true\" or \"false\"",
+					file, lineno);
+				goto error;
+			}
+		} else if (strcmp(opt, "remap") == 0) {
+			if (strcmp(value, "true") == 0)
+				ret->co_remap = 1;
+			else if (strcmp(value, "false") == 0)
+				ret->co_remap = 0;
+			else {
+				TSError("%s:%d: expected \"true\" or \"false\"",
+					file, lineno);
+				goto error;
+			}
 		} else {
 			TSError("%s:%d: unknown option \"%s\"",
 				file, lineno, opt);
@@ -106,45 +149,31 @@ int		 lineno = 0;
 		}
 	}
 
-	return ret;
-error:
-	if (f)
-		fclose(f);
-	k8s_config_free(ret);
-	return NULL;
-}
+	if (ret->co_tls_keyfile)
+		free(ret->co_token);
 
-k8s_config_t *
-k8s_incluster_config(void)
-{
-char		 line[2048];
-FILE		*f = NULL;
-k8s_config_t	*ret = NULL;
-
-	if ((ret = calloc(1, sizeof(*ret))) == NULL) {
-		TSError("calloc: %s", strerror(errno));
+	if (ret->co_tls_keyfile && !ret->co_tls_certfile) {
+		TSError("%s: must specify certfile with keyfile", file);
 		goto error;
 	}
 
-	if ((f = fopen(SA_TOKEN_FILE, "r")) == NULL) {
-		TSError("%s: %s", SA_TOKEN_FILE, strerror(errno));
+	if (ret->co_tls_certfile && !ret->co_tls_keyfile) {
+		TSError("%s: must specify keyfile with certfile", file);
 		goto error;
 	}
 
-	if (fgets(line, sizeof(line), f) == NULL) {
-		TSError("%s: %s", SA_TOKEN_FILE, strerror(errno));
+	if (!ret->co_token && !ret->co_tls_keyfile) {
+		TSError("%s: must specify either (keyfile, certfile) or token",
+			file);
 		goto error;
 	}
 
-	while (strchr("\r\n", line[strlen(line) - 1]))
-		line[strlen(line) - 1] = '\0';
-
-	ret->co_token = strdup(line);
-	ret->co_port = 443;
-	ret->co_host = strdup("kubernetes.default.svc");
+	if (!ret->co_host) {
+		TSError("%s: must specify server", file);
+		goto error;
+	}
 
 	return ret;
-
 error:
 	if (f)
 		fclose(f);

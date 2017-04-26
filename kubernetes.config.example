@@ -1,5 +1,10 @@
 # Example configuration file for TS Kubernetes plugins.
 
+### API server configuration
+# 
+# This is required when running outside the cluster, but not necessary when
+# running in-cluster; the pod's service account will be used by default.
+
 # Set the hostname and port of the API server to connect to.  Only TLS (https)
 # connections are supported.
 server: apiserver.mycluster.com:8443
@@ -15,3 +20,13 @@ keyfile: /mnt/c/Users/ft/.kube/kube-prod.key
 
 # Optional: configure the bearer token to authenticate to the API server.
 #token: ABCD1234
+
+### TLS configuration
+
+# Set this to false to disable TLS.
+#tls: false
+
+### Remap configuration
+
+# Set this to false to disable remapping.
+#remap: false

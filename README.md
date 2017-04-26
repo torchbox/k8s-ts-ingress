@@ -55,31 +55,10 @@ to the Ingress controller specification.  TLS Server Name Indication support is
 required; clients without SNI support will not work.  This is not considered
 a deficiency, since all current TLS clients support SNI.
 
-SSLv3 (and earlier) is not supported.
-
-TLS support currently has several limitations:
-
-* Specifying custom Diffie-Hellman parameters (dhparams) is not supported.
-* OCSP is not supported.
-* Multiple certificates per Ingress (e.g. Elliptic Curve and RSA certificates)
-  is not supported.
-* TLS session resumption across multiple servers is not supported.
-* TLS client certification authentication is not supported.
-* HTTP Strict Transport Security is not supported (although applications which
-  send their own HSTS headers will work fine).
-* TLS connections to origin servers (pods) is not supported.
-* The following Traffic Server TLS configuration options are supported; all
-  other TLS configuration is ignored.
-    * `proxy.config.ssl.TLSv1`
-    * `proxy.config.ssl.TLSv1_1`
-    * `proxy.config.ssl.TLSv1_2`
-    * `proxy.config.ssl.server.honor_cipher_order`
-    * `proxy.config.ssl.server.cipher_suite`
-
-If you don't want to use Kubernetes for TLS, you can configure your own TLS
-certificates in `ssl_multicert.config` or though some other mechanism (e.g.
-the `ssl-cert-loader` plugin).  In that case, TLS works exactly as it would
-if Kubernetes was not involved.
+If you don't want to use Kubernetes for TLS, set `tls: false` in
+`kubernetes.config`, then configure your own TLS certificates in
+`ssl_multicert.config` or though some other mechanism (e.g. the `ssl-cert-loader`
+plugin).  In that case, TLS works exactly as it would if Kubernetes was not involved.
 
 Debugging
 ---------
@@ -103,6 +82,15 @@ https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config
 For persistent cache storage, mount a volume on `/var/lib/trafficserver`.
 This can be a persistent volume or an emptyDir; any missing necessary files,
 including the cache store, will be created at startup.
+
+Ingress annotations
+-------------------
+
+The behaviour of an Ingress can be configured by setting annotations on the
+resource.  The following annotations are supported:
+
+* `ingress.kubernetes.io/ssl-redirect`: if `"false"`, do not redirect HTTP
+  requests to HTTPS, even if the Ingress has TLS configured.
 
 Support
 -------

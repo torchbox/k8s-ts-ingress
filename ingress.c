@@ -50,6 +50,7 @@ size_t	i, j;
 
 	free(ing->in_name);
 	free(ing->in_namespace);
+	hash_free(ing->in_annotations);
 	free(ing);
 }
 
@@ -104,8 +105,9 @@ size_t		 i;
 ingress_t *
 ingress_make(json_object *obj)
 {
-ingress_t	*ing = NULL;
-json_object	*metadata, *rules, *tls, *tmp, *spec;
+ingress_t		*ing = NULL;
+json_object		*metadata, *rules, *tls, *tmp, *spec;
+json_object_iter	 iter;
 
 	if ((ing = calloc(1, sizeof(*ing))) == NULL)
 		return NULL;
@@ -132,6 +134,14 @@ json_object	*metadata, *rules, *tls, *tmp, *spec;
 		goto error;
 	}
 	ing->in_name = strdup(json_object_get_string(tmp));
+
+	ing->in_annotations = hash_new(127, free);
+	if (json_object_object_get_ex(metadata, "annotations", &tmp)) {
+		json_object_object_foreachC(tmp, iter) {
+			hash_set(ing->in_annotations, iter.key,
+				 strdup(json_object_get_string(iter.val)));
+		}
+	}
 
 	/* Ingress.spec */
 	if (!json_object_object_get_ex(obj, "spec", &spec)

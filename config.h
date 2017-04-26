@@ -33,6 +33,8 @@ typedef struct k8s_config {
 	char	*co_tls_keyfile;
 	char	*co_tls_cafile;
 	char	*co_token;
+	int	 co_tls;
+	int	 co_remap;
 } k8s_config_t;
 
 k8s_config_t	*k8s_config_load(const char *file);

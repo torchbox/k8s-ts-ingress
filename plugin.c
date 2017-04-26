@@ -72,16 +72,14 @@ struct {
 	SSL_library_init();
 	SSL_load_error_strings();
 
-	if (argc >= 2) {
-		if ((conf = k8s_config_load(argv[1])) == NULL) {
-			TSError("[kubernetes] failed to load configuration");
-			return;
-		}
-	} else {
-		if ((conf = k8s_incluster_config()) == NULL) {
-			TSError("[kubernetes] failed to load configuration");
-			return;
-		}
+	if (argc >= 2)
+		conf = k8s_config_load(argv[1]);
+	else
+		conf = k8s_config_load(NULL);
+
+	if (conf == NULL) {
+		TSError("[kubernetes] failed to load configuration");
+		return;
 	}
 
 	if ((state = calloc(1, sizeof(*state))) == NULL) {
@@ -127,14 +125,18 @@ struct {
 	 * Create SNI hook to associate Kubernetes SSL_CTXs with incoming
 	 * connections.
 	 */
-	state->tls_cont = TSContCreate(handle_tls, NULL);
-	TSHttpHookAdd(TS_SSL_SNI_HOOK, state->tls_cont);
+	if (conf->co_tls) {
+		state->tls_cont = TSContCreate(handle_tls, NULL);
+		TSHttpHookAdd(TS_SSL_SNI_HOOK, state->tls_cont);
+	}
 
 	/*
 	 * Create remap hook to map incoming requests to pods.
 	 */
-	state->remap_cont = TSContCreate(handle_remap, NULL);
-	TSHttpHookAdd(TS_HTTP_READ_REQUEST_HDR_HOOK, state->remap_cont);
+	if (conf->co_remap) {
+		state->remap_cont = TSContCreate(handle_remap, NULL);
+		TSHttpHookAdd(TS_HTTP_READ_REQUEST_HDR_HOOK, state->remap_cont);
+	}
 
 	/*
 	 * Register ourselves.
