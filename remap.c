@@ -52,7 +52,7 @@ size_t	i, j;
 	regfree(&host->rh_default.rp_regex);
 
 	if (host->rh_ctx)
-		SSL_CTX_free(host->rh_ctx);
+		TSSslContextDestroy((TSSslContext) host->rh_ctx);
 
 	free(host);
 }

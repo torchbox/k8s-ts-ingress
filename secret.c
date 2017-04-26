@@ -100,8 +100,6 @@ const char	*certstr, *keystr;
 BIO		*cert_bio = NULL, *key_bio = NULL, *tmp_bio;
 X509		*cert;
 EVP_PKEY	*key;
-TSMgmtString	 mstr;
-TSMgmtInt	 mint;
 char		 buf[1024];
 int		 n;
 
@@ -117,7 +115,7 @@ int		 n;
 		return NULL;
 	}
 
-	if ((ctx = SSL_CTX_new(SSLv23_server_method())) == NULL) {
+	if ((ctx = (SSL_CTX *)TSSslServerContextCreate()) == NULL) {
 		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: SSL_CTX_new failed",
 			secret->se_namespace, secret->se_name);
 		goto error;
@@ -193,40 +191,6 @@ int		 n;
 		goto error;
 	}
 
-	if (TSMgmtStringGet("proxy.config.ssl.server.cipher_suite",
-			    &mstr) != TS_SUCCESS) {
-		TSError("[kubernetes_tls] cannot retrieve cypher list");
-		goto error;
-	}
-
-	if (SSL_CTX_set_cipher_list(ctx, mstr) != 1) {
-		TSError("[kubernetes_tls] cannot set cypher list on ctx");
-		goto error;
-	}
-
-	TSfree(mstr);
-
-	if (TSMgmtIntGet("proxy.config.ssl.TLSv1", &mint) == TS_SUCCESS && !mint)
-		SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1);
-	if (TSMgmtIntGet("proxy.config.ssl.TLSv1_1", &mint) == TS_SUCCESS && !mint)
-		SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1_1);
-	if (TSMgmtIntGet("proxy.config.ssl.TLSv1_2", &mint) == TS_SUCCESS && !mint)
-		SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1_2);
-
-	if (TSMgmtIntGet("proxy.config.ssl.server.honor_cipher_order",
-			 &mint) == TS_SUCCESS && mint == 0) {
-		SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
-	}
-
-	SSL_CTX_set_options(ctx,
-		  SSL_OP_NO_SSLv3
-		| SSL_OP_NO_SSLv3
-		| SSL_OP_SINGLE_DH_USE
-		| SSL_OP_SINGLE_ECDH_USE
-		| SSL_OP_NO_COMPRESSION
-		| SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION
-		| SSL_OP_ALL);
-
 	return ctx;
 
 error:
@@ -238,4 +202,3 @@ error:
         SSL_CTX_free(ctx);
     return NULL;
 }
-
