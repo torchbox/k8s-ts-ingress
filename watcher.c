@@ -16,11 +16,13 @@
  */
 
 #include	<sys/types.h>
+
 #include	<netinet/in.h>
 #include	<stdlib.h>
 #include	<stdio.h>
 #include	<errno.h>
 #include	<string.h>
+#include	<assert.h>
 
 #include	<openssl/ssl.h>
 #include	<openssl/err.h>
@@ -31,6 +33,7 @@
 #include	<json.h>
 
 #include	"watcher.h"
+#include	"api.h"
 #include	"config.h"
 
 static int	handler(TSCont, TSEvent, void *);
@@ -117,6 +120,9 @@ watcher_t
 watcher_create(k8s_config_t *conf, const char *resource)
 {
 watcher_t	wt = NULL;
+
+	assert(conf);
+	assert(resource);
 
 	if ((wt = calloc(1, sizeof(*wt))) == NULL) {
 		TSError("[watcher] calloc: %s", strerror(errno));
@@ -380,10 +386,19 @@ int	ret = 0;
 		wt->wt_requestbuf = calloc(1024, 1);
 		wt->wt_request = wt->wt_requestbuf;
 
-		wt->wt_requestsz = snprintf(wt->wt_requestbuf, 1024,
-			 "GET %s?watch=true%s HTTP/1.0\r\n"
-			 "Host: %s\r\n\r\n",
-			 wt->wt_resource, version, wt->wt_config->co_host);
+		if (wt->wt_config->co_token)
+			wt->wt_requestsz = snprintf(wt->wt_requestbuf, 1024,
+				 "GET %s?watch=true%s HTTP/1.0\r\n"
+				 "Host: %s\r\n"
+				 "Authorization: Bearer %s\r\n\r\n",
+				 wt->wt_resource, version, wt->wt_config->co_host,
+				 wt->wt_config->co_token);
+		else
+			wt->wt_requestsz = snprintf(wt->wt_requestbuf, 1024,
+				 "GET %s?watch=true%s HTTP/1.0\r\n"
+				 "Host: %s\r\n\r\n",
+				 wt->wt_resource, version, wt->wt_config->co_host);
+
 		TSDebug("watcher", "[%s] request: [%s]",
 			wt->wt_config->co_host, wt->wt_request);
 	}
