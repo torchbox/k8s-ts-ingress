@@ -18,7 +18,9 @@
 #ifndef SYNTH_H
 #define SYNTH_H
 
-#include    <ts/ts.h>
+#include	<stdarg.h>
+
+#include	<ts/ts.h>
 
 /*
  * Simple API for sending synthetic replies, used in various places.
@@ -26,10 +28,12 @@
 
 typedef struct synth synth_t;
 
-synth_t *synth_new(int status, const char *reason);
-void     synth_free(synth_t *);
-void     synth_add_header(synth_t *, const char *hdr, const char *value);
-void     synth_set_body(synth_t *, const char *body);
-void     synth_intercept(synth_t *, TSHttpTxn);
+synth_t	*synth_new(int status, const char *reason);
+void 	 synth_free(synth_t *);
+void 	 synth_add_header(synth_t *, const char *hdr, const char *fmt, ...);
+void 	 synth_vadd_header(synth_t *, const char *hdr,
+			   const char *fmt, va_list);
+void 	 synth_set_body(synth_t *, const char *body);
+void	 synth_intercept(synth_t *, TSHttpTxn);
 
 #endif  /* !SYNTH_H */

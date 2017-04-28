@@ -73,24 +73,6 @@ it will pick up its service account details automatically.
 Otherwise, copy `kubernetes.config.example` to the Traffic Server configuration
 directory as `kubernetes.config` and edit it for your site.
 
-TLS
----
-
-TLS keys and certificates are taken from Kubernetes Secret resources according
-to the Ingress controller specification.  TLS Server Name Indication support is
-required; clients without SNI support will not work.  This is not considered
-a deficiency, since all current TLS clients support SNI.
-
-By default, non-TLS HTTP requests to an Ingress host with TLS configured will
-be 301 redirected to HTTPS.  To disable this behaviour, use the `ssl-redirect`
-annotation described below.
-
-If you don't want to use Kubernetes for TLS, set `tls: false` in
-`kubernetes.config`, then configure your own TLS certificates in
-`ssl_multicert.config` or though some other mechanism (e.g. the `ssl-cert-loader`
-plugin).  In that case, TLS works exactly as it would if Kubernetes was not
-involved.
-
 Debugging
 ---------
 
@@ -114,16 +96,6 @@ For persistent cache storage, mount a volume on `/var/lib/trafficserver`.
 This can be a persistent volume or an emptyDir; any missing necessary files,
 including the cache store, will be created at startup.
 
-Caching
--------
-
-Traffic Server will cache HTTP responses according to their `Cache-Control`
-and/or `Expires` headers.  `Cache-Control` is the recommended method of
-configuring caching, since it's much more flexible than `Expires`.
-
-Ingress annotations, described below, can be used to configure caching.  In
-particular, to disable caching entirely, use the `cache-enable` annotations.
-
 Ingress annotations
 -------------------
 
@@ -131,31 +103,6 @@ The behaviour of an Ingress can be configured by setting annotations on the
 resource.  Annotations beginning with `ingress.kubernetes.io` are standard
 annotations supported by most Ingress controllers; those beginning with
 `ingress.torchbox.com` are specific to the Traffic Server Ingress controller.
-
-### TLS
-
-* `ingress.kubernetes.io/ssl-redirect`: if `"false"`, do not redirect HTTP
-  requests to HTTPS, even if the Ingress has TLS configured.
-
-* `ingress.kubernetes.io/force-ssl-redirect`: if `"true"`, redirect HTTP
-  requests to HTTPS even if the Ingress does not have TLS configured.
-
-* `ingress.kubernetes.io/secure-backends`: if `"true"`, use TLS connections to
-  the backend.  This is generally not useful when connecting to pods, but can
-  be useful for external proxying (described below).
-
-* `ingress.torchbox.com/hsts-max-age`: if set to a non-zero integer value,
-  TLS responses will include an HTTP Strict-Transport-Security header with the
-  given age in seconds.  To be useful, this should be set to at least six
-  months (15768000 seconds).  **NOTE**: While this can be configured for a
-  particular hostname on some paths and not others, once a browser sees the HSTS
-  header it will apply that to *all* paths for that hostname, not just the ones
-  where the HSTS header was set.  You cannot enable HSTS for a subset of paths.
-
-* `ingress.torchbox.com/hsts-include-subdomains`: if `"true"`, HSTS headers
-  will set `includeSubdomains`.
-
-### URL rewriting
 
 * `ingress.kubernetes.io/rewrite-target`: if set to a string, the portion of the
   request path matched by the Ingress `path` attribute will be replaced with
@@ -165,19 +112,6 @@ annotations supported by most Ingress controllers; those beginning with
   does not begin with that prefix, then a redirect will be returned to this
   path.  This can be used for applications which sit in a subdirectory rather
   than at the root.
-
-### Caching
-
-* `ingress.torchbox.com/cache-enable`: if `"false"`, do not cache responses
-  even if the response has `Cache-Control` headers.
-
-* `ingress.torchbox.com/cache-generation`: a non-zero integer used to set the
-  cache generation for this Ingress.  Changing the cache generation has the
-  effect of clearing the HTTP cache for that Ingress.  Typically this would be
-  set to the current timestamp to clear the cache when large changes are made
-  to the site.
-
-### Miscellaneous
 
 * `ingress.torchbox.com/follow-redirects`: if `"true"`, Traffic Server will
   follow 3xx redirect responses and serve the final response to the client.
@@ -189,6 +123,124 @@ annotations supported by most Ingress controllers; those beginning with
 * `ingress.torchbox.com/preserve-host`: if `"false"`, set the `Host` header
   in the request to the backend name (e.g., the pod name), instead of the
   original request host.
+
+TLS
+---
+
+TLS keys and certificates are taken from Kubernetes Secret resources according
+to `tls` attribute of each Ingress resource.  TLS Server Name Indication support
+is required for this to work; clients without SNI support will receive a TLS
+negotiation error.
+
+If you don't want to use Kubernetes for TLS, set `tls: false` in
+`kubernetes.config`.  You will need to provide TLS configuration some other way,
+like `ssl_multicert.config` or the `ssl-cert-loader` plugin, or else terminate
+TLS before traffic reaches Traffic Server.
+
+By default, non-TLS HTTP requests to an Ingress host with TLS configured will
+be 301 redirected to HTTPS.  To disable this behaviour, set the
+`ingress.kubernetes.io/ssl-redirect` annotation to `false`.
+
+To force a redirect to HTTPS even when TLS is not configured on the Ingress, set
+the `ingress.kubernetes.io/force-ssl-redirect` annotation to `true`.  This will
+not work unless you are offloading TLS termination in front of Traffic Server.
+
+Usually, communication between Traffic Server and backends (e.g. pods) is via
+non-TLS HTTP, even if the request was made over HTTPS.  To use HTTPS to
+communicate with the backend, set the `ingress.kubernetes.io/secure-backends`
+annotation to `true`.  This is not very useful when the backend is a pod,
+because TS connects to the pod by its IP address, and it's extremely unlikely
+the pod will have a TLS certificate for that IP address.  However, this can be
+useful when using external proxying (described below).
+
+A better method to secure traffic between Traffic Server and pods is to use a
+network CNI plugin that supports encryption, such as Weave Net.
+
+To enable HTTP Strict Transport Security (HSTS), set the 
+`ingress.torchbox.com/hsts-max-age` annotation on the Ingress to the HSTS
+max-age time in seconds.  To be useful, this should be set to at least six
+months (15768000 seconds), but you should start with a lower value and gradually
+increase it.  Do not set it to a large value without testing it first, because,
+by design, it cannot be turned off for browsers that already saw the HSTS
+header until the max-age expires.
+
+HSTS headers are per-hostname, not per-host.  Therefore, `hsts-max-age` can only
+be set on the Ingress that includes the root path for a particular hostname
+(i.e., where the Ingress rule has no `path` attribute).
+
+To apply HSTS to subdomains as well, set the
+`ingress.torchbox.com/hsts-include-subdomains` annotation.
+
+Caching
+-------
+
+Traffic Server will cache HTTP responses according to their `Cache-Control`
+and/or `Expires` headers.  `Cache-Control` is the recommended method of
+configuring caching, since it's much more flexible than `Expires`.
+
+Ingress annotations can be used to configure caching.  To disable caching
+entirely, set the `ingress.torchbox.com/cache-enable` annotation to `false`.
+
+You can purge individual URLs from the cache by sending an HTTP `PURGE` request
+to Traffic Server.  To make this easy to do from pods, create a Service for the
+TS pod.  The PURGE request should look like this:
+
+```
+PURGE http://www.mysite.com/mypage.html HTTP/1.0
+```
+
+Unfortunately, this doesn't work very well when multiple copies of TS are
+running, since there's no simple way for an application to retrieve the list of
+TS instances.  We plan to release our internal purge multiplexor service called
+"multipurger" which solves this problem.
+
+Occasionally, you might want to clear the cache for an entire domain, for
+example if some boilerplate HTML has changed that affects all pages.  To do this,
+set the `ingress.torchbox.com/cache-generation` annotation to a non-zero
+integer.  This changes the cache generation for the Ingress; any objects cached
+with a different generation are no longer visible, and have been effectively
+removed from the cache.  Typically the cache generation would be set to the
+current UNIX timestamp, although any non-zero integer will work.
+
+Authentication
+--------------
+
+To enable password authentication, set the `ingress.kubernetes.io/auth-type`
+annotation on the Ingress to `basic`, and `ingress.kubernetes.io/auth-secret`
+to the name of a secret which contains an htpasswd file as the `auth` key.  You
+can create such a secret with `kubectl`:
+
+```
+$ kubectl create secret generic my-auth --from-file=auth=my-htpasswd
+```
+
+Optionally, set `ingress.kubernetes.io/auth-realm` to the basic authentication
+realm, which is displayed in the password prompt by most browsers.
+
+Most common password hash schemes are supported, including DES, MD5 (`$1$` and
+`$apr1`), bcrypt (`$2[abxy]$`), SHA-256 (`$5$`) and SHA-512 (`$6$`), and four
+RFC2307-style hashes: `{PLAIN}`, `{SHA}`, `{SSHA}` and `{CRYPT}` (the first
+three of which are also supported by nginx; `{CRYPT}` is supported by OpenLDAP,
+but is somewhat redundant since it's handled by simply removing the `{CRYPT}`
+prefix and treating it as a normal crypt hash).
+
+Security-wise, although the MD5 schemes are extremely weak as password hashes,
+they are probably fine for any situation where htpasswd-based authentication is
+in use.  The primary security improvement in newer algorithms (e.g. bcrypt and
+SHA-2) is they are slower, which increases the time required to perform an
+offline brute force attack; however, this also increases the time required to
+_check_ the password, which leads to unacceptable delays on typical HTML page
+loads.
+
+For example, if you use a bcrypt configuration that takes 200ms to check one
+hash, and you load an HTML page with 20 assets, then you will spend 4 seconds
+doing nothing but waiting for authentication.  If multiple users are loading
+pages at the same time, then things will be even slower once you run out of
+CPUs.
+
+If you need stronger password security than MD5, you should stop using HTTP
+basic authentication and use another authentication method (like Cookie-based
+authentication) instead.
 
 External proxying
 -----------------

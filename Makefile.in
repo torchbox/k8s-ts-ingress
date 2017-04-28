@@ -22,24 +22,33 @@ TS_INCDIR=	@TS_INCDIR@
 TS_PLUGINDIR=	@TS_PLUGINDIR@
 
 CC=		@CC@
-CPPFLAGS=	@CPPFLAGS@ -I${TS_INCDIR}
+CPPFLAGS=	-I@top_srcdir@ @CPPFLAGS@ -I${TS_INCDIR}
 CFLAGS=		@TS_CFLAGS@ @JSON_CFLAGS@ @CFLAGS@
 LIBS=		@LIBS@ @LDFLAGS@ @JSON_LIBS@
 
-OBJS=		hash.o		\
-		config.o	\
-		cluster.o	\
-		ingress.o	\
-		secret.o	\
-		service.o	\
-		endpoints.o	\
-		namespace.o	\
-		watcher.o	\
-		synth.o		\
-		remap.o		\
-		tls.o		\
-		plugin.o	\
-		${HASH_OBJS}
+VPATH=		@top_srcdir@/crypt
+
+SRCS=		hash.c		\
+		config.c	\
+		cluster.c	\
+		ingress.c	\
+		secret.c	\
+		service.c	\
+		endpoints.c	\
+		namespace.c	\
+		watcher.c	\
+		synth.c		\
+		remap.c		\
+		tls.c		\
+		plugin.c	\
+		base64.c	\
+		crypt.c		\
+		crypt_des.c	\
+		crypt_bf.c	\
+		crypt_sha256.c	\
+		crypt_sha512.c	\
+		crypt_md5.c
+OBJS=		${SRCS:.c=.o}
 
 all: kubernetes.so
 
@@ -52,6 +61,9 @@ install: all
 
 .c.o:
 	${CC} ${CPPFLAGS} ${CFLAGS} -c $<
+
+lint: ${SRCS}
+	${CC} ${CPPFLAGS} ${CFLAGS} --analyze $?
 
 clean:
 	rm -f kubernetes_tls.so ${OBJS}

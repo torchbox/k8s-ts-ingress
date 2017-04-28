@@ -1,13 +1,23 @@
-*.swp
-/kubernetes_tls.so
-/kubernetes_remap.so
-.kube
+# Editor backup/auto-save files.
+*.sw?
+*~
+\#*#
+
+# Build swap files
 *.o
 *.so
-/aclocal.m4
+
+# autoconf generated files
 /Makefile
+/aclocal.m4
 /autom4te.cache
 /autoconf.h
 /config.log
 /config.status
+
+# clang-analyzer creates these
+*.plist
+
+# Files that might exist in development.
+.kube
 /kubernetes.config

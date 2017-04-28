@@ -38,21 +38,26 @@ struct rebuild_ctx {
 /*
  * Stores one path entry in an Ingress.
  */
+#define REMAP_AUTH_NONE		0x0
+#define REMAP_AUTH_BASIC	0x1
+#define	REMAP_AUTH_DIGEST	0x2
+
 struct remap_path {
 	char	 *rp_prefix;
 	regex_t	  rp_regex;
 	char	**rp_addrs;
 	size_t	  rp_naddrs;
+	hash_t	  rp_users;
 
 	int	  rp_cache:1;
 	int	  rp_follow_redirects:1;
-	int	  rp_hsts_subdomains:1;
 	int	  rp_secure_backends:1;
 	int	  rp_preserve_host:1;
+	uint	  rp_auth_type:2;
 	int	  rp_cache_gen;
-	int	  rp_hsts_max_age;
 	char	 *rp_app_root;
 	char	 *rp_rewrite_target;
+	char	 *rp_auth_realm;
 };
 
 /*
@@ -66,6 +71,8 @@ struct remap_host {
 	SSL_CTX			*rh_ctx;
 	int			 rh_no_ssl_redirect:1;
 	int			 rh_force_ssl_redirect:1;
+	int			 rh_hsts_subdomains:1;
+	int			 rh_hsts_max_age;
 };
 
 /*
