@@ -21,6 +21,7 @@
 #include	<errno.h>
 #include	<getopt.h>
 #include	<regex.h>
+#include	<ctype.h>
 
 #include	<ts/ts.h>
 #include	<ts/remap.h>
@@ -32,28 +33,34 @@
 #include	"config.h"
 #include	"plugin.h"
 #include	"synth.h"
+#include	"ts_crypt.h"
+
+static void
+remap_path_free(struct remap_path *rp)
+{
+size_t	i;
+
+	for (i = 0; i < rp->rp_naddrs; i++)
+		free(rp->rp_addrs[i]);
+
+	free(rp->rp_prefix);
+	free(rp->rp_addrs);
+	free(rp->rp_app_root);
+	free(rp->rp_rewrite_target);
+	free(rp->rp_auth_realm);
+	hash_free(rp->rp_users);
+	regfree(&rp->rp_regex);
+}
 
 static void
 remap_host_free(struct remap_host *host)
 {
-size_t	i, j;
-	for (i = 0; i < host->rh_npaths; i++) {
-		for (j = 0; j < host->rh_paths[i].rp_naddrs; j++)
-			free(host->rh_paths[i].rp_addrs[j]);
-
-		free(host->rh_paths[i].rp_prefix);
-		free(host->rh_paths[i].rp_addrs);
-		free(host->rh_paths[i].rp_app_root);
-		free(host->rh_paths[i].rp_rewrite_target);
-		regfree(&host->rh_paths[i].rp_regex);
-	}
+size_t	i;
+	for (i = 0; i < host->rh_npaths; i++)
+		remap_path_free(&host->rh_paths[i]);
 	free(host->rh_paths);
 
-	for (j = 0; j < host->rh_default.rp_naddrs; j++)
-		free(host->rh_default.rp_addrs[j]);
-	free(host->rh_default.rp_addrs);
-
-	regfree(&host->rh_default.rp_regex);
+	remap_path_free(&host->rh_default);
 
 	if (host->rh_ctx)
 		TSSslContextDestroy((TSSslContext) host->rh_ctx);
@@ -141,6 +148,40 @@ size_t		 i, j;
 }
 
 static void
+remap_path_add_users(struct remap_path *rp, secret_t *secret)
+{
+char	*authdata = NULL;
+char	 buf[512];
+BIO	*bio;
+
+	if ((authdata = hash_get(secret->se_data, "auth")) == NULL)
+		return;
+
+	bio = BIO_new_mem_buf(authdata, -1);
+	bio = BIO_push(BIO_new(BIO_f_base64()), bio);
+	BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+	bio = BIO_push(BIO_new(BIO_f_buffer()), bio);
+
+	while (BIO_gets(bio, buf, sizeof(buf)) > 0) {
+	char	*password, *rest;
+		if ((password = strchr(buf, ':')) == NULL)
+			continue;
+		*password++ = '\0';
+
+		if ((rest = strchr(password, ':')) != NULL)
+			*rest = '\0';
+
+		while (strchr("\r\n", password[strlen(password) - 1]))
+			password[strlen(password) - 1] = '\0';
+
+		TSDebug("kubernetes", "added user %s/%s", buf, password);
+		hash_set(rp->rp_users, buf, strdup(password));
+	}
+
+	BIO_free(bio);
+}
+
+static void
 rebuild_make_host(struct rebuild_ctx *ctx,
 		  struct remap_host *rh,
 		  ingress_rule_t *rule)
@@ -217,20 +258,6 @@ char		*s;
 		else
 			rp->rp_cache = 1;
 
-		/* hsts-max-age: enable hsts */
-		s = hash_get(ctx->ingress->in_annotations,
-			     "ingress.torchbox.com/hsts-max-age");
-		if (s)
-			rp->rp_hsts_max_age = atoi(s);
-
-		/* hsts-include-subdomains: if set, hsts includes subdomains */
-		s = hash_get(ctx->ingress->in_annotations,
-			     "ingress.torchbox.com/hsts-include-subdomains");
-		if (s && !strcmp(s, "true"))
-			rp->rp_hsts_subdomains = 1;
-		else
-			rp->rp_hsts_subdomains = 0;
-
 		/* follow-redirects: if set, TS will resolve 3xx responses itself */
 		s = hash_get(ctx->ingress->in_annotations,
 			     "ingress.torchbox.com/follow-redirects");
@@ -270,6 +297,33 @@ char		*s;
 		 */
 		if (s && *s == '/')
 			rp->rp_rewrite_target = strdup(s + 1);
+
+		/*
+		 * Authentication.
+		 */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.kubernetes.io/auth-type");
+		if (s) {
+			if (strcmp(s, "basic") == 0)
+				rp->rp_auth_type = REMAP_AUTH_BASIC;
+			else if (strcmp(s, "digest") == 0)
+				rp->rp_auth_type = REMAP_AUTH_DIGEST;
+		}
+
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.kubernetes.io/auth-realm");
+		if (s)
+			rp->rp_auth_realm = strdup(s);
+
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.kubernetes.io/auth-secret");
+		if (s) {
+		secret_t	*se;
+			if ((se = namespace_get_secret(ctx->ns, s)) != NULL) {
+				rp->rp_users = hash_new(127, free);
+				remap_path_add_users(rp, se);
+			}
+		}
 
 		/*
 		 * Add the endpoints for this service's backends.
@@ -316,15 +370,34 @@ size_t			 i;
 		TSDebug("kubernetes", "      %s: added with CTX[%p]",
 			hostname, rh->rh_ctx);
 
+		/* ssl-redirect: if false, disable http->https redirect */
 		s = hash_get(ing->in_annotations,
 			     "ingress.kubernetes.io/ssl-redirect");
 		if (s && !strcmp(s, "false"))
 			rh->rh_no_ssl_redirect = 1;
 
+		/*
+		 * force-ssl-redirect: redirect http->https even if the
+		 * Ingress doesn't have TLS configured.
+		 */
 		s = hash_get(ing->in_annotations,
 			     "ingress.kubernetes.io/force-ssl-redirect");
 		if (s && !strcmp(s, "true"))
 			rh->rh_force_ssl_redirect = 1;
+
+		/* hsts-max-age: enable hsts. */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/hsts-max-age");
+		if (s)
+			rh->rh_hsts_max_age = atoi(s);
+
+		/* hsts-include-subdomains: if set, hsts includes subdomains */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/hsts-include-subdomains");
+		if (s && !strcmp(s, "true"))
+			rh->rh_hsts_subdomains = 1;
+		else
+			rh->rh_hsts_subdomains = 0;
 	}
 }
 
@@ -417,21 +490,44 @@ size_t	i = 0;
 	regmatch_t		 matches[1];
 
 		if (regexec(&rp->rp_regex, path, 1, matches, 0) == 0) {
-			TSDebug("kubernetes", "find_path: path [%s] matched [%s]",
-				path, rp->rp_prefix);
-
 			if (pfxs)
 				*pfxs = matches[0].rm_eo - matches[0].rm_so;
 			return rp;
 		}
-		TSDebug("kubernetes", "find_path: path [%s] did not match [%s]",
-			path, rp->rp_prefix);
 	}
 
 	if (pfxs)
 		*pfxs = 0;
-	TSDebug("kubernetes", "find_path: returning default for [%s]", path);
 	return &rh->rh_default;
+}
+
+/*
+ * Return a 401 response for a particular remap_path.
+ */
+static void
+return_unauthorized(TSHttpTxn txnp, struct remap_path *rp)
+{
+synth_t	*sy;
+	sy = synth_new(401, "Authentication required");
+
+	if (rp->rp_auth_type == REMAP_AUTH_BASIC)
+		synth_add_header(sy, "WWW-Authenticate", "Basic realm=\"%s\"",
+				 rp->rp_auth_realm ? rp->rp_auth_realm :
+				   "Authentication required");
+
+	synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
+	synth_set_body(sy, "Authentication required.\r\n");
+	synth_intercept(sy, txnp);
+}
+
+int
+check_password(hash_t users, const char *usenam, const char *pass)
+{
+char	*crypted;
+	if ((crypted = hash_get(users, usenam)) == NULL)
+		return 0;
+
+	return crypt_check(crypted, pass);
 }
 
 /*
@@ -450,15 +546,15 @@ handle_remap(TSCont contn, TSEvent event, void *edata)
 int			 pod_port, len, hostn;
 char			*pod_host = NULL, *requrl = NULL;
 const char		*cs;
-char			*hbuf = NULL, *pbuf = NULL, *s;
+char			*hbuf = NULL, *pbuf = NULL, *s, *authn = NULL;
 struct remap_host	*rh;
 struct remap_path	*rp;
 size_t			 poffs;
 TSMBuffer		 reqp;
-TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr;
+TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr = NULL;
 TSHttpTxn		 txnp = (TSHttpTxn) edata;
 TSConfig		 map_cfg = NULL;
-hash_t			 map;
+hash_t			 map = NULL;
 struct state		*state = TSContDataGet(contn);
 
 	map_cfg = TSConfigGet(state->cfg_slot);
@@ -478,7 +574,9 @@ struct state		*state = TSContDataGet(contn);
 	 * or in the request path for a proxy-style request (GET http://).
 	 * We need to handle both cases.
 	 */
-	host_hdr = TSMimeHdrFieldFind(reqp, hdr_loc, "Host", 4);
+	host_hdr = TSMimeHdrFieldFind(reqp, hdr_loc,
+				      TS_MIME_FIELD_HOST,
+				      TS_MIME_LEN_HOST);
 	if (host_hdr) {
 		/*
 		 * TS fails a request for too many host headers anymore, but
@@ -543,25 +641,6 @@ struct state		*state = TSContDataGet(contn);
 	}
 
 	/*
-	 * If the ingress has no backends, return an error.
-	 */
-	if (rp->rp_naddrs == 0) {
-	synth_t	*sy;
-		TSDebug("kubernetes", "host <%s>: no addrs", hbuf);
-		sy = synth_new(503, "Service unavailable");
-		synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
-		synth_set_body(sy, "No backends are available to service this "
-				"request.  Please try again later.\r\n");
-		synth_intercept(sy, txnp);
-		goto cleanup;
-	}
-
-	if ((cs = TSUrlSchemeGet(reqp, url_loc, &len)) == NULL) {
-		TSDebug("kubernetes", "<%s>: could not get url scheme", requrl);
-		goto cleanup;
-	}
-
-	/*
 	 * If the Ingress has TLS configured, then redirect to TLS unless
 	 * ssl-redirect is set to false.
 	 *
@@ -600,12 +679,90 @@ struct state		*state = TSContDataGet(contn);
 		 * Return a synthetic response to redirect.
 		 */
 		sy = synth_new(301, "Moved");
-		synth_add_header(sy, "Location", s);
+		synth_add_header(sy, "Location", "%s", s);
 		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
 		synth_set_body(sy, "The requested document has moved.\r\n");
 		synth_intercept(sy, txnp);
 		TSfree(s);
 
+		goto cleanup;
+	}
+
+	/*
+	 * Check authorization.  Do this after TLS redirect, so users aren't
+	 * prompted to enter passwords over a plaintext connection.
+	 */
+	if (rp->rp_auth_type) {
+	TSMLoc	 auth_hdr;
+	char	 buf[256];
+	char	 *creds;
+	char	*p;
+	BIO	*bio;
+	int	 n;
+
+		if (!rp->rp_users) {
+			return_unauthorized(txnp, rp);
+			goto cleanup;
+		}
+
+		auth_hdr = TSMimeHdrFieldFind(reqp, hdr_loc,
+					      TS_MIME_FIELD_AUTHORIZATION,
+					      TS_MIME_LEN_AUTHORIZATION);
+		if (auth_hdr == NULL) {
+			return_unauthorized(txnp, rp);
+			goto cleanup;
+		}
+
+		cs = TSMimeHdrFieldValueStringGet(reqp, hdr_loc, auth_hdr,
+						  0, &len);
+		authn = malloc(len + 1);
+		bcopy(cs, authn, len);
+		authn[len] = '\0';
+		TSHandleMLocRelease(reqp, hdr_loc, auth_hdr);
+
+		if ((creds = strchr(authn, ' ')) == NULL) {
+			return_unauthorized(txnp, rp);
+			goto cleanup;
+		}
+		*creds++ = '\0';
+		while (isspace(*creds))
+			++creds;
+
+		bio = BIO_new_mem_buf(creds, -1);
+		bio = BIO_push(BIO_new(BIO_f_base64()), bio);
+		BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+		n = BIO_read(bio, buf, sizeof(buf) - 1);
+		BIO_free(bio);
+
+		if (n < 1) {
+			return_unauthorized(txnp, rp);
+			goto cleanup;
+		}
+
+		buf[n] = 0;
+		if ((p = strchr(buf, ':')) == NULL) {
+			return_unauthorized(txnp, rp);
+			goto cleanup;
+		}
+		*p++ = '\0';
+
+		if (!check_password(rp->rp_users, buf, p)) {
+			return_unauthorized(txnp, rp);
+			goto cleanup;
+		}
+	}
+
+	/*
+	 * If the ingress has no backends, return an error.
+	 */
+	if (rp->rp_naddrs == 0) {
+	synth_t	*sy;
+		TSDebug("kubernetes", "host <%s>: no addrs", hbuf);
+		sy = synth_new(503, "Service unavailable");
+		synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
+		synth_set_body(sy, "No backends are available to service this "
+				"request.  Please try again later.\r\n");
+		synth_intercept(sy, txnp);
 		goto cleanup;
 	}
 
@@ -623,10 +780,11 @@ struct state		*state = TSContDataGet(contn);
 	/*
 	 * Send HSTS headers.
 	 */
-	if (rp->rp_hsts_max_age)
+	if (rh->rh_hsts_max_age)
 		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_MAX_AGE,
-				      rp->rp_hsts_max_age);
-	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS, 1);
+				      rh->rh_hsts_max_age);
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS,
+			      rh->rh_hsts_subdomains);
 
 	/*
 	 * If the Ingress has app-root set, then any request not inside the
@@ -653,7 +811,7 @@ struct state		*state = TSContDataGet(contn);
 
 		s = TSUrlStringGet(newurl, new_loc, &len);
 		sy = synth_new(301, "Redirected");
-		synth_add_header(sy, "Location", s);
+		synth_add_header(sy, "Location", "%s", s);
 		synth_add_header(sy, "Content-Type",
 				 "text/plain; charset=UTF-8");
 		synth_set_body(sy, "The requested document is found "
@@ -768,6 +926,10 @@ struct state		*state = TSContDataGet(contn);
 cleanup:
 	TSConfigRelease(state->cfg_slot, map_cfg);
 	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
+	if (authn)
+		free(authn);
+	if (host_hdr)
+		TSHandleMLocRelease(reqp, hdr_loc, host_hdr);
 	if (url_loc)
 		TSHandleMLocRelease(reqp, hdr_loc, url_loc);
 	if (hdr_loc)

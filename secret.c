@@ -29,6 +29,7 @@ secret_free(secret_t *secret)
 	free(secret->se_type);
 	free(secret->se_name);
 	free(secret->se_namespace);
+	free(secret);
 }
 
 secret_t *

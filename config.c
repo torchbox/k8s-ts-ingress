@@ -35,6 +35,7 @@ k8s_config_free(k8s_config_t *cfg)
 	free(cfg->co_tls_certfile);
 	free(cfg->co_tls_keyfile);
 	free(cfg->co_tls_cafile);
+	free(cfg);
 }
 
 k8s_config_t *
@@ -101,11 +102,12 @@ int		 lineno = 0;
 		if (*opt == '#' || *opt == '\0')
 			continue;
 
-		if ((value = strchr(opt, ':')) != NULL) {
-			*value++ = '\0';
-			while (isspace(*value))
-				value++;
-		}
+		if ((value = strchr(opt, ':')) == NULL)
+			goto error;
+
+		*value++ = '\0';
+		while (isspace(*value))
+			value++;
 
 		if (strcmp(opt, "server") == 0) {
 		char	*port;

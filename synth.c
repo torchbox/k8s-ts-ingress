@@ -45,19 +45,27 @@ struct synth {
 };
 
 static int
-sy_printf(synth_t *sy, const char *fmt, ...)
+sy_vprintf(synth_t *sy, const char *fmt, va_list args)
 {
-va_list	args;
 int	n;
 size_t	left = SY_BUFSZ - sy->sy_bufpos;
-
-	va_start(args, fmt);
 
 	n = vsnprintf(sy->sy_buf + sy->sy_bufpos, left, fmt, args);
 	if ((size_t) n > left)
 		n = left;
 	sy->sy_bufpos += n;
 
+	return n;
+}
+
+static int
+sy_printf(synth_t *sy, const char *fmt, ...)
+{
+va_list	args;
+int	n;
+
+	va_start(args, fmt);
+	n = sy_vprintf(sy, fmt, args);
 	va_end(args);
 	return n;
 }
@@ -86,9 +94,20 @@ synth_free(synth_t *sy)
 }
 
 void
-synth_add_header(synth_t *sy, const char *hdr, const char *val)
+synth_add_header(synth_t *sy, const char *hdr, const char *fmt, ...)
 {
-	sy_printf(sy, "%s: %s\r\n", hdr, val);
+va_list	args;
+	va_start(args, fmt);
+	synth_vadd_header(sy, hdr, fmt, args);
+	va_end(args);
+}
+
+void
+synth_vadd_header(synth_t *sy, const char *hdr, const char *fmt, va_list args)
+{
+	sy_printf(sy, "%s: ", hdr);
+	sy_vprintf(sy, fmt, args);
+	sy_printf(sy, "\r\n");
 }
 
 void
