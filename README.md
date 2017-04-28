@@ -218,7 +218,7 @@ Optionally, set `ingress.kubernetes.io/auth-realm` to the basic authentication
 realm, which is displayed in the password prompt by most browsers.
 
 Most common password hash schemes are supported, including DES, MD5 (`$1$` and
-`$apr1`), bcrypt (`$2[abxy]$`), SHA-256 (`$5$`) and SHA-512 (`$6$`), and four
+`$apr1$`), bcrypt (`$2[abxy]$`), SHA-256 (`$5$`) and SHA-512 (`$6$`), and four
 RFC2307-style hashes: `{PLAIN}`, `{SHA}`, `{SSHA}` and `{CRYPT}` (the first
 three of which are also supported by nginx; `{CRYPT}` is supported by OpenLDAP,
 but is somewhat redundant since it's handled by simply removing the `{CRYPT}`
@@ -364,16 +364,29 @@ for questions or support, or to report bugs.
 License
 -------
 
-This plugin was developed by Felicity Tarnell <felicity@torchbox.com> for
-[Torchbox](https://torchbox.com).  Copyright (c) 2016-2017 Torchbox Ltd.
+This plugin was developed by Felicity Tarnell (ft@le-Fay.ORG) for
+[Torchbox Ltd.](https://torchbox.com).  Copyright (c) 2016-2017 Torchbox Ltd.
 
 Permission is granted to anyone to use this software for any purpose,
 including commercial applications, and to alter it and redistribute it
-freely.
+freely. This software is provided 'as-is', without any express or implied
+warranty.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+----
+
+`crypt_bf.c` was written by Solar Designer, and is released into the public
+domain.
+
+`crypt_des.c` is copyright (c) 1989, 1993 The Regents of the University of
+California, based on code written by Tom Truscott.
+
+`crypt_md5.c` was written by Poul-Henning Kamp, and is released under the
+"beer-ware" license.
+
+`crypt_sha256.c` and `crypt_sha512.c` were written by Ulrich Drepper, and are
+released into the public domain.
+
+`hash.c` contains code written by Landon Curt Noll, which is released into the
+public domain.
+
+`base64.c` is copyright (c) 2011-2017 Felicity Tarnell.
