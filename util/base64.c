@@ -14,7 +14,8 @@
 
 #include	"base64.h"
 
-static char b64table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static char b64table[] =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 #define	b64untable(c)							\
 	( ((c) >= 'A' && (c) <= 'Z') ? ((c) - 'A')			\
 	: ((c) >= 'a' && (c) <= 'z') ? (((c) - 'a') + 26)		\

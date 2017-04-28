@@ -242,7 +242,7 @@ struct hashbucket	*hb, *prev = NULL;
 		if (prev)
 			prev->hb_next = hb->hb_next;
 		else
-			hs->hs_buckets[bn] = NULL;
+			hs->hs_buckets[bn] = hb->hb_next;
 
 		ret = hb->hb_value;
 

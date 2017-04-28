@@ -26,6 +26,7 @@
 #include	"config.h"
 #include	"plugin.h"
 #include	"synth.h"
+#include	"base64.h"
 #include	"ts_crypt.h"
 
 static void
@@ -144,20 +145,27 @@ static void
 remap_path_add_users(struct remap_path *rp, secret_t *secret)
 {
 char	*authdata = NULL;
-char	 buf[512];
-BIO	*bio;
+char	*buf, *entry, *s;
+size_t	 dlen;
+ssize_t	 n;
 
 	if ((authdata = hash_get(secret->se_data, "auth")) == NULL)
 		return;
 
-	bio = BIO_new_mem_buf(authdata, -1);
-	bio = BIO_push(BIO_new(BIO_f_base64()), bio);
-	BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
-	bio = BIO_push(BIO_new(BIO_f_buffer()), bio);
+	dlen = strlen(authdata);
+	s = buf = malloc(base64_decode_len(dlen) + 1);
+	n = base64_decode(authdata, dlen, (unsigned char *)buf);
 
-	while (BIO_gets(bio, buf, sizeof(buf)) > 0) {
+	if (n == -1) {
+		free(buf);
+		return;
+	}
+
+	buf[n] = '\0';
+
+	while ((entry = strsep(&s, "\r\n")) != NULL) {
 	char	*password, *rest;
-		if ((password = strchr(buf, ':')) == NULL)
+		if ((password = strchr(entry, ':')) == NULL)
 			continue;
 		*password++ = '\0';
 
@@ -167,11 +175,11 @@ BIO	*bio;
 		while (strchr("\r\n", password[strlen(password) - 1]))
 			password[strlen(password) - 1] = '\0';
 
-		TSDebug("kubernetes", "added user %s/%s", buf, password);
-		hash_set(rp->rp_users, buf, strdup(password));
+		TSDebug("kubernetes", "added user %s/%s", entry, password);
+		hash_set(rp->rp_users, entry, strdup(password));
 	}
 
-	BIO_free(bio);
+	free(buf);
 }
 
 static void
@@ -520,7 +528,73 @@ char	*crypted;
 	if ((crypted = hash_get(users, usenam)) == NULL)
 		return 0;
 
-	return crypt_check(crypted, pass);
+	return crypt_check(pass, crypted);
+}
+
+int
+check_auth(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, struct remap_path *rp)
+{
+TSMLoc		 auth_hdr = NULL;
+char		 buf[256];
+char		*creds;
+char		*p;
+int		 n, len;
+const char	*cs;
+size_t		 credslen;
+
+	if (rp->rp_auth_type != REMAP_AUTH_BASIC)
+		goto error;
+
+	if (!rp->rp_users)
+		goto error;
+
+	auth_hdr = TSMimeHdrFieldFind(reqp, hdrs,
+				      TS_MIME_FIELD_AUTHORIZATION,
+				      TS_MIME_LEN_AUTHORIZATION);
+	if (auth_hdr == NULL)
+		goto error;
+
+	cs = TSMimeHdrFieldValueStringGet(reqp, hdrs, auth_hdr, 0, &len);
+	if ((creds = memchr(cs, ' ', len)) == NULL)
+		goto error;
+
+	if (len < 7)
+		goto error;
+	if (memcmp(cs, "Basic ", 6))
+		goto error;
+
+	while (isspace(*creds) && (creds < cs + len))
+		++creds;
+
+	if (creds == cs + len)
+		goto error;
+	credslen = (cs + len) - creds;
+
+	if (base64_decode_len(credslen) > sizeof(buf) - 1)
+		goto error;
+
+	n = base64_decode(creds, credslen, (unsigned char *)buf);
+	TSHandleMLocRelease(reqp, hdrs, auth_hdr);
+	auth_hdr = NULL;
+
+	if (n < 3)
+		goto error;
+
+	buf[n] = '\0';
+
+	if ((p = strchr(buf, ':')) == NULL)
+		goto error;
+	*p++ = '\0';
+
+	if (!check_password(rp->rp_users, buf, p))
+		goto error;
+
+	return 1;
+
+error:
+	if (auth_hdr)
+		TSHandleMLocRelease(reqp, hdrs, auth_hdr);
+	return 0;
 }
 
 /*
@@ -539,7 +613,7 @@ handle_remap(TSCont contn, TSEvent event, void *edata)
 int			 pod_port, len, hostn;
 char			*pod_host = NULL, *requrl = NULL;
 const char		*cs;
-char			*hbuf = NULL, *pbuf = NULL, *s, *authn = NULL;
+char			*hbuf = NULL, *pbuf = NULL, *s;
 struct remap_host	*rh;
 struct remap_path	*rp;
 size_t			 poffs;
@@ -686,60 +760,7 @@ struct state		*state = TSContDataGet(contn);
 	 * prompted to enter passwords over a plaintext connection.
 	 */
 	if (rp->rp_auth_type) {
-	TSMLoc	 auth_hdr;
-	char	 buf[256];
-	char	 *creds;
-	char	*p;
-	BIO	*bio;
-	int	 n;
-
-		if (!rp->rp_users) {
-			return_unauthorized(txnp, rp);
-			goto cleanup;
-		}
-
-		auth_hdr = TSMimeHdrFieldFind(reqp, hdr_loc,
-					      TS_MIME_FIELD_AUTHORIZATION,
-					      TS_MIME_LEN_AUTHORIZATION);
-		if (auth_hdr == NULL) {
-			return_unauthorized(txnp, rp);
-			goto cleanup;
-		}
-
-		cs = TSMimeHdrFieldValueStringGet(reqp, hdr_loc, auth_hdr,
-						  0, &len);
-		authn = malloc(len + 1);
-		bcopy(cs, authn, len);
-		authn[len] = '\0';
-		TSHandleMLocRelease(reqp, hdr_loc, auth_hdr);
-
-		if ((creds = strchr(authn, ' ')) == NULL) {
-			return_unauthorized(txnp, rp);
-			goto cleanup;
-		}
-		*creds++ = '\0';
-		while (isspace(*creds))
-			++creds;
-
-		bio = BIO_new_mem_buf(creds, -1);
-		bio = BIO_push(BIO_new(BIO_f_base64()), bio);
-		BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
-		n = BIO_read(bio, buf, sizeof(buf) - 1);
-		BIO_free(bio);
-
-		if (n < 1) {
-			return_unauthorized(txnp, rp);
-			goto cleanup;
-		}
-
-		buf[n] = 0;
-		if ((p = strchr(buf, ':')) == NULL) {
-			return_unauthorized(txnp, rp);
-			goto cleanup;
-		}
-		*p++ = '\0';
-
-		if (!check_password(rp->rp_users, buf, p)) {
+		if (!check_auth(txnp, reqp, hdr_loc, rp)) {
 			return_unauthorized(txnp, rp);
 			goto cleanup;
 		}
@@ -919,8 +940,6 @@ struct state		*state = TSContDataGet(contn);
 cleanup:
 	TSConfigRelease(state->cfg_slot, map_cfg);
 	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
-	if (authn)
-		free(authn);
 	if (host_hdr)
 		TSHandleMLocRelease(reqp, hdr_loc, host_hdr);
 	if (url_loc)

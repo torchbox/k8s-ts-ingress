@@ -18,10 +18,15 @@ AC_INIT([k8s-ts-ingress], [1.0-dev])
 
 AC_CONFIG_HEADERS([autoconf.h])
 
+TSXS=tsxs
 AC_ARG_WITH([tsxs],
 	[AS_HELP_STRING([--with-tsxs[=PATH]], [path to Traffic Server tsxs])],
 	[TSXS="$withval"])
-AC_CHECK_PROG(TSXS, tsxs)
+AC_CHECK_PROG(HAVE_TSXS, $TSXS, yes, no)
+
+AS_IF([test "${HAVE_TSXS}" != "yes"], [
+	AC_ERROR([could not find tsxs; maybe you need --with-tsxs=/path/to/tsxs])
+])
 
 PIC_FLAG=-fPIC
 AC_ARG_WITH([cc-pic-flag],
@@ -30,25 +35,26 @@ AC_ARG_WITH([cc-pic-flag],
 	[PIC_FLAG="$withval"])
 CFLAGS="$CFLAGS $PIC_FLAG"
 
-AS_IF([test -z "${TSXS}"], [
-	AC_ERROR([could not find tsxs; maybe you need --with-tsxs=/path/to/tsxs])
-])
-
 TS_CC=`$TSXS -q CC`
+TS_CXX=`$TSXS -q CXX`
 TS_CFLAGS=`$TSXS -q CFLAGS`
+TS_CXXFLAGS=`$TSXS -q CXXFLAGS`
 TS_INCDIR=`$TSXS -q INCLUDEDIR`
 TS_PLUGINDIR=`$TSXS -q LIBEXECDIR`
 AC_SUBST(TS_CFLAGS)
+AC_SUBST(TS_CXXFLAGS)
 AC_SUBST(TS_INCDIR)
 AC_SUBST(TS_PLUGINDIR)
 
 AC_LANG_C
 AC_PROG_CC([$TS_CC])
+AC_PROG_CXX([$TS_CXX])
 
 PKG_CHECK_MODULES(JSON, json-c)
 AC_SUBST([JSON_CFLAGS])
 AC_SUBST([JSON_LIBS])
 
 AC_CHECK_LIB(ssl, SSL_library_init, [], [AC_ERROR([could not find OpenSSL])])
+AC_CHECK_LIB(crypto, MD5_Update, [], [AC_ERROR([could not find OpenSSL])])
 
 AC_OUTPUT(Makefile)

@@ -81,10 +81,8 @@
 #include	"ts_crypt.h"
 #include	"base64.h"
 
-typedef int (*crypt_check_fn) (const char *, const char *);
-
 /* UNIX DES; BSD/OS extended DES */
-static int
+int
 crypt_check_des(const char *plain, const char *hashed)
 {
 char	buf[128];
@@ -93,7 +91,7 @@ char	buf[128];
 }
 
 /* phk's multi-round MD5 from FreeBSD */
-static int
+int
 crypt_check_phk_md5(const char *plain, const char *hashed)
 {
 char	buf[128];
@@ -102,7 +100,7 @@ char	buf[128];
 }
 
 /* Blowfish from OpenBSD */
-static int
+int
 crypt_check_blowfish(const char *plain, const char *hashed)
 {
 char	buf[128];
@@ -111,7 +109,7 @@ char	buf[128];
 }
 
 /* Ulrich Drepped's SHA-256 from glibc */
-static int
+int
 crypt_check_sha256(const char *plain, const char *hashed)
 {
 char	buf[128];
@@ -120,7 +118,7 @@ char	buf[128];
 }
 
 /* Ulrich Drepped's SHA-512 from glibc */
-static int
+int
 crypt_check_sha512(const char *plain, const char *hashed)
 {
 char	buf[128];
@@ -129,14 +127,12 @@ char	buf[128];
 }
 
 /* RFC2307 "PLAIN" mechanism (not actually a hash) */
-static int
+int
 crypt_check_rfc2307_plain(const char *plain, const char *hashed)
 {
-	TSDebug("kubernetes", "plain: hashed=[%s]", hashed);
 	if (strncmp(hashed, "{PLAIN}", 7))
 		return 0;
 
-	TSDebug("kubernetes", "plain: compared [%s]=[%s]", hashed+7, plain);
 	if (strcmp(hashed + 7, plain))
 		return 0;
 
@@ -144,7 +140,7 @@ crypt_check_rfc2307_plain(const char *plain, const char *hashed)
 }
 
 /* RFC2307 unsalted SHA mechanism */
-static int
+int
 crypt_check_rfc2307_sha(const char *plain, const char *hashed)
 {
 unsigned char	 sha[SHA_DIGEST_LENGTH];
@@ -172,7 +168,7 @@ ssize_t		 s;
 }
 
 /* RFC2307 salted SHA mechanism */
-static int
+int
 crypt_check_rfc2307_ssha(const char *plain, const char *hashed)
 {
 unsigned char	 sha[SHA_DIGEST_LENGTH];
@@ -212,7 +208,7 @@ size_t		 plainlen, hashlen, saltlen;
 	return ret;
 }
 
-crypt_check_fn
+static crypt_check_fn
 get_crypt_function(const char *hash)
 {
 const char	*p;
@@ -265,7 +261,7 @@ const char	*p;
 }
 
 int
-crypt_check(const char *hash, const char *plain)
+crypt_check(const char *plain, const char *hash)
 {
 crypt_check_fn	 crypt_fn;
 

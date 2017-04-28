@@ -21,12 +21,35 @@ DOCKER_IMAGE=		${DOCKER_REGISTRY}:${DOCKER_TAG}
 TS_INCDIR=	@TS_INCDIR@
 TS_PLUGINDIR=	@TS_PLUGINDIR@
 
+ROOT=		@top_srcdir@
+
 CC=		@CC@
-CPPFLAGS=	-I@top_srcdir@ @CPPFLAGS@ -I${TS_INCDIR}
+CXX=		@CXX@
+CPPFLAGS=	@CPPFLAGS@		\
+		-I${TS_INCDIR}		\
+		-I${ROOT}		\
+		-I${ROOT}/gtest		\
+		-I${ROOT}/gtest/include	\
+		-I${ROOT}/api		\
+		-I${ROOT}/util
+
 CFLAGS=		@TS_CFLAGS@ @JSON_CFLAGS@ @CFLAGS@
+CXXFLAGS=	@TS_CXXFLAGS@ @JSON_CFLAGS@ @CXXFLAGS@
 LIBS=		@LIBS@ @LDFLAGS@ @JSON_LIBS@
 
-VPATH=		@top_srcdir@/crypt
+VPATH=		${ROOT}/crypt		\
+		${ROOT}/util		\
+		${ROOT}/api		\
+		${ROOT}/tests		\
+		${ROOT}/gtest/src
+
+CRYPT_SRCS=	crypt.c		\
+		crypt_des.c	\
+		crypt_bf.c	\
+		crypt_sha256.c	\
+		crypt_sha512.c	\
+		crypt_md5.c
+CRYPT_OBJS=	${CRYPT_SRCS:.c=.o}
 
 SRCS=		hash.c		\
 		config.c	\
@@ -42,31 +65,38 @@ SRCS=		hash.c		\
 		tls.c		\
 		plugin.c	\
 		base64.c	\
-		crypt.c		\
-		crypt_des.c	\
-		crypt_bf.c	\
-		crypt_sha256.c	\
-		crypt_sha512.c	\
-		crypt_md5.c
+		${CRYPT_SRCS}
 OBJS=		${SRCS:.c=.o}
+
+TEST_OBJS=	gtest-all.o	gtest_main.o	\
+		base64.o	test_base64.o	\
+		hash.o		test_hash.o	\
+		${CRYPT_OBJS}	test_crypt.o
 
 all: kubernetes.so
 
 kubernetes.so: ${OBJS}
 	${CC} ${CFLAGS} ${LDFLAGS} -shared -o $@ ${OBJS} ${LIBS}
 
+test: ${TEST_OBJS} ${GTEST_OBJS}
+	${CXX} ${CXXFLAGS} ${LDFLAGS} ${TEST_OBJS} ${GTEST_OBJS} -o test ${LIBS}
+	./test
+
 install: all
 	install -d -m 0755 ${TS_PLUGINDIR}
 	install -c -m 0755 kubernetes.so ${TS_PLUGINDIR}
 
-.c.o:
+%.o: %.c
 	${CC} ${CPPFLAGS} ${CFLAGS} -c $<
+
+%.o: %.cc
+	${CXX} ${CPPFLAGS} ${CXXFLAGS} -c $<
 
 lint: ${SRCS}
 	${CC} ${CPPFLAGS} ${CFLAGS} --analyze $?
 
 clean:
-	rm -f kubernetes_tls.so ${OBJS}
+	rm -f kubernetes.so ${OBJS} ${TEST_OBJS} *.plist test
 
 docker-build:
 	docker build --pull -t ${DOCKER_IMAGE} .
@@ -77,11 +107,10 @@ docker-push:
 depend:
 	sed -e '/^# ADDED BY MAKE DEPEND -- DO NOT DELETE/,$$ d' < Makefile > Makefile.tmp
 	echo '# ADDED BY MAKE DEPEND -- DO NOT DELETE' >> Makefile.tmp
-	cc -MM *.c >> Makefile.tmp
+	${CC} ${CPPFLAGS} ${CFLAGS} ${JSON_CFLAGS} -MM \
+		*.c crypt/*.c >> Makefile.tmp
+	${CXX} ${CPPFLAGS} ${CXXFLAGS} ${JSON_CFLAGS} -MM \
+		tests/*.cc >> Makefile.tmp
 	mv Makefile.tmp Makefile
 
-hashtest:
-	${CC} -DTEST hash.c -o hashtest
-	./hashtest
-
-.PHONY: hashtest
+.PHONY: test

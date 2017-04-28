@@ -13,6 +13,10 @@
 
 #include    <stdlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * An opaque type representing a hash.
  */
@@ -83,5 +87,9 @@ struct hash_iter_state {
 
 int	hash_iterate(hash_t, struct hash_iter_state *iterstate,
 		     const char **key, void **value);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* !HASH_H */
