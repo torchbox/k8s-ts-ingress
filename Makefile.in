@@ -51,14 +51,16 @@ CRYPT_SRCS=	crypt.c		\
 		crypt_md5.c
 CRYPT_OBJS=	${CRYPT_SRCS:.c=.o}
 
-SRCS=		hash.c		\
-		config.c	\
-		cluster.c	\
+API_SRCS=	cluster.c	\
 		ingress.c	\
 		secret.c	\
 		service.c	\
 		endpoints.c	\
-		namespace.c	\
+		namespace.c
+API_OBJS=	${API_SRCS:.c=.o}
+
+SRCS=		hash.c		\
+		config.c	\
 		watcher.c	\
 		synth.c		\
 		remap.c		\
@@ -71,6 +73,7 @@ OBJS=		${SRCS:.c=.o}
 TEST_OBJS=	gtest-all.o	gtest_main.o	\
 		base64.o	test_base64.o	\
 		hash.o		test_hash.o	\
+		${API_OBJS}	test_api.o	\
 		${CRYPT_OBJS}	test_crypt.o
 
 all: kubernetes.so

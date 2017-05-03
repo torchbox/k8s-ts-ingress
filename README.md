@@ -48,6 +48,7 @@ Building
 
 Requirements:
 
+* Traffic Server 7.0 or later (including development headers).
 * A working C compiler and `make` utility.
 * json-c library
 * OpenSSL (or a compatible TLS library, e.g. LibreSSL)
@@ -58,6 +59,12 @@ Build and install the plugin:
 $ ./configure [--with-tsxs=/path/to/trafficserver/bin/tsxs]
 $ make
 # make install
+```
+
+Optionally, run the test suite (requires a C++11 compiler):
+
+```
+$ make test
 ```
 
 Configuration
@@ -156,7 +163,7 @@ useful when using external proxying (described below).
 A better method to secure traffic between Traffic Server and pods is to use a
 network CNI plugin that supports encryption, such as Weave Net.
 
-To enable HTTP Strict Transport Security (HSTS), set the 
+To enable HTTP Strict Transport Security (HSTS), set the
 `ingress.torchbox.com/hsts-max-age` annotation on the Ingress to the HSTS
 max-age time in seconds.  To be useful, this should be set to at least six
 months (15768000 seconds), but you should start with a lower value and gradually

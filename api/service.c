@@ -23,6 +23,7 @@ service_free(service_t *svc)
 	free(svc->sv_type);
 	free(svc->sv_cluster_ip);
 	free(svc->sv_session_affinity);
+	free(svc->sv_external_name);
 	hash_free(svc->sv_selector);
 	hash_free(svc->sv_ports);
 	free(svc);

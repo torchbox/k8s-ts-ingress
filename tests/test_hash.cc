@@ -26,23 +26,32 @@ using std::string;
 
 namespace {
 	/*
-	 * Repeat each test with various different hash sizes, to exercise both the
-	 * hashing and the bucket handling code.
+	 * Repeat each test with various different hash sizes, to exercise both
+	 * the hashing and the bucket handling code.
 	 */
-	vector<int>	test_sizes{ 1, 2, 7, 127, 15601 };
+	vector<int> test_sizes{ 1, 2, 7, 127, 15601 };
+
+	/*
+	 * Populate a hash with data.  This inserts and deletes data in a
+	 * specific order, to exercise the single linked list deletion code.
+	 */
+	void
+	populate_hash(hash_t hs)
+	{
+#define	VOID_P(s)	const_cast<void *>(static_cast<void const *>(s))
+		hash_set(hs, "delete 1", VOID_P("x"));
+		hash_set(hs, "foo", VOID_P("foo key"));
+		hash_set(hs, "delete 2", VOID_P("x"));
+		hash_set(hs, "bar", VOID_P("bar key"));
+		hash_del(hs, "delete 2");
+		hash_set(hs, "quux", VOID_P("quux key"));
+		hash_set(hs, "delete 3", VOID_P("x"));
+		hash_del(hs, "delete 1");
+		hash_del(hs, "delete 3");
+#undef VOID_P
+	}
 
 } // anonymous namespace
-
-#define	VOID_P(s)	const_cast<void *>(static_cast<void const *>(s))
-
-/*
- * Test various primitive hash functions.  Each test inserts 6 keys, then
- * deletes three of them; this is intended to exercise the single linked list
- * deletion code.
- *
- * Unfortunately the hash interface is not especially amenable to use in C++,
- * the a lot of casting is required to use it.
- */
 
 TEST(Hash, SetGet)
 {
@@ -51,28 +60,19 @@ TEST(Hash, SetGet)
 	char	*s;
 
 		hs = hash_new(size, NULL);
-
-		hash_set(hs, "delete 1", VOID_P("x"));
-		hash_set(hs, "foo", VOID_P("foo key"));
-		hash_set(hs, "delete 2", VOID_P("x"));
-		hash_set(hs, "bar", VOID_P("bar key"));
-		hash_del(hs, "delete 2");
-		hash_set(hs, "quux", VOID_P("quux key"));
-		hash_set(hs, "delete 3", VOID_P("x"));
-		hash_del(hs, "delete 1");
-		hash_del(hs, "delete 3");
+		populate_hash(hs);
 
 		s = static_cast<char *>(hash_get(hs, "foo"));
 		ASSERT_NE(s, static_cast<char *>(NULL));
-		EXPECT_EQ(0, strcmp(s, "foo key"));
+		EXPECT_STREQ("foo key", s);
 
 		s = static_cast<char *>(hash_get(hs, "bar"));
 		ASSERT_NE(s, static_cast<char *>(NULL));
-		EXPECT_EQ(0, strcmp(s, "bar key"));
+		EXPECT_STREQ("bar key", s);
 
 		s = static_cast<char *>(hash_get(hs, "quux"));
 		ASSERT_NE(s, static_cast<char *>(NULL));
-		EXPECT_EQ(0, strcmp(s, "quux key"));
+		EXPECT_STREQ("quux key", s);
 
 		hash_free(hs);
 	}
@@ -80,34 +80,31 @@ TEST(Hash, SetGet)
 
 namespace {
 
-void
-foreach_incr(hash_t hs, const char *key, void *value, void *data)
-{
-	++*static_cast<int *>(data);
-}
+	void
+	foreach_incr(hash_t hs, const char *key, void *value, void *data)
+	{
+	map<string, string>	*actual = static_cast<map<string, string>*>(data);
+		actual->emplace(key, static_cast<char *>(value));
+	}
 
 } // anonymous namespace
 
 TEST(Hash, Foreach)
 {
 	for (int size: test_sizes) {
-	hash_t	hs;
+	hash_t			 hs;
+	map<string, string>	 actual, expected{
+			{ "foo", "foo key" },
+			{ "bar", "bar key" },
+			{ "quux", "quux key" },
+		};
+
 		hs = hash_new(size, NULL);
+		populate_hash(hs);
 
-		hash_set(hs, "delete 1", VOID_P("x"));
-		hash_set(hs, "foo", VOID_P("foo key"));
-		hash_set(hs, "delete 2", VOID_P("x"));
-		hash_set(hs, "bar", VOID_P("bar key"));
-		hash_del(hs, "delete 2");
-		hash_set(hs, "quux", VOID_P("quux key"));
-		hash_set(hs, "delete 3", VOID_P("x"));
-		hash_del(hs, "delete 1");
-		hash_del(hs, "delete 3");
-
-		int i = 0;
-		hash_foreach(hs, foreach_incr, &i);
-
-		EXPECT_EQ(i, 3);
+		hash_foreach(hs, foreach_incr, &actual);
+		EXPECT_EQ(size_t(3), actual.size());
+		EXPECT_EQ(expected, actual);
 
 		hash_free(hs);
 	}
@@ -128,24 +125,9 @@ TEST(Hash, Iterate)
 		};
 
 		hs = hash_new(size, NULL);
+		populate_hash(hs);
 
-		hash_set(hs, "delete 1", VOID_P("x"));
-		hash_set(hs, "foo", VOID_P("foo key"));
-		hash_set(hs, "delete 2", VOID_P("x"));
-		hash_set(hs, "bar", VOID_P("bar key"));
-		hash_del(hs, "delete 2");
-		hash_set(hs, "quux", VOID_P("quux key"));
-		hash_set(hs, "delete 3", VOID_P("x"));
-		hash_del(hs, "delete 1");
-		hash_del(hs, "delete 3");
-
-		bzero(&iterstate, sizeof(iterstate));
-
-		/*
-		 * This test relies on a specific iteration order.  Any change
-		 * in the hash function will required that the test is changed
-		 * to match.
-		 */
+		memset(&iterstate, 0, sizeof(iterstate));
 
 		for (int c = 0; c < 3; c++) {
 			i = hash_iterate(hs, &iterstate, &k, &v);

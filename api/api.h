@@ -18,6 +18,10 @@
 
 #include	"hash.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 char	*_k8s_get_ssl_error(void);
 
 /*
@@ -49,14 +53,6 @@ typedef struct {
 
 void		 endpoints_free(endpoints_t *ing);
 endpoints_t	*endpoints_make(json_object *obj);
-
-/*
- * Secrets
- */
-typedef struct {
-	const char	*ts_crt;
-	const char	*ts_key;
-} tls_secret_t;
 
 /*
  * Services
@@ -173,5 +169,9 @@ typedef struct {
 
 cluster_t	*cluster_make(void);
 namespace_t	*cluster_get_namespace(cluster_t *, const char *nsname);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
