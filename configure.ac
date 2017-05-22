@@ -16,6 +16,10 @@ dnl SOFTWARE.
 
 AC_INIT([k8s-ts-ingress], [1.0-dev])
 
+AC_CANONICAL_BUILD
+AC_CANONICAL_HOST
+
+AC_CONFIG_MACRO_DIRS([acinclude])
 AC_CONFIG_HEADERS([autoconf.h])
 
 AC_ARG_WITH([tsxs],
@@ -58,6 +62,8 @@ AC_PROG_CXX([$TS_CXX])
 PKG_CHECK_MODULES(JSON, json-c)
 AC_SUBST([JSON_CFLAGS])
 AC_SUBST([JSON_LIBS])
+
+ACX_PTHREAD
 
 AC_CHECK_LIB(ssl, SSL_library_init, [], [AC_ERROR([could not find OpenSSL])])
 AC_CHECK_LIB(crypto, MD5_Update, [], [AC_ERROR([could not find OpenSSL])])

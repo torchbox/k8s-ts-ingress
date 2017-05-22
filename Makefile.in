@@ -29,9 +29,11 @@ CPPFLAGS=	@CPPFLAGS@		\
 		-I${ROOT}/api		\
 		-I${ROOT}/util
 
-CFLAGS=		@TS_CFLAGS@ @JSON_CFLAGS@ @CFLAGS@
+CFLAGS=		@TS_CFLAGS@ @JSON_CFLAGS@ @PTHREAD_CFLAGS@ @CFLAGS@
 CXXFLAGS=	@TS_CXXFLAGS@ @JSON_CFLAGS@ @CXXFLAGS@
 LIBS=		@LIBS@ @LDFLAGS@ @JSON_LIBS@
+
+PTHREAD_LIBS=	@PTHREAD_LIBS@
 
 VPATH=		${ROOT}/crypt		\
 		${ROOT}/util		\
@@ -79,7 +81,7 @@ kubernetes.so: ${OBJS}
 	${CC} ${CFLAGS} ${LDFLAGS} -shared -o $@ ${OBJS} ${LIBS}
 
 test: ${TEST_OBJS} ${GTEST_OBJS}
-	${CXX} ${CXXFLAGS} ${LDFLAGS} ${TEST_OBJS} ${GTEST_OBJS} -o test ${LIBS}
+	${CXX} ${CXXFLAGS} ${LDFLAGS} ${TEST_OBJS} ${GTEST_OBJS} -o test ${LIBS} ${PTHREAD_LIBS}
 	./test
 
 install: all
