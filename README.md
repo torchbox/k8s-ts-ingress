@@ -61,7 +61,7 @@ and edit it for your needs before using it.
 Unfortunately, there are many different ways to expose an Ingress controller on
 Kubernetes, and we can't document every possible variation, so you will need to
 decide what method is best for your cluster.  The example configuration uses a
-hostPort, which is suitable for use with an external load balancer in either
+`hostPort`, which is suitable for use with an external load balancer in either
 self-hosted clusters or using a cloud provider.
 
 Building
