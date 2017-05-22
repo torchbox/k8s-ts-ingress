@@ -3,10 +3,16 @@ sudo: required
 services:
 - docker
 before_script:
-- docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASSWORD
-script:
-- make -f Makefile.docker docker-build DOCKER_TAG=$COMMIT
-- make -f Makefile.docker docker-push DOCKER_TAG=$COMMIT
+- docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+script: |
+	set -ex
+	DOCKER_REPOSITORY=torchbox/k8s-ts-ingress
+	docker build --pull -t $DOCKER_REPOSITORY:$COMMIT .
+	docker push $DOCKER_REPOSITORY:$COMMIT
+	if [ "$TRAVIS_PULL_REQUEST" = "false" -a -n "$TRAVIS_TAG" ]; then
+		docker tag $DOCKER_REPOSITORY:$COMMIT $DOCKER_REPOSITORY:$TRAVIS_TAG
+		docker push $DOCKER_REPOSITORY:$TRAVIS_TAG
+	fi
 notifications:
   slack:
     secure: gDQXXz9C5FPFzXJG/5Zpy1AHk0kWvLfkOJSdwTaGrU6jA5zZmcJU46z8pG/ch7qZmTKvtuthdfI5gWd3U8ZFs1KPn3iQwk7LgQgEq3TTBaa+L3DPK9ChD5JnOGiYbTOUYnhwlMRnD/0XxK4gZbJ1aiw2EZmjQRYqYsrKPEYNy3ZGDH9ipHCpBz+83HhlbSOpSq2eeKSjs6+qKeSQZCR7l9u31lWGHWrrzqaDS0/z9Fz0amQXw2bc5me2R1891H6lTZhO1sysVXgXcMfqB2lHetJYyhdbRfLDhpXQD2XvvBbpD139ae40M+1GsnAPMSHnu0vho0I6GTj1lCfomPj2cjzON9hilijMTkDb3DSwwxaB9GORwdH0Y7Cqvj8laihOVC0sCCLUGgEKNPOypB5pNM5h6fnbHsv37iKXhwl7ls76Xf+Fz87v8NnOE4/wPFUga7his6OhtaLJZcDs/s5PAmy8kDQ2WwTlNfX1kqTndHBwzunhW2rrA0IXHujlxS4CCWoKrK5vge0O7jqLvjdMQeP5F1Q8PfTl5mRfu+pgbuOOf66qaGSLM+L43tMOFdq7q0hVi522KRFn30u+521M42szzElfk2uBE4qJwLL8Cz0ByhpoCaZzWYSwJ8R0TVsyknYdHbb96CCreVTcCb9ZJRC+sARJVajA779TJ/6Az6A=
