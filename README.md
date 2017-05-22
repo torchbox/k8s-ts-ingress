@@ -68,6 +68,9 @@ You can set the following environment variables to configure Traffic Server:
 
 * `TS_CACHE_SIZE`: Size of the on-disk cache file to create, in megabytes.
 
+Most of the configuration options from `kubernetes.config` can also be set in
+the environment; see `kubernetes.config.example` for details.
+
 In addition, any TS configuration (records.config) setting can be
 overridden in the environment:
 

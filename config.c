@@ -34,7 +34,7 @@ k8s_config_free(k8s_config_t *cfg)
 k8s_config_t *
 k8s_config_load(const char *file)
 {
-char		 line[1024];
+char		 line[1024], *s;
 FILE		*f = NULL;
 k8s_config_t	*ret = NULL;
 int		 lineno = 0;
@@ -146,6 +146,61 @@ int		 lineno = 0;
 		} else {
 			TSError("%s:%d: unknown option \"%s\"",
 				file, lineno, opt);
+			goto error;
+		}
+	}
+
+	if ((s = getenv("TS_SERVER")) != NULL) {
+	char	*port;
+		free(ret->co_host);
+		ret->co_host = strdup(s);
+		if ((port = strchr(ret->co_host, ':')) != NULL) {
+			*port++ = '\0';
+			ret->co_port = atoi(port);
+		} else
+			ret->co_port = 443;
+	}
+
+	if ((s = getenv("TS_CAFILE")) != NULL) {
+		free(ret->co_tls_cafile);
+		ret->co_tls_cafile = strdup(s);
+	}
+
+	if ((s = getenv("TS_CERTFILE")) != NULL) {
+		free(ret->co_tls_certfile);
+		ret->co_tls_certfile = strdup(s);
+	}
+
+	if ((s = getenv("TS_KEYFILE")) != NULL) {
+		free(ret->co_tls_keyfile);
+		ret->co_tls_keyfile = strdup(s);
+	}
+
+	if ((s = getenv("TS_TOKEN")) != NULL) {
+		free(ret->co_token);
+		ret->co_token = strdup(s);
+	}
+
+	if ((s = getenv("TS_TLS")) != NULL) {
+		if (strcmp(s, "true") == 0)
+			ret->co_tls = 1;
+		else if (strcmp(s, "false") == 0)
+			ret->co_tls = 0;
+		else {
+			TSError("$TS_TLS: expected \"true\" or \"false\","
+				" not \"%s\"", s);
+			goto error;
+		}
+	}
+
+	if ((s = getenv("TS_REMAP")) != NULL) {
+		if (strcmp(s, "true") == 0)
+			ret->co_remap = 1;
+		else if (strcmp(s, "false") == 0)
+			ret->co_remap = 0;
+		else {
+			TSError("$TS_REMAP: expected \"true\" or \"false\","
+				" not \"%s\"", s);
 			goto error;
 		}
 	}
