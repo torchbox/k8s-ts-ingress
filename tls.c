@@ -35,8 +35,8 @@ TSVConn			 ssl_vc = edata;
 SSL			*ssl = (SSL *)TSVConnSSLConnectionGet(ssl_vc);
 const char		*host = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
 struct remap_host	*rh;
-TSConfig		 map_cfg;
-hash_t			 map;
+TSConfig		 map_cfg = NULL;
+hash_t			 map = NULL;
 struct state		*state = TSContDataGet(contn);
 
 	/* Host can sometimes be null; do nothing in that case. */
@@ -67,7 +67,8 @@ struct state		*state = TSContDataGet(contn);
 	TSVConnReenable(ssl_vc);
 
 cleanup:
-	TSConfigRelease(state->cfg_slot, map_cfg);
+	if (map_cfg)
+		TSConfigRelease(state->cfg_slot, map_cfg);
 	return TS_SUCCESS;
 }
 
