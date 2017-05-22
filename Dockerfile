@@ -14,7 +14,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-FROM	torchbox/trafficserver:7.0
+FROM	torchbox/trafficserver:7.0.0-1.0
 
 COPY	. /usr/src/k8s-ts-ingress
 
