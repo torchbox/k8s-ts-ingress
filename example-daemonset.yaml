@@ -1,0 +1,131 @@
+# Example Kubernetes DaemonSet configuration for running the Traffic Server
+# ingress controller.  It will listed on hostPort 7080 for HTTP requests, and
+# hostPor 7443 for TLS requests.  It will only run on nodes with the label
+# node-role.kubernetes.io/master: "true".
+
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  annotations:
+  labels:
+    app: trafficserver
+  name: trafficserver
+  namespace: trafficserver
+spec:
+  minReadySeconds: 30
+
+  selector:
+    matchLabels:
+      app: trafficserver
+
+  # TS is safe to use with rolling updates, allowing it to be upgraded without
+  # any downtime as long as you run more than one copy.
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+  template:
+    metadata:
+      labels:
+        app: trafficserver
+    spec:
+      # Ensure that we run only on master nodes.  This uses the newer style
+      # "node-role.kubernetes.io/master" label; you may need to change this if
+      # your cluster has different annotations, or remove it entirely if you
+      # don't want TS running on master nodes.
+      nodeSelector:
+        node-role.kubernetes.io/master: "true"
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+
+      # Create a volume for the TS cache.  We use an emptyDir here.  Each
+      # instance requires its own cache volume, so you cannot use a persistent
+      # volume (or hostPath, etc.) if deploying as a DaemonSet.  Use a
+      # StatefulSet with a PV claim template if you want a fully persistent
+      # cache; but node that this emptyDir will only be emptied when the pod is
+      # deleted.
+      volumes:
+      - name: ts-storage
+        emptyDir: {}
+
+      # Depending on your cluster setup, you may need to use hostNetwork here if
+      # you want to use hostPort to expose TS.  In particular, as of Kubernetes
+      # 1.6.1, clusters using a CNI plugin cannot use hostPort without
+      # hostNetwork.  An alternative way to expose TS is to use a Service,
+      # with either NodePort or type: LoadBalancer.
+      hostNetwork: true
+
+      containers:
+      - name: trafficserver
+        image: docker.io/torchbox/k8s-ts-ingress:1.0.0-alpha1
+        imagePullPolicy: IfNotPresent
+
+        # The memory limit must be large enough for both TS itself, and its RAM
+        # cache, which is set to 64MB by default.
+        resources:
+          limits:
+            cpu: "1"
+            memory: 196Mi
+          requests:
+            cpu: 100m
+            memory: 196Mi
+
+        # By default we listen on 7080 and 7443; you can use any port you like
+        # here, or remove the hostPort entirely and use a Service instead.
+        ports:
+        - containerPort: 7080
+          hostPort: 7080
+          name: http
+          protocol: TCP
+        - containerPort: 7443
+          hostPort: 7443
+          name: https
+          protocol: TCP
+
+        # Ensure TS's healthcheck fails before it stops serving requests, so it
+        # can be removed from any load balancer node list.
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - /bin/rm -f /run/ts-alive; sleep 20
+
+        # The probes use TS's healthchecks plugin, so this will only return
+        # successfully when TS is running.  It does not currently check the
+        # health of the plugin, e.g. that it was able to contact the API server.
+        livenessProbe:
+          failureThreshold: 2
+          httpGet:
+            httpHeaders:
+            - name: Host
+              value: localhost
+            path: /__trafficserver_alive
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          successThreshold: 1
+          timeoutSeconds: 10
+
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            httpHeaders:
+            - name: Host
+              value: localhost
+            path: /__trafficserver_alive
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          successThreshold: 1
+          timeoutSeconds: 10
+
+        # Mount the cache storage we configured above.
+        volumeMounts:
+        - mountPath: /var/lib/trafficserver
+          name: ts-storage

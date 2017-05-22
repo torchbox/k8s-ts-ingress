@@ -43,6 +43,27 @@ A secondary reason to use TS is its plugin support; it has a stable and
 well-developed plugin API allowing plugins (like this one) to extend its
 functionality.
 
+Using the Docker image
+----------------------
+
+We provide a pre-built version of Traffic Server, including the plugin.  If you
+use this pre-built image, you do not need to build the plugin manually.
+
+Current image: `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha1`
+
+Deploying the Docker image on Kubernetes
+----------------------------------------
+
+We provide a `example-daemonset.yaml` containing a sample configuration for
+deploying the controller as a DaemonSet.  Please read the entire file and edit
+it for your needs before using it.
+
+Unfortunately, there are many different ways to expose an Ingress controller on
+Kubernetes, and we can't document every possibly variation, so you will need to
+decide what method is best for your cluster.  The example configuration uses a
+hostPort, which is suitable for use with an external load balancer in either
+self-hosted clusters or using a cloud provider.
+
 Building
 --------
 
