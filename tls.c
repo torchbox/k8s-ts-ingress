@@ -39,6 +39,10 @@ TSConfig		 map_cfg;
 hash_t			 map;
 struct state		*state = TSContDataGet(contn);
 
+	/* Host can sometimes be null; do nothing in that case. */
+	if (!host)
+		goto cleanup;
+
 	TSDebug("kubernetes_tls", "doing SNI map for [%s]", host);
 
 	map_cfg = TSConfigGet(state->cfg_slot);
