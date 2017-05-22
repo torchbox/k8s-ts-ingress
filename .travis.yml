@@ -43,7 +43,7 @@ deploy:
   provider: releases
   api_key:
     secure: N0DUuCuGalNeLWM0L0Dgobh1TaHkoun5Hnb2GtsXe4FN2sNfLSnIbldcMjxnQpqAPHacveTovz91G1QKg95giTkvOQlDhxLtjP6NLuXqUXCmmQ4ngZBPk+nsUuyk9TmE5YDudA/mSp4v1+BxYLA4zTUFpTNVkDSQzINDlOL+sElIDYgOsWVPWIvDTHaEwAoGDCiP0Qy2NZtaZUGCG2W5N7D4DblzbU25XbBQKV0eGQzhoSGBzr1ZC0j4/x0m0Po+MTRvCBK61j64maWfRDqzH7+PXHGL4HchxpA+VO6anJrIMUbYDTPtAnryukwMIlQLl7Dw/+zVp6lT9yUAzg1s0iBdjadXEB+WAuRbzoXBJCexk7VigX56yt2lGrtRt4JfZukQIpydQoNXsQ3o3PWMcad5quftgcIqHaHxWNZN8q7qo3Kd3+YRmTW1BdNjLKvnCdmk9pBIj5K2Q7lWUca9ZGtHLyrofHmVV0Wwi3myCSKj5HwDMtVSiB9T/W1jroUiwnSHNB7jzGZP8vvM7kL2rTV+uyXqp4QvOl8aWWoGy3jyrV7Jj2mGrWXdlmA6YtgFLq/YMws5L8qGkKjBFzthrxF66v3merwmvv602XWl/zqunJXYsVdQuArM4rTN72JqjvD/dzra3HKlTbMmY2iT26X6JDvVxQ2uF2x1JbRSlio=
-  file: release.tar.gz
+  file: k8s-ts-ingress-${TRAVIS_TAG}.tar.gz
   skip_cleanup: true
   overwrite: true
   on:

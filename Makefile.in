@@ -17,8 +17,6 @@
 TS_INCDIR=	@TS_INCDIR@
 TS_PLUGINDIR=	@TS_PLUGINDIR@
 
-VERSION?=	unversioned
-
 ROOT=		@top_srcdir@
 
 CC=		@CC@
