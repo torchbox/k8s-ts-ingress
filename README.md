@@ -93,6 +93,7 @@ Requirements:
 Build and install the plugin:
 
 ```
+$ autoreconf -if  # if building from a git checkout
 $ ./configure [--with-tsxs=/path/to/trafficserver/bin/tsxs]
 $ make
 # make install
