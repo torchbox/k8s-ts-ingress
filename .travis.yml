@@ -8,7 +8,7 @@ script: |
   set -ex
 
   if [ -n "$TRAVIS_TAG" ]; then
-    VERSION=$(echo "$TRAVIS_TAG" | sed -e 's/^v//')
+    VERSION="$TRAVIS_TAG"
   else
     VERSION=$COMMIT
   fi
