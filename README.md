@@ -49,7 +49,7 @@ Using the Docker image
 We provide a pre-built version of Traffic Server, including the plugin.  If you
 use this pre-built image, you do not need to build the plugin manually.
 
-Current image: `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha1`
+Current image: `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha2`
 
 Deploying the Docker image on Kubernetes
 ----------------------------------------
@@ -294,7 +294,7 @@ either `any` or `all`:
 
 To prevent accidental misconfiguration, the default value is `all`.
 
-Note: the IP list is implementation as a simple linked list, rather than a more
+Note: the IP list is implemented as a simple linked list, rather than a more
 efficient data structure such as a radix tree.  This means that the lookup time,
 and consequently the overall request time, will increase linearly as the number
 of entries in the list increases.
@@ -427,6 +427,12 @@ Support
 Please open a [Github issue](https://github.com/torchbox/k8s-ts-ingress/issues)
 for questions or support, or to report bugs.
 
+
+Release history
+---------------
+
+* 1.0.0-alpha2: Implement IP address authentication.
+* 1.0.0-alpha1: Initial release.
 
 License
 -------

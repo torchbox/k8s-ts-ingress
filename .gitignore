@@ -21,3 +21,5 @@
 # Files that might exist in development.
 .kube
 /kubernetes.config
+/release.tar.gz
+/k8s-ts-ingress-*
