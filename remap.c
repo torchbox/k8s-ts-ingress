@@ -344,11 +344,10 @@ size_t			 i;
 	TSDebug("kubernetes", "    secret %s (%d hosts):",
 		itls->it_secret_name, (int) itls->it_nhosts);
 
-	if ((secret = namespace_get_secret(ctx->ns, itls->it_secret_name)) == NULL) {
-		TSDebug("kubernete", "Could not find secret [%s]",
+	secret = namespace_get_secret(ctx->ns, itls->it_secret_name);
+	if (!secret)
+		TSDebug("kubernetes", "    warning: could not find secret [%s]",
 			itls->it_secret_name);
-		return;
-	}
 
 	for (i = 0; i < itls->it_nhosts; i++) {
 	const char		*hostname = itls->it_hosts[i];
@@ -363,19 +362,13 @@ size_t			 i;
 			TSDebug("kubernetes", "      existing host");
 		}
 
-		if ((rh->rh_ctx = secret_make_ssl_ctx(secret)) == NULL) {
-			TSDebug("kubernetes", "      %s: can't make ctx",
-				hostname);
-			return;
-		}
-		TSDebug("kubernetes", "      %s: added with CTX[%p]",
-			hostname, rh->rh_ctx);
-
 		/* ssl-redirect: if false, disable http->https redirect */
 		s = hash_get(ing->in_annotations,
 			     "ingress.kubernetes.io/ssl-redirect");
 		if (s && !strcmp(s, "false"))
 			rh->rh_no_ssl_redirect = 1;
+		TSDebug("kubernetes", "      %s: rh_no_ssl_redirect=%d",
+			hostname, rh->rh_no_ssl_redirect);
 
 		/*
 		 * force-ssl-redirect: redirect http->https even if the
@@ -385,6 +378,8 @@ size_t			 i;
 			     "ingress.kubernetes.io/force-ssl-redirect");
 		if (s && !strcmp(s, "true"))
 			rh->rh_force_ssl_redirect = 1;
+		TSDebug("kubernetes", "      %s: rh_force_ssl_redirect=%d",
+			hostname, rh->rh_force_ssl_redirect);
 
 		/* hsts-max-age: enable hsts. */
 		s = hash_get(ctx->ingress->in_annotations,
@@ -399,6 +394,16 @@ size_t			 i;
 			rh->rh_hsts_subdomains = 1;
 		else
 			rh->rh_hsts_subdomains = 0;
+
+		if (secret) {
+			if ((rh->rh_ctx = secret_make_ssl_ctx(secret)) == NULL) {
+				TSDebug("kubernetes", "      %s: can't make ctx",
+					hostname);
+				continue;
+			}
+			TSDebug("kubernetes", "      %s: added with CTX[%p]",
+				hostname, rh->rh_ctx);
+		}
 	}
 }
 
@@ -714,6 +719,7 @@ struct state		*state = TSContDataGet(contn);
 	 * If the Ingress does not have TLS configured, redirect to TLS if
 	 * force-ssl-redirect is set to true.
 	 */
+
 	if (!TSHttpTxnClientProtocolStackContains(txnp, "tls") &&
 	    ((rh->rh_ctx && !rh->rh_no_ssl_redirect)
 	     || rh->rh_force_ssl_redirect)) {
