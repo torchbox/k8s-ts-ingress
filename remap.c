@@ -32,7 +32,8 @@
 static void
 remap_path_free(struct remap_path *rp)
 {
-size_t	i;
+size_t			 i;
+struct remap_auth_addr	*rip, *nrip;
 
 	for (i = 0; i < rp->rp_naddrs; i++)
 		free(rp->rp_addrs[i]);
@@ -44,6 +45,11 @@ size_t	i;
 	free(rp->rp_auth_realm);
 	hash_free(rp->rp_users);
 	regfree(&rp->rp_regex);
+
+	for (rip = rp->rp_auth_addr_list; rip; rip = nrip) {
+		nrip = rip->ra_next;
+		free(rip);
+	}
 }
 
 static void
@@ -139,6 +145,47 @@ size_t		 i, j;
 
 		rp->rp_naddrs += es->es_naddrs;
 	}
+}
+
+static struct remap_auth_addr *
+remap_path_get_addresses(const char *str)
+{
+struct remap_auth_addr	*list = NULL;
+char			*mstr, *save, *saddr;
+
+	if ((mstr = strdup(str)) == NULL)
+		return NULL;
+
+	for (saddr = strtok_r(mstr, " \t\n\r", &save); saddr != NULL;
+	     saddr = strtok_r(NULL, " \t\n\r", &save)) {
+	struct remap_auth_addr	*entry;
+	char			*p = NULL;
+	
+		entry = calloc(1, sizeof(*entry));
+		if ((p = strchr(saddr, '/')) != NULL) {
+			*p++ = '\0';
+			entry->ra_prefix_length = atoi(p);
+		}
+
+		if (inet_pton(AF_INET6, saddr, entry->ra_addr_v6) == 1) {
+			entry->ra_family = AF_INET6;
+			if (p == NULL)
+				entry->ra_prefix_length = 128;
+		} else if (inet_pton(AF_INET, saddr, &entry->ra_addr_v4) == 1) {
+			entry->ra_family = AF_INET;
+			if (p == NULL)
+				entry->ra_prefix_length = 32;
+		} else {
+			free(entry);
+			continue;
+		}
+
+		entry->ra_next = list;
+		list = entry;
+	}
+	     
+	free(mstr);
+	return list;
 }
 
 static void
@@ -317,6 +364,8 @@ char		*s;
 		/*
 		 * Authentication.
 		 */
+
+		/* authentication type (basic/digest) */
 		s = hash_get(ctx->ingress->in_annotations,
 			     "ingress.kubernetes.io/auth-type");
 		if (s) {
@@ -326,11 +375,13 @@ char		*s;
 				rp->rp_auth_type = REMAP_AUTH_DIGEST;
 		}
 
+		/* authentication realm */
 		s = hash_get(ctx->ingress->in_annotations,
 			     "ingress.kubernetes.io/auth-realm");
 		if (s)
 			rp->rp_auth_realm = strdup(s);
 
+		/* authentication user database */
 		s = hash_get(ctx->ingress->in_annotations,
 			     "ingress.kubernetes.io/auth-secret");
 		if (s) {
@@ -340,6 +391,20 @@ char		*s;
 				remap_path_add_users(rp, se);
 			}
 		}
+
+		/* authentication satisfy requirement (any, all) */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/auth-satisfy");
+		if (s && !strcmp(s, "any"))
+			rp->rp_auth_satisfy = REMAP_SATISFY_ANY;
+		else
+			rp->rp_auth_satisfy = REMAP_SATISFY_ALL;
+
+		/* authentication address list */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.torchbox.com/auth-address-list");
+		if (s)
+			rp->rp_auth_addr_list = remap_path_get_addresses(s);
 
 		/*
 		 * Add the endpoints for this service's backends.
@@ -478,6 +543,20 @@ struct rebuild_ctx	ctx;
 }
 
 /*
+ * Test whether the given plaintext password matches the encrypted password
+ * stored in the hash for the given user.
+ */
+int
+check_password(hash_t users, const char *usenam, const char *pass)
+{
+char	*crypted;
+	if ((crypted = hash_get(users, usenam)) == NULL)
+		return 0;
+
+	return crypt_check(pass, crypted);
+}
+
+/*
  * Search the list of paths in a remap_host for one that matches the provided
  * path, and return it.  If pfxs is non-NULL, the length of the portion of the
  * request path that was matched by the remap_path will be stored.
@@ -504,36 +583,13 @@ size_t	i = 0;
 }
 
 /*
- * Return a 401 response for a particular remap_path.
+ * check_authn_basic: consider whether the request's authentication details
+ * match the given route_path's configured user database.  if so, return 1;
+ * otherwise return 0.
  */
-static void
-return_unauthorized(TSHttpTxn txnp, struct remap_path *rp)
-{
-synth_t	*sy;
-	sy = synth_new(401, "Authentication required");
-
-	if (rp->rp_auth_type == REMAP_AUTH_BASIC)
-		synth_add_header(sy, "WWW-Authenticate", "Basic realm=\"%s\"",
-				 rp->rp_auth_realm ? rp->rp_auth_realm :
-				   "Authentication required");
-
-	synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
-	synth_set_body(sy, "Authentication required.\r\n");
-	synth_intercept(sy, txnp);
-}
 
 int
-check_password(hash_t users, const char *usenam, const char *pass)
-{
-char	*crypted;
-	if ((crypted = hash_get(users, usenam)) == NULL)
-		return 0;
-
-	return crypt_check(pass, crypted);
-}
-
-int
-check_auth(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, struct remap_path *rp)
+check_authn_basic(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, struct remap_path *rp)
 {
 TSMLoc		 auth_hdr = NULL;
 char		 buf[256];
@@ -544,16 +600,16 @@ const char	*cs;
 size_t		 credslen;
 
 	if (rp->rp_auth_type != REMAP_AUTH_BASIC)
-		goto error;
+		return 0;
 
 	if (!rp->rp_users)
-		goto error;
+		return 0;
 
 	auth_hdr = TSMimeHdrFieldFind(reqp, hdrs,
 				      TS_MIME_FIELD_AUTHORIZATION,
 				      TS_MIME_LEN_AUTHORIZATION);
 	if (auth_hdr == NULL)
-		goto error;
+		return 0;
 
 	cs = TSMimeHdrFieldValueStringGet(reqp, hdrs, auth_hdr, 0, &len);
 	if ((creds = memchr(cs, ' ', len)) == NULL)
@@ -596,6 +652,185 @@ error:
 	if (auth_hdr)
 		TSHandleMLocRelease(reqp, hdrs, auth_hdr);
 	return 0;
+}
+
+/*
+ * check_authz_address: test whether the client IP address for this txn matches
+ * the address list in the remap_path.
+ */
+int
+check_authz_address(TSHttpTxn txn, struct remap_path *rp)
+{
+struct remap_auth_addr	*rad;
+const struct sockaddr	*addr;
+
+	addr = TSHttpTxnClientAddrGet(txn);
+	if (addr == NULL)
+		return 0;
+
+	switch (addr->sa_family) {
+	case AF_INET:
+		for (rad = rp->rp_auth_addr_list; rad; rad = rad->ra_next) {
+		struct sockaddr_in	*sin = (struct sockaddr_in *)addr;
+		in_addr_t		 ip, net, mask;
+
+			if (rad->ra_family != AF_INET)
+				continue;
+
+			if (rad->ra_prefix_length < 0
+			    || rad->ra_prefix_length > 32)
+				continue;
+
+			ip = htonl(sin->sin_addr.s_addr);
+			net = htonl(rad->ra_addr_v4);
+			mask = ~(uint32_t)0 << (32 - rad->ra_prefix_length);
+
+			if ((ip & mask) == (net & mask))
+				return 1;
+		}
+
+		return 0;
+
+	case AF_INET6:
+		for (rad = rp->rp_auth_addr_list; rad; rad = rad->ra_next) {
+		struct sockaddr_in6	*sin = (struct sockaddr_in6 *)addr;
+#define IP6_U32LEN	(128 / 8 / 4)
+		uint32_t		 ip[IP6_U32LEN],
+					 net[IP6_U32LEN],
+					 mask[IP6_U32LEN];
+		int			 i;
+
+			if (rad->ra_family != AF_INET6)
+				continue;
+
+			if (rad->ra_prefix_length < 0
+			    || rad->ra_prefix_length > 128)
+				continue;
+
+			bcopy(sin->sin6_addr.s6_addr, ip, sizeof(ip));
+			bcopy(rad->ra_addr_v6, net, sizeof(net));
+			memset(mask, 0xFF, sizeof(mask));
+
+			i = rad->ra_prefix_length / 32;
+			switch (i) {
+			case 0: mask[0] = 0;
+			case 1: mask[1] = 0;
+			case 2: mask[2] = 0;
+			case 3: mask[3] = 0;
+			}
+
+			if (rad->ra_prefix_length % 32)
+				mask[i] = htonl(~(uint32_t)0 <<
+						(32 - (rad->ra_prefix_length % 32)));
+
+			for (i = 0; i < 4; i++)
+				if ((ip[i] & mask[i]) != (net[i] & mask[i]))
+					continue;
+
+			return 1;
+		}
+
+		return 0;
+
+	default:
+		return 0;
+	}
+}
+
+/*
+ * check_authz: validate the request against the given remap_path's
+ * authentication configuration.  One of the following values will be
+ * returned:
+ *
+ * AUTHZ_PERMIT:
+ * 	The request was successfully authentication and can proceed.
+ *
+ * AUTHZ_DENY_ADDRESS:
+ * 	The request was denied because of the client's IP address; it should not
+ * 	proceed and providing authentication will not help.  (Return code 403.)
+ *
+ * AUTHZ_DENY_AUTHN:
+ * 	The request was denied because it was missing authentication details,
+ * 	or the provided authentication was incorrect.  The request should not
+ * 	proceed, but it may succeed if the client retries with valid
+ * 	authentication.  (Return code 401.)
+ */
+
+#define	AUTHZ_PERMIT		1
+#define	AUTHZ_DENY_ADDRESS	2
+#define	AUTHZ_DENY_AUTHN	3
+
+int
+check_authz(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, struct remap_path *rp)
+{
+	if (rp->rp_auth_addr_list) {
+		if (check_authz_address(txn, rp)) {
+			if (rp->rp_auth_satisfy == REMAP_SATISFY_ANY) {
+				TSDebug("kubernetes", "check_authz: permitted"
+					" request because IP address matches"
+					" and satisfy is ANY");
+				return AUTHZ_PERMIT;
+			}
+		} else {
+			if (rp->rp_auth_satisfy == REMAP_SATISFY_ALL)
+				return AUTHZ_DENY_ADDRESS;
+		}
+	}
+
+	switch (rp->rp_auth_type) {
+	case REMAP_AUTH_NONE:
+		TSDebug("kubernetes", "check_authz: permitted request because"
+			" authentication is not configured");
+		return AUTHZ_PERMIT;
+
+	case REMAP_AUTH_BASIC:
+		if (check_authn_basic(txn, reqp, hdrs, rp)) {
+			TSDebug("kubernetes", "check_authz: permitted request"
+				" because basic authentication succeeded");
+			return AUTHZ_PERMIT;
+		}
+		break;
+
+	case REMAP_AUTH_DIGEST:
+		/* unimplemented */
+		break;
+	}
+
+	return AUTHZ_DENY_AUTHN;
+}
+
+/*
+ * Return 401 Unauthorized: the request was denied, but it might be permitted
+ * if the client retries with an Authorization header field.
+ */
+static void
+return_unauthorized(TSHttpTxn txnp, struct remap_path *rp)
+{
+synth_t	*sy;
+	sy = synth_new(401, "Authentication required");
+
+	if (rp->rp_auth_type == REMAP_AUTH_BASIC)
+		synth_add_header(sy, "WWW-Authenticate", "Basic realm=\"%s\"",
+				 rp->rp_auth_realm ? rp->rp_auth_realm :
+				   "Authentication required");
+
+	synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
+	synth_set_body(sy, "Authentication required.\r\n");
+	synth_intercept(sy, txnp);
+}
+
+/*
+ * Return 403 Forbidden: the request was denied, and it will never be allowed.
+ */
+static void
+return_forbidden(TSHttpTxn txnp, struct remap_path *rp)
+{
+synth_t	*sy;
+	sy = synth_new(403, "Forbidden");
+
+	synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
+	synth_set_body(sy, "You do not have access to the requested resource.\r\n");
+	synth_intercept(sy, txnp);
 }
 
 /*
@@ -761,11 +996,17 @@ struct state		*state = TSContDataGet(contn);
 	 * Check authorization.  Do this after TLS redirect, so users aren't
 	 * prompted to enter passwords over a plaintext connection.
 	 */
-	if (rp->rp_auth_type) {
-		if (!check_auth(txnp, reqp, hdr_loc, rp)) {
-			return_unauthorized(txnp, rp);
-			goto cleanup;
-		}
+	switch (check_authz(txnp, reqp, hdr_loc, rp)) {
+	case AUTHZ_DENY_ADDRESS:
+		return_forbidden(txnp, rp);
+		goto cleanup;
+
+	case AUTHZ_DENY_AUTHN:
+		return_unauthorized(txnp, rp);
+		goto cleanup;
+
+	default:
+		break;
 	}
 
 	/*

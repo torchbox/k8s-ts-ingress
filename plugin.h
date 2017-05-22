@@ -11,6 +11,10 @@
 #ifndef KUBERNETES_PLUGIN_H
 #define KUBERNETES_PLUGIN_H
 
+#include	<sys/types.h>
+#include	<netinet/in.h>
+#include	<arpa/inet.h>
+
 #include	<regex.h>
 
 #include	<ts/ts.h>
@@ -35,6 +39,25 @@ struct rebuild_ctx {
 #define REMAP_AUTH_BASIC	0x1
 #define	REMAP_AUTH_DIGEST	0x2
 
+/*
+ * An entry in the IP whitelist.
+ */
+
+struct remap_auth_addr {
+	struct remap_auth_addr	*ra_next;
+	int			 ra_family;
+	union {
+		in_addr_t	 ra_v4;
+		unsigned char	 ra_v6[16];
+	}			 ra_addr;
+#define ra_addr_v4 ra_addr.ra_v4
+#define ra_addr_v6 ra_addr.ra_v6
+	int			 ra_prefix_length;
+};
+
+#define	REMAP_SATISFY_ALL	0
+#define	REMAP_SATISFY_ANY	1
+
 struct remap_path {
 	char	 *rp_prefix;
 	regex_t	  rp_regex;
@@ -49,10 +72,12 @@ struct remap_path {
 	int	  rp_no_ssl_redirect:1;
 	int	  rp_force_ssl_redirect:1;
 	uint	  rp_auth_type:2;
+	uint	  rp_auth_satisfy:1;
 	int	  rp_cache_gen;
 	char	 *rp_app_root;
 	char	 *rp_rewrite_target;
 	char	 *rp_auth_realm;
+	struct remap_auth_addr *rp_auth_addr_list;
 };
 
 /*

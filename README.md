@@ -64,6 +64,22 @@ decide what method is best for your cluster.  The example configuration uses a
 `hostPort`, which is suitable for use with an external load balancer in either
 self-hosted clusters or using a cloud provider.
 
+You can set the following environment variables to configure Traffic Server:
+
+* `TS_CACHE_SIZE`: Size of the on-disk cache file to create, in megabytes.
+
+In addition, any TS configuration (records.config) setting can be
+overridden in the environment:
+
+https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides
+
+For persistent cache storage, mount a volume on `/var/lib/trafficserver`.  This
+can be a persistent volume or an emptyDir; any necessary files, including the
+cache store, will be created at startup.  If using a persistent volume, be aware
+that only one instance of TS can access the cache at once.  If you are running
+multiple copies, you will need to create a separate PV for each instance
+(perhaps by using a StatefulSet instead of a DaemonSet).
+
 Building
 --------
 
@@ -106,23 +122,6 @@ Debugging
 
 To debug problems with the plugin, enable the debug tags `kubernetes` (for the
 plugin itself) or `watcher` (for the Kubernetes API code).
-
-Docker configuration
---------------------
-
-If you're using the pre-built Docker image, you can set the following environment
-variables to configure Traffic Server:
-
-* `TS_CACHE_SIZE`: Size of the on-disk cache file to create, in megabytes.
-
-In addition, any TS configuration (records.config) setting can be
-overridden in the environment:
-
-https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides
-
-For persistent cache storage, mount a volume on `/var/lib/trafficserver`.
-This can be a persistent volume or an emptyDir; any missing necessary files,
-including the cache store, will be created at startup.
 
 Ingress annotations
 -------------------
@@ -233,6 +232,8 @@ current UNIX timestamp, although any non-zero integer will work.
 Authentication
 --------------
 
+### Password authentication
+
 To enable password authentication, set the `ingress.kubernetes.io/auth-type`
 annotation on the Ingress to `basic`, and `ingress.kubernetes.io/auth-secret`
 to the name of a secret which contains an htpasswd file as the `auth` key.  You
@@ -269,6 +270,44 @@ CPUs.
 If you need stronger password security than MD5, you should stop using HTTP
 basic authentication and use another authentication method (like Cookie-based
 authentication) instead.
+
+### IP address authentication
+
+To enable IP authentication, set the `ingress.torchbox.com/auth-address-list`
+annotation to a space-delimited list of IP addresses or networks, for example
+`"127.0.0.0/8 ::1/128"`.
+
+When both IP authentication and password authentication are configured on the
+same ingress, you can set the `ingress.torchbox.com/auth-satisfy` annotation to
+either `any` or `all`:
+
+* `any` will permit the request if either the IP is present in
+  `auth-address-list` or if the client provides valid basic authentication;
+  otherwise the request will be denied with HTTP 401 Unauthorized.
+
+* `all` will permit the request if the client IP is present in
+  `auth-address-list` *and* the client also provides valid basic authentication.
+  If the client IP address is not in the address list, the request will be
+  denied with HTTP 403 Forbidden.  If the IP address is present but the request
+  did not contain valid basic authentication, the request will be denied with
+  HTTP 401 Unauthorized.
+
+To prevent accidental misconfiguration, the default value is `all`.
+
+Note: the IP list is implementation as a simple linked list, rather than a more
+efficient data structure such as a radix tree.  This means that the lookup time,
+and consequently the overall request time, will increase linearly as the number
+of entries in the list increases.
+
+This decision was made because a linked list is a simpler data structure, and
+therefore performs better with a small number of entries even though performance
+is worse with a larger list.  This trade-off will only become noticeable if you
+have hundreds or thousands of entries in the address list, which is very
+unlikely in real-world deployments.  (For one thing, it would be extremely
+cumbersome to manage such a large list as an annotation.)
+
+If you require support for such a large number of addresses in a single Ingress,
+please let us know via a Github issue.
 
 External proxying
 -----------------
