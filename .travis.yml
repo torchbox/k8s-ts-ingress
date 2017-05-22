@@ -5,5 +5,5 @@ services:
 - docker
 
 script:
-- make docker-build
+- make -f Makefile.docker docker-build
 

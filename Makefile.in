@@ -14,10 +14,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-DOCKER_REGISTRY?=	torchbox/k8s-ts-ingress
-DOCKER_TAG?=		1.0-dev
-DOCKER_IMAGE=		${DOCKER_REGISTRY}:${DOCKER_TAG}
-
 TS_INCDIR=	@TS_INCDIR@
 TS_PLUGINDIR=	@TS_PLUGINDIR@
 
@@ -101,12 +97,6 @@ lint: ${SRCS}
 
 clean:
 	rm -f kubernetes.so ${OBJS} ${TEST_OBJS} *.plist test
-
-docker-build:
-	docker build --pull -t ${DOCKER_IMAGE} .
-
-docker-push:
-	docker push ${DOCKER_IMAGE}
 
 depend:
 	sed -e '/^# ADDED BY MAKE DEPEND -- DO NOT DELETE/,$$ d' < Makefile > Makefile.tmp
