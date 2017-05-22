@@ -77,30 +77,6 @@ TEST_OBJS=	gtest-all.o	gtest_main.o	\
 		${API_OBJS}	test_api.o	\
 		${CRYPT_OBJS}	test_crypt.o
 
-DISTFILES=	api crypt util			\
-		config.h plugin.h synth.h tls.h	\
-		ts_crypt.h watcher.h		\
-		config.c namespace.c plugin.c	\
-		remap.c synth.c tls.c watcher.c	\
-		gtest				\
-		tests				\
-		configure			\
-		configure.ac			\
-		acinclude			\
-		aclocal.m4			\
-		autoconf.h.in			\
-		config.guess			\
-		config.sub			\
-		install-sh			\
-		kubernetes.config.example	\
-		test.htpasswd			\
-		Dockerfile			\
-		Makefile.docker			\
-		Makefile.in			\
-		README.md			\
-		docker				\
-		example-daemonset.yaml
-
 all: kubernetes.so
 
 kubernetes.so: ${OBJS}
@@ -126,13 +102,6 @@ lint: ${SRCS}
 clean:
 	rm -f kubernetes.so ${OBJS} ${TEST_OBJS} *.plist test
 
-release:
-	rm -rf k8s-ts-ingress-${VERSION}
-	mkdir -p k8s-ts-ingress-${VERSION}
-	tar cf - ${DISTFILES} | tar xf - -C k8s-ts-ingress-${VERSION}
-	tar cf - k8s-ts-ingress-${VERSION} | gzip > release.tar.gz
-	ls -oh release.tar.gz
-
 depend:
 	sed -e '/^# ADDED BY MAKE DEPEND -- DO NOT DELETE/,$$ d' < Makefile > Makefile.tmp
 	echo '# ADDED BY MAKE DEPEND -- DO NOT DELETE' >> Makefile.tmp
@@ -142,4 +111,4 @@ depend:
 		tests/*.cc >> Makefile.tmp
 	mv Makefile.tmp Makefile
 
-.PHONY: test
+.PHONY: test install clean depend lint

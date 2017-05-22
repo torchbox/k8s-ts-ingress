@@ -15,8 +15,32 @@
 # SOFTWARE.
 
 DOCKER_REGISTRY?=	torchbox/k8s-ts-ingress
-DOCKER_TAG?=		1.0-dev
+DOCKER_TAG?=		latest
 DOCKER_IMAGE=		${DOCKER_REGISTRY}:${DOCKER_TAG}
+
+DISTFILES=	api crypt util			\
+		config.h plugin.h synth.h tls.h	\
+		ts_crypt.h watcher.h		\
+		config.c namespace.c plugin.c	\
+		remap.c synth.c tls.c watcher.c	\
+		gtest				\
+		tests				\
+		configure			\
+		configure.ac			\
+		acinclude			\
+		aclocal.m4			\
+		autoconf.h.in			\
+		config.guess			\
+		config.sub			\
+		install-sh			\
+		kubernetes.config.example	\
+		test.htpasswd			\
+		Dockerfile			\
+		Makefile.docker			\
+		Makefile.in			\
+		README.md			\
+		docker				\
+		example-daemonset.yaml
 
 docker-build:
 	docker build --pull -t ${DOCKER_IMAGE} .
@@ -24,4 +48,11 @@ docker-build:
 docker-push:
 	docker push ${DOCKER_IMAGE}
 
-.PHONY: test
+release:
+	rm -rf k8s-ts-ingress-${VERSION}
+	mkdir -p k8s-ts-ingress-${VERSION}
+	tar cf - ${DISTFILES} | tar xf - -C k8s-ts-ingress-${VERSION}
+	tar cf - k8s-ts-ingress-${VERSION} | gzip > release.tar.gz
+	ls -oh release.tar.gz
+
+.PHONY: docker-build docker-push release

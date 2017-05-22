@@ -14,7 +14,7 @@ script: |
   fi
 
   # Always build from a release, so we know the release process works.
-  make VERSION=$VERSION release
+  make -f Makefile.dist VERSION=$VERSION release
   cd k8s-ts-ingress-$VERSION
 
   DOCKER_REPOSITORY=torchbox/k8s-ts-ingress
