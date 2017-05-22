@@ -275,6 +275,21 @@ char		*s;
 		else
 			rp->rp_secure_backends = 0;
 
+		/* ssl-redirect: if false, disable http->https redirect */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.kubernetes.io/ssl-redirect");
+		if (s && !strcmp(s, "false"))
+			rp->rp_no_ssl_redirect = 1;
+
+		/*
+		 * force-ssl-redirect: redirect http->https even if the
+		 * Ingress doesn't have TLS configured.
+		 */
+		s = hash_get(ctx->ingress->in_annotations,
+			     "ingress.kubernetes.io/force-ssl-redirect");
+		if (s && !strcmp(s, "true"))
+			rp->rp_force_ssl_redirect = 1;
+
 		/* preserve-host: use origin request host header */
 		s = hash_get(ctx->ingress->in_annotations,
 			     "ingress.torchbox.com/preserve-host");
@@ -361,25 +376,6 @@ size_t			 i;
 		} else {
 			TSDebug("kubernetes", "      existing host");
 		}
-
-		/* ssl-redirect: if false, disable http->https redirect */
-		s = hash_get(ing->in_annotations,
-			     "ingress.kubernetes.io/ssl-redirect");
-		if (s && !strcmp(s, "false"))
-			rh->rh_no_ssl_redirect = 1;
-		TSDebug("kubernetes", "      %s: rh_no_ssl_redirect=%d",
-			hostname, rh->rh_no_ssl_redirect);
-
-		/*
-		 * force-ssl-redirect: redirect http->https even if the
-		 * Ingress doesn't have TLS configured.
-		 */
-		s = hash_get(ing->in_annotations,
-			     "ingress.kubernetes.io/force-ssl-redirect");
-		if (s && !strcmp(s, "true"))
-			rh->rh_force_ssl_redirect = 1;
-		TSDebug("kubernetes", "      %s: rh_force_ssl_redirect=%d",
-			hostname, rh->rh_force_ssl_redirect);
 
 		/* hsts-max-age: enable hsts. */
 		s = hash_get(ctx->ingress->in_annotations,
@@ -721,8 +717,8 @@ struct state		*state = TSContDataGet(contn);
 	 */
 
 	if (!TSHttpTxnClientProtocolStackContains(txnp, "tls") &&
-	    ((rh->rh_ctx && !rh->rh_no_ssl_redirect)
-	     || rh->rh_force_ssl_redirect)) {
+	    ((rh->rh_ctx && !rp->rp_no_ssl_redirect)
+	     || rp->rp_force_ssl_redirect)) {
 	const char	*newp;
 	synth_t		*sy;
 	TSMBuffer	 newurl;

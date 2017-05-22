@@ -46,6 +46,8 @@ struct remap_path {
 	int	  rp_follow_redirects:1;
 	int	  rp_secure_backends:1;
 	int	  rp_preserve_host:1;
+	int	  rp_no_ssl_redirect:1;
+	int	  rp_force_ssl_redirect:1;
 	uint	  rp_auth_type:2;
 	int	  rp_cache_gen;
 	char	 *rp_app_root;
@@ -62,8 +64,6 @@ struct remap_host {
 	size_t			 rh_npaths;
 	struct remap_path	 rh_default;
 	SSL_CTX			*rh_ctx;
-	int			 rh_no_ssl_redirect:1;
-	int			 rh_force_ssl_redirect:1;
 	int			 rh_hsts_subdomains:1;
 	int			 rh_hsts_max_age;
 };
