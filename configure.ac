@@ -18,14 +18,19 @@ AC_INIT([k8s-ts-ingress], [1.0-dev])
 
 AC_CONFIG_HEADERS([autoconf.h])
 
-TSXS=tsxs
 AC_ARG_WITH([tsxs],
 	[AS_HELP_STRING([--with-tsxs[=PATH]], [path to Traffic Server tsxs])],
 	[TSXS="$withval"])
-AC_CHECK_PROG(HAVE_TSXS, $TSXS, yes, no)
 
-AS_IF([test "${HAVE_TSXS}" != "yes"], [
-	AC_ERROR([could not find tsxs; maybe you need --with-tsxs=/path/to/tsxs])
+AS_IF([test -n "$TSXS" -a -x "$TSXS"], [
+	AC_SUBST(TSXS)
+], [
+	TSXS=tsxs
+	AC_CHECK_PROG(HAVE_TSXS, $TSXS, yes, no)
+
+	AS_IF([test "${HAVE_TSXS}" != "yes"], [
+		AC_ERROR([could not find tsxs; maybe you need --with-tsxs=/path/to/tsxs])
+	])
 ])
 
 PIC_FLAG=-fPIC

@@ -603,6 +603,7 @@ TS_INCDIR
 TS_CXXFLAGS
 TS_CFLAGS
 HAVE_TSXS
+TSXS
 target_alias
 host_alias
 build_alias
@@ -1849,14 +1850,21 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 ac_config_headers="$ac_config_headers autoconf.h"
 
 
-TSXS=tsxs
 
 # Check whether --with-tsxs was given.
 if test "${with_tsxs+set}" = set; then :
   withval=$with_tsxs; TSXS="$withval"
 fi
 
-# Extract the first word of "$TSXS", so it can be a program name with args.
+
+if test -n "$TSXS" -a -x "$TSXS"; then :
+
+
+
+else
+
+	TSXS=tsxs
+	# Extract the first word of "$TSXS", so it can be a program name with args.
 set dummy $TSXS; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
@@ -1895,9 +1903,11 @@ fi
 
 
 
-if test "${HAVE_TSXS}" != "yes"; then :
+	if test "${HAVE_TSXS}" != "yes"; then :
 
-	as_fn_error $? "could not find tsxs; maybe you need --with-tsxs=/path/to/tsxs" "$LINENO" 5
+		as_fn_error $? "could not find tsxs; maybe you need --with-tsxs=/path/to/tsxs" "$LINENO" 5
+
+fi
 
 fi
 
