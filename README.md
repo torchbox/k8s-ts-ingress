@@ -54,12 +54,12 @@ Current image: `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha1`
 Deploying the Docker image on Kubernetes
 ----------------------------------------
 
-We provide a `example-daemonset.yaml` containing a sample configuration for
-deploying the controller as a DaemonSet.  Please read the entire file and edit
-it for your needs before using it.
+We provide an `example-daemonset.yaml` containing a sample configuration for
+deploying the controller as a Kubernetes DaemonSet.  Please read the entire file
+and edit it for your needs before using it.
 
 Unfortunately, there are many different ways to expose an Ingress controller on
-Kubernetes, and we can't document every possibly variation, so you will need to
+Kubernetes, and we can't document every possible variation, so you will need to
 decide what method is best for your cluster.  The example configuration uses a
 hostPort, which is suitable for use with an external load balancer in either
 self-hosted clusters or using a cloud provider.
