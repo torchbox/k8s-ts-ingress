@@ -34,7 +34,7 @@ DISTFILES=	api crypt util auth remap_db	\
 		kubernetes.config.example	\
 		test.htpasswd			\
 		Dockerfile			\
-		Makefile.docker			\
+		Makefile.dist			\
 		Makefile.in			\
 		README.md			\
 		docker				\
@@ -47,10 +47,13 @@ docker-push:
 	docker push ${DOCKER_IMAGE}
 
 release:
+	autoreconf -if
 	rm -rf k8s-ts-ingress-${VERSION}
 	mkdir -p k8s-ts-ingress-${VERSION}
-	tar cf - ${DISTFILES} | tar xf - -C k8s-ts-ingress-${VERSION}
-	tar cf - k8s-ts-ingress-${VERSION} | gzip > k8s-ts-ingress-${VERSION}.tar.gz
+	tar cf dist.tar ${DISTFILES}
+	tar xf dist.tar -C k8s-ts-ingress-${VERSION}
+	tar cf k8s-ts-ingress-${VERSION}.tar k8s-ts-ingress-${VERSION}
+	gzip -f k8s-ts-ingress-${VERSION}.tar
 	@ls -oh k8s-ts-ingress-${VERSION}.tar.gz
 
 .PHONY: docker-build docker-push release

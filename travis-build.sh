@@ -10,7 +10,6 @@ else
 fi
 
 # Always build from a release, so we know the release process works.
-autoreconf -if
 make -f Makefile.dist VERSION=$VERSION release
 
 cd k8s-ts-ingress-$VERSION
