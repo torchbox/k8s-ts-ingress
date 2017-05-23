@@ -25,6 +25,7 @@ DISTFILES=	api crypt util			\
 		ts_crypt.h watcher.h		\
 		config.c namespace.c plugin.c	\
 		remap.c synth.c tls.c watcher.c	\
+		auth.c				\
 		gtest				\
 		tests				\
 		configure			\

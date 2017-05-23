@@ -26,6 +26,7 @@
 
 #include	"gtest/gtest.h"
 
+#include	"tests/test.h"
 #include	"api.h"
 
 using std::string;
@@ -54,26 +55,10 @@ namespace {
 	map<string, string>	*actual = static_cast<map<string, string>*>(data);
 		actual->emplace(key, static_cast<char *>(value));
 	}
-
-	int errors = 0;
-}
-
-extern "C" void TSError(char const *fmt, ...)
-{
-va_list	args;
-	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
-	va_end(args);
-
-	++errors;
-}
-
-extern "C" void TSDebug(char const *tag, char const *fmt, ...)
-{
 }
 
 TEST(API, Ingress) {
-	errors = 0;
+	ts_api_errors = 0;
 
 	json_object *obj = load_json("tests/ingress.json");
 	ASSERT_TRUE(obj != NULL);
@@ -110,11 +95,11 @@ TEST(API, Ingress) {
 	EXPECT_STREQ("http", path->ip_service_port);
 
 	ingress_free(ing);
-	EXPECT_EQ(0, errors);
+	EXPECT_EQ(0, ts_api_errors);
 }
 
 TEST(API, Service) {
-	errors = 0;
+	ts_api_errors = 0;
 
 	json_object *obj = load_json("tests/service.json");
 	ASSERT_TRUE(obj != NULL);
@@ -149,11 +134,11 @@ TEST(API, Service) {
 	EXPECT_EQ(port->sp_target_port, 8080);
 
 	service_free(svc);
-	EXPECT_EQ(0, errors);
+	EXPECT_EQ(0, ts_api_errors);
 }
 
 TEST(API, ExternalService) {
-	errors = 0;
+	ts_api_errors = 0;
 
 	json_object *obj = load_json("tests/service_external.json");
 	ASSERT_TRUE(obj != NULL);
@@ -176,11 +161,11 @@ TEST(API, ExternalService) {
 	EXPECT_EQ(expected_selectors, actual_selectors);
 
 	service_free(svc);
-	EXPECT_EQ(0, errors);
+	EXPECT_EQ(0, ts_api_errors);
 }
 
 TEST(API, Secret) {
-	errors = 0;
+	ts_api_errors = 0;
 
 	json_object *obj = load_json("tests/secret.json");
 	ASSERT_TRUE(obj != NULL);
@@ -202,5 +187,5 @@ TEST(API, Secret) {
 	EXPECT_EQ(expected_data, actual_data);
 
 	secret_free(srt);
-	EXPECT_EQ(0, errors);
+	EXPECT_EQ(0, ts_api_errors);
 }

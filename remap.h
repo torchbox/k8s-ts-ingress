@@ -11,16 +11,18 @@
 #ifndef REMAP_H
 #define REMAP_H
 
+#include	<sys/types.h>
+#include	<netinet/in.h>
+
+#include	<regex.h>
+
+#include	<openssl/ssl.h>
+
+#include	"hash.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include    <sys/types.h>
-#include    <netinet/in.h>
-
-#include    <regex.h>
-
-#include    <openssl/ssl.h>
 
 /*
  * Stores one path entry in an Ingress.
@@ -48,8 +50,7 @@ struct remap_auth_addr {
 #define	REMAP_SATISFY_ALL	0
 #define	REMAP_SATISFY_ANY	1
 
-struct remap_path {
-	char	 *rp_prefix;
+typedef struct {
 	regex_t	  rp_regex;
 	char	**rp_addrs;
 	size_t	  rp_naddrs;
@@ -68,21 +69,45 @@ struct remap_path {
 	char	 *rp_rewrite_target;
 	char	 *rp_auth_realm;
 	struct remap_auth_addr *rp_auth_addr_list;
-};
+} remap_path_t;
+
+remap_path_t	*remap_path_new(const char *path);
+void		 remap_path_free(remap_path_t *);
 
 /*
  * Store configuration for a particular hostname.  This contains the TLS
  * context, zero or more paths, and maybe a default backend.
  */
-struct remap_host {
-	struct remap_path	*rh_paths;
-	size_t			 rh_npaths;
-	struct remap_path	 rh_default;
-	SSL_CTX			*rh_ctx;
-	int			 rh_hsts_subdomains:1;
-	int			 rh_hsts_max_age;
-};
+typedef struct {
+	remap_path_t	**rh_paths;
+	size_t		 rh_npaths;
+	SSL_CTX		*rh_ctx;
+	int		 rh_hsts_subdomains:1;
+	int		 rh_hsts_max_age;
+} remap_host_t;
 
+remap_host_t	*remap_host_new(void);
+void		 remap_host_free(remap_host_t *host);
+remap_path_t	*remap_host_find_path(const remap_host_t *,
+				      const char *pathname,
+				      size_t *pfxsz);
+remap_path_t	*remap_host_new_path(remap_host_t *, const char *path);
+remap_path_t	*remap_host_get_default_path(remap_host_t *);
+
+/*
+ * remap_db stores a built remap database, i.e. remap_host objects.
+ */
+typedef struct {
+	hash_t	rd_hosts;
+} remap_db_t;
+
+/* create and destroy remap_dbs */
+remap_db_t	*remap_db_new(void);
+void		 remap_db_free(remap_db_t *);
+
+/* fetch hosts from a remap_db */
+remap_host_t	*remap_db_get_host(const remap_db_t *, const char *hostname);
+remap_host_t	*remap_db_get_or_create_host(remap_db_t *, const char *hostname);
 
 #ifdef __cplusplus
 }

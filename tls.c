@@ -34,9 +34,9 @@ handle_tls(TSCont contn, TSEvent evt, void *edata)
 TSVConn			 ssl_vc = edata;
 SSL			*ssl = (SSL *)TSVConnSSLConnectionGet(ssl_vc);
 const char		*host = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-struct remap_host	*rh;
-TSConfig		 map_cfg = NULL;
-hash_t			 map = NULL;
+const remap_host_t	*rh;
+TSConfig		 db_cfg = NULL;
+const remap_db_t	*db;
 struct state		*state = TSContDataGet(contn);
 
 	/* Host can sometimes be null; do nothing in that case. */
@@ -45,14 +45,14 @@ struct state		*state = TSContDataGet(contn);
 
 	TSDebug("kubernetes_tls", "doing SNI map for [%s]", host);
 
-	map_cfg = TSConfigGet(state->cfg_slot);
-	map = TSConfigDataGet(map_cfg);
+	db_cfg = TSConfigGet(state->cfg_slot);
+	db = TSConfigDataGet(db_cfg);
 
 	/* Not initialised yet? */
-	if (!map)
+	if (!db)
 		goto cleanup;
 
-	if ((rh = hash_get(map, host)) == NULL) {
+	if ((rh = remap_db_get_host(db, host)) == NULL) {
 		TSDebug("kubernetes", "[%s] TLS SNI: host not found", host);
 		goto cleanup;
 	}
@@ -67,8 +67,8 @@ struct state		*state = TSContDataGet(contn);
 	TSVConnReenable(ssl_vc);
 
 cleanup:
-	if (map_cfg)
-		TSConfigRelease(state->cfg_slot, map_cfg);
+	if (db_cfg)
+		TSConfigRelease(state->cfg_slot, db_cfg);
 	return TS_SUCCESS;
 }
 

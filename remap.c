@@ -28,45 +28,7 @@
 #include	"synth.h"
 #include	"base64.h"
 #include	"ts_crypt.h"
-
-static void
-remap_path_free(struct remap_path *rp)
-{
-size_t			 i;
-struct remap_auth_addr	*rip, *nrip;
-
-	for (i = 0; i < rp->rp_naddrs; i++)
-		free(rp->rp_addrs[i]);
-
-	free(rp->rp_prefix);
-	free(rp->rp_addrs);
-	free(rp->rp_app_root);
-	free(rp->rp_rewrite_target);
-	free(rp->rp_auth_realm);
-	hash_free(rp->rp_users);
-	regfree(&rp->rp_regex);
-
-	for (rip = rp->rp_auth_addr_list; rip; rip = nrip) {
-		nrip = rip->ra_next;
-		free(rip);
-	}
-}
-
-static void
-remap_host_free(struct remap_host *host)
-{
-size_t	i;
-	for (i = 0; i < host->rh_npaths; i++)
-		remap_path_free(&host->rh_paths[i]);
-	free(host->rh_paths);
-
-	remap_path_free(&host->rh_default);
-
-	if (host->rh_ctx)
-		TSSslContextDestroy((TSSslContext) host->rh_ctx);
-
-	free(host);
-}
+#include	"auth.h"
 
 static int
 find_port_name(hash_t hs, const char *key, void *value, void *data)
@@ -92,7 +54,7 @@ static void
 rebuild_add_endpoints(
 	struct rebuild_ctx *ctx,
 	service_t *svc,
-	struct remap_path *rp,
+	remap_path_t *rp,
 	const char *port_name)
 {
 service_port_t	*port;
@@ -167,7 +129,8 @@ char			*mstr, *save, *saddr;
 			entry->ra_prefix_length = atoi(p);
 		}
 
-		if (inet_pton(AF_INET6, saddr, entry->ra_addr_v6) == 1) {
+		if (inet_pton(AF_INET6, saddr,
+			      entry->ra_addr_v6.s6_addr) == 1) {
 			entry->ra_family = AF_INET6;
 			if (p == NULL)
 				entry->ra_prefix_length = 128;
@@ -189,7 +152,7 @@ char			*mstr, *save, *saddr;
 }
 
 static void
-remap_path_add_users(struct remap_path *rp, secret_t *secret)
+remap_path_add_users(remap_path_t *rp, secret_t *secret)
 {
 char	*authdata = NULL;
 char	*buf, *entry, *s;
@@ -230,17 +193,16 @@ ssize_t	 n;
 }
 
 static void
-rebuild_make_host(struct rebuild_ctx *ctx,
-		  struct remap_host *rh,
+rebuild_make_host(struct rebuild_ctx *ctx, remap_host_t *rh,
 		  ingress_rule_t *rule)
 {
 size_t		 i;
 char		*s;
 
 	for (i = 0; i < rule->ir_npaths; i++) {
-	ingress_path_t		*path = &rule->ir_paths[i];
-	struct remap_path	*rp;
-	service_t		*svc;
+	ingress_path_t	*path = &rule->ir_paths[i];
+	remap_path_t	*rp;
+	service_t	*svc;
 
 		svc = namespace_get_service(ctx->ns,
 					    path->ip_service_name);
@@ -250,43 +212,13 @@ char		*s;
 		TSDebug("kubernetes", "      path <%s> -> service <%s/%s>",
 			path->ip_path, svc->sv_namespace, svc->sv_name);
 
-		if (path->ip_path) {
-		int	rerr;
-		char	*pregex;
-		regex_t	regex;
-			if (path->ip_path[0] != '/')
-				continue;
+		if (path->ip_path)
+			rp = remap_host_new_path(rh, path->ip_path);
+		else
+			rp = remap_host_get_default_path(rh);
 
-			/*
-			 * Path is required to begin with '/'.  However, when
-			 * TS provides us the request path later to match
-			 * against, the leading '/' is stripped.  Strip it here
-			 * as well to make matching the request easier.
-			 */
-			if ((pregex = malloc(strlen(path->ip_path) + 1)) == NULL)
-				continue;
-			sprintf(pregex, "^%s", path->ip_path + 1);
-			rerr = regcomp(&regex, pregex, REG_EXTENDED);
-			free(pregex);
-			if (rerr != 0) {
-				regfree(&regex);
-				continue;
-			}
-
-			rh->rh_paths = realloc(rh->rh_paths,
-					       sizeof(struct remap_path)
-						 * (rh->rh_npaths + 1));
-			rp = &rh->rh_paths[rh->rh_npaths];
-			bzero(rp, sizeof(*rp));
-			++rh->rh_npaths;
-
-			rp->rp_addrs = NULL;
-			rp->rp_naddrs = 0;
-			rp->rp_prefix = strdup(path->ip_path);
-			bcopy(&regex, &rp->rp_regex, sizeof(regex));
-		} else {
-			rp = &rh->rh_default;
-		}
+		if (rp == NULL)
+			continue;
 
 		/*
 		 * Set configuration on this rp from annotations.
@@ -430,17 +362,11 @@ size_t			 i;
 			itls->it_secret_name);
 
 	for (i = 0; i < itls->it_nhosts; i++) {
-	const char		*hostname = itls->it_hosts[i];
-	struct remap_host	*rh;
-	char			*s;
+	const char	*hostname = itls->it_hosts[i];
+	remap_host_t	*rh;
+	char		*s;
 
-		if ((rh = hash_get(ctx->map, hostname)) == NULL) {
-			TSDebug("kubernetes", "      new host");
-			rh = calloc(1, sizeof(*rh));
-			hash_set(ctx->map, hostname, rh);
-		} else {
-			TSDebug("kubernetes", "      existing host");
-		}
+		rh = remap_db_get_or_create_host(ctx->db, hostname);
 
 		/* hsts-max-age: enable hsts. */
 		s = hash_get(ctx->ingress->in_annotations,
@@ -487,24 +413,12 @@ size_t			 i;
 	/* Rebuild remap state.
 	 */
 	for (i = 0; i < ing->in_nrules; i++) {
-	struct remap_host	*rh;
-	const char		*hostname = ing->in_rules[i].ir_host;
+	remap_host_t	*rh;
+	const char	*hostname = ing->in_rules[i].ir_host;
 
 		TSDebug("kubernetes", "    hostname %s:", hostname);
 
-		/*
-		 * If this host already exists (because another Ingress uses
-		 * it), then add paths to the existing host; otherwise, create
-		 * a new one.
-		 */
-		if ((rh = hash_get(ctx->map, hostname)) == NULL) {
-			TSDebug("kubernetes", "      new host");
-			rh = calloc(1, sizeof(*rh));
-			hash_set(ctx->map, hostname, rh);
-		} else {
-			TSDebug("kubernetes", "      existing host");
-		}
-
+		rh = remap_db_get_or_create_host(ctx->db, hostname);
 		rebuild_make_host(ctx, rh, &ing->in_rules[i]);
 	}
 }
@@ -533,53 +447,13 @@ struct rebuild_ctx	ctx;
 	}
 
 	TSDebug("kubernetes", "rebuild_maps: running");
-	ctx.map = hash_new(127, (hash_free_fn) remap_host_free);
+	ctx.db = remap_db_new();
 	hash_foreach(state->cluster->cs_namespaces, rebuild_namespace, &ctx);
 
 	state->changed = 0;
 	TSMutexUnlock(state->cluster_lock);
 
-	TSConfigSet(state->cfg_slot, ctx.map, (TSConfigDestroyFunc)hash_free);
-}
-
-/*
- * Test whether the given plaintext password matches the encrypted password
- * stored in the hash for the given user.
- */
-int
-check_password(hash_t users, const char *usenam, const char *pass)
-{
-char	*crypted;
-	if ((crypted = hash_get(users, usenam)) == NULL)
-		return 0;
-
-	return crypt_check(pass, crypted);
-}
-
-/*
- * Search the list of paths in a remap_host for one that matches the provided
- * path, and return it.  If pfxs is non-NULL, the length of the portion of the
- * request path that was matched by the remap_path will be stored.
- */
-static struct remap_path *
-find_path(struct remap_host *rh, const char *path, size_t *pfxs)
-{
-size_t	i = 0;
-
-	for (i = 0; i < rh->rh_npaths; i++) {
-	struct remap_path	*rp = &rh->rh_paths[i];
-	regmatch_t		 matches[1];
-
-		if (regexec(&rp->rp_regex, path, 1, matches, 0) == 0) {
-			if (pfxs)
-				*pfxs = matches[0].rm_eo - matches[0].rm_so;
-			return rp;
-		}
-	}
-
-	if (pfxs)
-		*pfxs = 0;
-	return &rh->rh_default;
+	TSConfigSet(state->cfg_slot, ctx.db, (TSConfigDestroyFunc)remap_db_free);
 }
 
 /*
@@ -587,23 +461,13 @@ size_t	i = 0;
  * match the given route_path's configured user database.  if so, return 1;
  * otherwise return 0.
  */
-
 int
-check_authn_basic(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, struct remap_path *rp)
+check_authn_basic(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs,
+		  const remap_path_t *rp)
 {
 TSMLoc		 auth_hdr = NULL;
-char		 buf[256];
-char		*creds;
-char		*p;
-int		 n, len;
+int		 len, ret;
 const char	*cs;
-size_t		 credslen;
-
-	if (rp->rp_auth_type != REMAP_AUTH_BASIC)
-		return 0;
-
-	if (!rp->rp_users)
-		return 0;
 
 	auth_hdr = TSMimeHdrFieldFind(reqp, hdrs,
 				      TS_MIME_FIELD_AUTHORIZATION,
@@ -612,46 +476,10 @@ size_t		 credslen;
 		return 0;
 
 	cs = TSMimeHdrFieldValueStringGet(reqp, hdrs, auth_hdr, 0, &len);
-	if ((creds = memchr(cs, ' ', len)) == NULL)
-		goto error;
-
-	if (len < 7)
-		goto error;
-	if (memcmp(cs, "Basic ", 6))
-		goto error;
-
-	while (isspace(*creds) && (creds < cs + len))
-		++creds;
-
-	if (creds == cs + len)
-		goto error;
-	credslen = (cs + len) - creds;
-
-	if (base64_decode_len(credslen) > sizeof(buf) - 1)
-		goto error;
-
-	n = base64_decode(creds, credslen, (unsigned char *)buf);
+	ret = auth_check_basic(cs, len, rp);
 	TSHandleMLocRelease(reqp, hdrs, auth_hdr);
-	auth_hdr = NULL;
 
-	if (n < 3)
-		goto error;
-
-	buf[n] = '\0';
-
-	if ((p = strchr(buf, ':')) == NULL)
-		goto error;
-	*p++ = '\0';
-
-	if (!check_password(rp->rp_users, buf, p))
-		goto error;
-
-	return 1;
-
-error:
-	if (auth_hdr)
-		TSHandleMLocRelease(reqp, hdrs, auth_hdr);
-	return 0;
+	return ret == 1 ? 1 : 0;
 }
 
 /*
@@ -659,82 +487,15 @@ error:
  * the address list in the remap_path.
  */
 int
-check_authz_address(TSHttpTxn txn, struct remap_path *rp)
+check_authz_address(TSHttpTxn txn, const remap_path_t *rp)
 {
-struct remap_auth_addr	*rad;
 const struct sockaddr	*addr;
 
 	addr = TSHttpTxnClientAddrGet(txn);
 	if (addr == NULL)
 		return 0;
 
-	switch (addr->sa_family) {
-	case AF_INET:
-		for (rad = rp->rp_auth_addr_list; rad; rad = rad->ra_next) {
-		struct sockaddr_in	*sin = (struct sockaddr_in *)addr;
-		in_addr_t		 ip, net, mask;
-
-			if (rad->ra_family != AF_INET)
-				continue;
-
-			if (rad->ra_prefix_length < 0
-			    || rad->ra_prefix_length > 32)
-				continue;
-
-			ip = htonl(sin->sin_addr.s_addr);
-			net = htonl(rad->ra_addr_v4);
-			mask = ~(uint32_t)0 << (32 - rad->ra_prefix_length);
-
-			if ((ip & mask) == (net & mask))
-				return 1;
-		}
-
-		return 0;
-
-	case AF_INET6:
-		for (rad = rp->rp_auth_addr_list; rad; rad = rad->ra_next) {
-		struct sockaddr_in6	*sin = (struct sockaddr_in6 *)addr;
-#define IP6_U32LEN	(128 / 8 / 4)
-		uint32_t		 ip[IP6_U32LEN],
-					 net[IP6_U32LEN],
-					 mask[IP6_U32LEN];
-		int			 i;
-
-			if (rad->ra_family != AF_INET6)
-				continue;
-
-			if (rad->ra_prefix_length < 0
-			    || rad->ra_prefix_length > 128)
-				continue;
-
-			bcopy(sin->sin6_addr.s6_addr, ip, sizeof(ip));
-			bcopy(rad->ra_addr_v6, net, sizeof(net));
-			memset(mask, 0xFF, sizeof(mask));
-
-			i = rad->ra_prefix_length / 32;
-			switch (i) {
-			case 0: mask[0] = 0;
-			case 1: mask[1] = 0;
-			case 2: mask[2] = 0;
-			case 3: mask[3] = 0;
-			}
-
-			if (rad->ra_prefix_length % 32)
-				mask[i] = htonl(~(uint32_t)0 <<
-						(32 - (rad->ra_prefix_length % 32)));
-
-			for (i = 0; i < 4; i++)
-				if ((ip[i] & mask[i]) != (net[i] & mask[i]))
-					continue;
-
-			return 1;
-		}
-
-		return 0;
-
-	default:
-		return 0;
-	}
+	return auth_check_address(addr, rp);
 }
 
 /*
@@ -761,7 +522,7 @@ const struct sockaddr	*addr;
 #define	AUTHZ_DENY_AUTHN	3
 
 int
-check_authz(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, struct remap_path *rp)
+check_authz(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, const remap_path_t *rp)
 {
 	if (rp->rp_auth_addr_list) {
 		if (check_authz_address(txn, rp)) {
@@ -804,7 +565,7 @@ check_authz(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, struct remap_path *rp)
  * if the client retries with an Authorization header field.
  */
 static void
-return_unauthorized(TSHttpTxn txnp, struct remap_path *rp)
+return_unauthorized(TSHttpTxn txnp, const remap_path_t *rp)
 {
 synth_t	*sy;
 	sy = synth_new(401, "Authentication required");
@@ -823,7 +584,7 @@ synth_t	*sy;
  * Return 403 Forbidden: the request was denied, and it will never be allowed.
  */
 static void
-return_forbidden(TSHttpTxn txnp, struct remap_path *rp)
+return_forbidden(TSHttpTxn txnp, const remap_path_t *rp)
 {
 synth_t	*sy;
 	sy = synth_new(403, "Forbidden");
@@ -850,21 +611,21 @@ int			 pod_port, len, hostn;
 char			*pod_host = NULL, *requrl = NULL;
 const char		*cs;
 char			*hbuf = NULL, *pbuf = NULL, *s;
-struct remap_host	*rh;
-struct remap_path	*rp;
+const remap_host_t	*rh;
+const remap_path_t	*rp;
 size_t			 poffs;
 TSMBuffer		 reqp;
 TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr = NULL;
 TSHttpTxn		 txnp = (TSHttpTxn) edata;
 TSConfig		 map_cfg = NULL;
-hash_t			 map = NULL;
+const remap_db_t	*db;
 struct state		*state = TSContDataGet(contn);
 
 	map_cfg = TSConfigGet(state->cfg_slot);
-	map = TSConfigDataGet(map_cfg);
+	db = TSConfigDataGet(map_cfg);
 
 	/* Not initialised yet? */
-	if (!map)
+	if (!db)
 		goto cleanup;
 
 
@@ -915,7 +676,7 @@ struct state		*state = TSContDataGet(contn);
 	 * Look for a remap_host for this hostname.  If there isn't one, we
 	 * have no configuration for this host and there's nothing more to do.
 	 */
-	if ((rh = hash_get(map, hbuf)) == NULL) {
+	if ((rh = remap_db_get_host(db, hbuf)) == NULL) {
 		TSDebug("kubernetes", "host <%s> map not found", hbuf);
 		goto cleanup;
 	}
@@ -937,7 +698,7 @@ struct state		*state = TSContDataGet(contn);
 	 * if no path is found, pass on this request and let the default
 	 * backend return a 404.
 	 */
-	if ((rp = find_path(rh, pbuf, &poffs)) == NULL) {
+	if ((rp = remap_host_find_path(rh, pbuf, &poffs)) == NULL) {
 		TSDebug("kubernetes", "host <%s>, path <%s> not found",
 			hbuf, pbuf);
 		goto cleanup;

@@ -50,7 +50,7 @@ int      hash_set(hash_t, const char *key, void *data);
  * Retrieve an item from the hash.  Returns the item data, or NULL if the item
  * was not found.
  */
-void    *hash_get(hash_t, const char *key);
+void    *hash_get(const hash_t, const char *key);
 
 /*
  * Remove an item from the hash.  Returns the item value on success.  On error,
@@ -69,7 +69,7 @@ void	 hash_foreach(hash_t, hash_foreach_fn, void *data);
  * Return the first entry in the hash where find_fn(value) returns true.
  */
 typedef int (*hash_find_fn) (hash_t, const char *key, void *value, void *data);
-void	*hash_find(hash_t, hash_find_fn, void *data);
+void	*hash_find(const hash_t, hash_find_fn, void *data);
 
 /*
  * Iterate through each element of the hash; iteration context is stored in

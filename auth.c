@@ -40,7 +40,7 @@ char	*crypted;
  * the header could not be parsed (or is not a basic authentication header).
  */
 int
-auth_check_basic(const char *hdr, size_t len, const struct remap_path *rp)
+auth_check_basic(const char *hdr, size_t len, const remap_path_t *rp)
 {
 char		 buf[256];
 char		*creds;
@@ -158,7 +158,7 @@ int	 i;
  * given route_path's access list.  Returns 1 if so, else 0.
  */
 int
-auth_check_address(const struct sockaddr *addr, const struct remap_path *rp)
+auth_check_address(const struct sockaddr *addr, const remap_path_t *rp)
 {
 struct remap_auth_addr	*rad;
 

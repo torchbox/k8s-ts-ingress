@@ -17,16 +17,15 @@
 
 #include    "hash.h"
 #include    "plugin.h"
+#include    "remap.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct remap_path;
-
 int auth_check_password(hash_t users, const char *usenam, const char *pass);
-int auth_check_basic(const char *hdr, size_t hdrlen, const struct remap_path *);
-int auth_check_address(const struct sockaddr *addr, const struct remap_path *);
+int auth_check_basic(const char *hdr, size_t hdrlen, const remap_path_t *);
+int auth_check_address(const struct sockaddr *addr, const remap_path_t *);
 
 int ipv4_in_network(in_addr_t ip, in_addr_t netw, int pfxlen);
 int ipv6_in_network(const struct in6_addr *ip, const struct in6_addr *net,

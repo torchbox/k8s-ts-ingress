@@ -154,7 +154,7 @@ struct hashbucket	*b = state->p;
 }
 
 void *
-hash_find(hash_t hs, hash_find_fn fn, void *data)
+hash_find(const hash_t hs, hash_find_fn fn, void *data)
 {
 size_t	i;
 
@@ -197,7 +197,7 @@ uint32_t		 bn;
 }
 
 void *
-hash_get(hash_t hs, const char *key)
+hash_get(const hash_t hs, const char *key)
 {
 uint32_t		 bn;
 struct hashbucket	*hb = NULL;

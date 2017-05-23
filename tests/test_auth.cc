@@ -109,7 +109,7 @@ TEST(Auth, IPv6Network)
 TEST(Auth, Basic)
 {
 	for (basic_test test: basic_tests) {
-		struct remap_path test_rp;
+		remap_path_t test_rp;
 
 		std::memset(&test_rp, 0, sizeof(test_rp));
 		test_rp.rp_auth_type = REMAP_AUTH_BASIC;
