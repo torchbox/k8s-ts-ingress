@@ -85,6 +85,7 @@ TEST_SRCS=	ts_mockapi.cc		\
 		test_api.cc		\
 		test_base64.cc		\
 		test_crypt.cc		\
+		test_config.cc		\
 		test_hash.cc
 
 TEST_OBJS=	gtest-all.o		\
@@ -93,6 +94,7 @@ TEST_OBJS=	gtest-all.o		\
 		hash.o			\
 		auth.o			\
 		remap_db.o		\
+		config.o		\
 		${TEST_SRCS:.cc=.o}	\
 		${API_OBJS}		\
 		${CRYPT_OBJS}

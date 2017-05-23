@@ -29,7 +29,9 @@ TSError(char const *fmt, ...)
 {
 va_list	args;
 	va_start(args, fmt);
+	std::fputs("[    TSAPI ] ", stderr);
 	std::vfprintf(stderr, fmt, args);
+	std::fputs("\n", stderr);
 	va_end(args);
 
 	++ts_api_errors;

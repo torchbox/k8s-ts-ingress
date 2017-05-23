@@ -11,7 +11,9 @@
 #ifndef	CONFIG_H
 #define	CONFIG_H
 
-#include	"hash.h"
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 /*
  * Service account credential files.
@@ -33,5 +35,9 @@ typedef struct k8s_config {
 k8s_config_t	*k8s_config_load(const char *file);
 k8s_config_t	*k8s_incluster_config(void);
 void		 k8s_config_free(k8s_config_t *);
+
+#ifdef	__cplusplus
+}
+#endif
 
 #endif	/* !CONFIG_H */

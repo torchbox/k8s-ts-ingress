@@ -86,17 +86,16 @@ int		 lineno = 0;
 		while (s >= line && strchr("\r\n", *s))
 			*s-- = '\0';
 
-		if (line[strlen(line) - 1] == '\n')
-			line[strlen(line) - 1] = '\0';
-
 		while (isspace(*opt))
 			opt++;
 
 		if (*opt == '#' || *opt == '\0')
 			continue;
 
-		if ((value = strchr(opt, ':')) == NULL)
+		if ((value = strchr(opt, ':')) == NULL) {
+			TSError("%s:%d: syntax error", file, lineno);
 			goto error;
+		}
 
 		*value++ = '\0';
 		while (isspace(*value))
@@ -205,8 +204,10 @@ int		 lineno = 0;
 		}
 	}
 
-	if (ret->co_tls_keyfile)
+	if (ret->co_tls_keyfile) {
 		free(ret->co_token);
+		ret->co_token = NULL;
+	}
 
 	if (ret->co_tls_keyfile && !ret->co_tls_certfile) {
 		TSError("%s: must specify certfile with keyfile", file);
