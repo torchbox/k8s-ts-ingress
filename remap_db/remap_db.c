@@ -191,9 +191,9 @@ size_t			 i;
 struct remap_auth_addr	*rip, *nrip;
 
 	for (i = 0; i < rp->rp_naddrs; i++)
-		free(rp->rp_addrs[i]);
-
+		free(rp->rp_addrs[i].rt_host);
 	free(rp->rp_addrs);
+
 	free(rp->rp_app_root);
 	free(rp->rp_rewrite_target);
 	free(rp->rp_auth_realm);
@@ -211,14 +211,10 @@ struct remap_auth_addr	*rip, *nrip;
 void
 remap_path_add_address(remap_path_t *rp, const char *host, int port)
 {
-char	*buf;
-size_t	 buflen = strlen(host) + 1 + 5 + 1;
-
-	buf = malloc(buflen);
-	snprintf(buf, buflen, "%s:%d", host, port);
 	rp->rp_addrs = realloc(rp->rp_addrs,
-			       sizeof(char *) * (rp->rp_naddrs + 1));
-	rp->rp_addrs[rp->rp_naddrs] = buf;
+			       sizeof(remap_target_t) * (rp->rp_naddrs + 1));
+	rp->rp_addrs[rp->rp_naddrs].rt_host = strdup(host);
+	rp->rp_addrs[rp->rp_naddrs].rt_port = port;
 	++rp->rp_naddrs;
 }
 
@@ -415,6 +411,16 @@ ssize_t	 n;
 	}
 
 	free(buf);
+}
+
+/*
+ * Pick a random backend for this path.
+ */
+const remap_target_t *
+remap_path_pick_target(const remap_path_t *rp)
+{
+int	n = rand() / (RAND_MAX / rp->rp_naddrs + 1);
+	return &rp->rp_addrs[n];
 }
 
 /*

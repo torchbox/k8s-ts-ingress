@@ -51,24 +51,30 @@ struct remap_auth_addr {
 #define	REMAP_SATISFY_ALL	0
 #define	REMAP_SATISFY_ANY	1
 
+typedef struct remap_target {
+	char	*rt_host;
+	int	 rt_port;
+} remap_target_t;
+
 typedef struct {
-	regex_t	  rp_regex;
-	char	**rp_addrs;
-	size_t	  rp_naddrs;
-	hash_t	  rp_users;
+	regex_t		  rp_regex;
+	remap_target_t	 *rp_addrs;
+	size_t		  rp_naddrs;
+	hash_t		  rp_users;
 
 	int	  rp_cache:1;
+	int	  rp_cache_gen;
 	int	  rp_follow_redirects:1;
 	int	  rp_secure_backends:1;
 	int	  rp_preserve_host:1;
+	char	 *rp_app_root;
+	char	 *rp_rewrite_target;
 	int	  rp_no_ssl_redirect:1;
 	int	  rp_force_ssl_redirect:1;
 	uint	  rp_auth_type:2;
 	uint	  rp_auth_satisfy:1;
-	int	  rp_cache_gen;
-	char	 *rp_app_root;
-	char	 *rp_rewrite_target;
 	char	 *rp_auth_realm;
+
 	struct remap_auth_addr *rp_auth_addr_list;
 } remap_path_t;
 
@@ -77,6 +83,8 @@ void		 remap_path_free(remap_path_t *);
 void		 remap_path_annotate(namespace_t *ns, remap_path_t *, hash_t);
 void		 remap_path_add_address(remap_path_t *, const char *host,
 					int port);
+const remap_target_t
+		*remap_path_pick_target(const remap_path_t *);
 
 /*
  * Store configuration for a particular hostname.  This contains the TLS

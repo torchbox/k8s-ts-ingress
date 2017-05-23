@@ -201,12 +201,13 @@ synth_t	*sy;
 int
 handle_remap(TSCont contn, TSEvent event, void *edata)
 {
-int			 pod_port, len, hostn;
-char			*pod_host = NULL, *requrl = NULL;
+int			 len;
+char			*requrl = NULL;
 const char		*cs;
 char			*hbuf = NULL, *pbuf = NULL, *s;
 const remap_host_t	*rh;
 const remap_path_t	*rp;
+const remap_target_t	*rt;
 size_t			 poffs;
 TSMBuffer		 reqp;
 TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr = NULL;
@@ -450,10 +451,8 @@ struct state		*state = TSContDataGet(contn);
 	/*
 	 * Pick a random backend endpoint to route the request to.
 	 */
-	hostn = rand() / (RAND_MAX / rp->rp_naddrs + 1);
-
-	pod_host = strdup(rp->rp_addrs[hostn]);
-	TSDebug("kubernetes", "remapped to %s", pod_host);
+	rt = remap_path_pick_target(rp);
+	TSDebug("kubernetes", "remapped to %s:%d", rt->rt_host, rt->rt_port);
 
 	/*
 	 * Usually, we want to preserve the request host header so the backend
@@ -464,7 +463,8 @@ struct state		*state = TSContDataGet(contn);
 		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_URL_REMAP_PRISTINE_HOST_HDR, 0);
 		if (host_hdr)
 			TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
-						     pod_host, strlen(pod_host));
+						     rt->rt_host,
+						     strlen(rt->rt_host));
 	}
 
 	/*
@@ -482,20 +482,16 @@ struct state		*state = TSContDataGet(contn);
 	}
 
 	/*
-	 * Strip the port from the host and set the backend in the URL.  This
-	 * is equivalent to remapping the request.
+	 * Set the backend for this request.  This is the actual request
+	 * remapping.
 	 */
-	if ((s = strchr(pod_host, ':')) != NULL) {
-		*s++ = 0;
-		pod_port = atoi(s);
-	} else goto cleanup;
-
-	if (TSUrlHostSet(reqp, url_loc, pod_host, strlen(pod_host)) != TS_SUCCESS) {
+	if (TSUrlHostSet(reqp, url_loc, rt->rt_host,
+			 strlen(rt->rt_host)) != TS_SUCCESS) {
 		TSError("[kubernetes] <%s>: could not set request host", requrl);
 		goto cleanup;
 	}
 
-	if (TSUrlPortSet(reqp, url_loc, pod_port) != TS_SUCCESS) {
+	if (TSUrlPortSet(reqp, url_loc, rt->rt_port) != TS_SUCCESS) {
 		TSError("[kubernetes] <%s>: could not set request port", requrl);
 		goto cleanup;
 	}
@@ -544,7 +540,6 @@ cleanup:
 		TSHandleMLocRelease(reqp, hdr_loc, url_loc);
 	if (hdr_loc)
 		TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdr_loc);
-	free(pod_host);
 	free(pbuf);
 	free(hbuf);
 	return TS_SUCCESS;

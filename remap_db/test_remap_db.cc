@@ -129,7 +129,13 @@ TEST(RemapDB, Basic)
 	/* the path should have one address... */
 	ASSERT_EQ(1u, rp->rp_naddrs);
 	/* ... and it should be this one: */
-	ASSERT_STREQ("172.28.100.135:8080", rp->rp_addrs[0]);
+	ASSERT_STREQ("172.28.100.135", rp->rp_addrs[0].rt_host);
+	ASSERT_EQ(8080, rp->rp_addrs[0].rt_port);
+
+	/* Make sure pick_target returns the same host */
+	remap_target_t const *target = remap_path_pick_target(rp);
+	ASSERT_STREQ("172.28.100.135", target->rt_host);
+	ASSERT_EQ(8080, target->rt_port);
 
 	remap_db_free(db);
 	cluster_free(cluster);
