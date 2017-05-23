@@ -22,10 +22,10 @@ VERSION?=		unversioned
 
 DISTFILES=	api crypt util			\
 		config.h plugin.h synth.h tls.h	\
-		ts_crypt.h watcher.h		\
+		ts_crypt.h watcher.h remap.h	\
 		config.c namespace.c plugin.c	\
 		remap.c synth.c tls.c watcher.c	\
-		auth.c				\
+		auth.c remap_db.c		\
 		gtest				\
 		tests				\
 		configure			\
