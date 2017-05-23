@@ -18,6 +18,7 @@ DOCKER_REPOSITORY=torchbox/k8s-ts-ingress
 docker build --pull -t $DOCKER_REPOSITORY:$COMMIT .
 
 if [ "$TRAVIS_PULL_REQUEST" = "false" -a -n "$TRAVIS_TAG" ]; then
+	docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
 	docker tag $DOCKER_REPOSITORY:$COMMIT $DOCKER_REPOSITORY:$VERSION
 	docker push $DOCKER_REPOSITORY:$VERSION
 fi
