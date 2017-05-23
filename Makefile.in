@@ -27,17 +27,25 @@ CPPFLAGS=	@CPPFLAGS@		\
 		-I${ROOT}/gtest		\
 		-I${ROOT}/gtest/include	\
 		-I${ROOT}/api		\
+		-I${ROOT}/auth		\
+		-I${ROOT}/crypt		\
+		-I${ROOT}/remap_db	\
+		-I${ROOT}/tsapi		\
 		-I${ROOT}/util
+
+JSON_CFLAGS=	@JSON_CFLAGS@
+PTHREAD_LIBS=	@PTHREAD_LIBS@
 
 CFLAGS=		@TS_CFLAGS@ @JSON_CFLAGS@ @PTHREAD_CFLAGS@ @CFLAGS@
 CXXFLAGS=	@TS_CXXFLAGS@ @JSON_CFLAGS@ @CXXFLAGS@
 LIBS=		@LIBS@ @LDFLAGS@ @JSON_LIBS@
 
-PTHREAD_LIBS=	@PTHREAD_LIBS@
-
 VPATH=		${ROOT}/crypt		\
 		${ROOT}/util		\
 		${ROOT}/api		\
+		${ROOT}/auth		\
+		${ROOT}/remap_db	\
+		${ROOT}/tsapi		\
 		${ROOT}/tests		\
 		${ROOT}/gtest/src
 
@@ -71,14 +79,24 @@ SRCS=		hash.c		\
 		${API_SRCS}
 OBJS=		${SRCS:.c=.o}
 
-TEST_OBJS=	gtest-all.o	gtest_main.o	\
-		ts_mockapi.o			\
-		base64.o	test_base64.o	\
-		hash.o		test_hash.o	\
-		auth.o		test_auth.o	\
-		remap_db.o	test_remap_db.o	\
-		${API_OBJS}	test_api.o	\
-		${CRYPT_OBJS}	test_crypt.o
+TEST_SRCS=	ts_mockapi.cc		\
+		test_auth.cc		\
+		test_remap_db.cc	\
+		test_api.cc		\
+		test_base64.cc		\
+		test_crypt.cc		\
+		test_hash.cc
+
+TEST_OBJS=	gtest-all.o		\
+		gtest_main.o		\
+		ts_mockapi.o		\
+		base64.o		\
+		hash.o			\
+		auth.o			\
+		remap_db.o		\
+		${TEST_SRCS:.cc=.o}	\
+		${API_OBJS}		\
+		${CRYPT_OBJS}
 
 all: kubernetes.so
 
@@ -105,13 +123,10 @@ lint: ${SRCS}
 clean:
 	rm -f kubernetes.so ${OBJS} ${TEST_OBJS} *.plist test
 
-depend:
+depend: ${SRCS} ${TEST_SRCS}
 	sed -e '/^# ADDED BY MAKE DEPEND -- DO NOT DELETE/,$$ d' < Makefile > Makefile.tmp
 	echo '# ADDED BY MAKE DEPEND -- DO NOT DELETE' >> Makefile.tmp
-	${CC} ${CPPFLAGS} ${CFLAGS} ${JSON_CFLAGS} -MM \
-		*.c crypt/*.c >> Makefile.tmp
-	${CXX} ${CPPFLAGS} ${CXXFLAGS} ${JSON_CFLAGS} -MM \
-		tests/*.cc >> Makefile.tmp
+	${CC} ${CPPFLAGS} ${JSON_CFLAGS} -MM $^ >> Makefile.tmp
 	mv Makefile.tmp Makefile
 
 .PHONY: test install clean depend lint

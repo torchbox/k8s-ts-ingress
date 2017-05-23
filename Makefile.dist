@@ -20,14 +20,9 @@ DOCKER_IMAGE=		${DOCKER_REGISTRY}:${DOCKER_TAG}
 
 VERSION?=		unversioned
 
-DISTFILES=	api crypt util			\
-		config.h plugin.h synth.h tls.h	\
-		ts_crypt.h watcher.h remap.h	\
-		config.c namespace.c plugin.c	\
-		remap.c synth.c tls.c watcher.c	\
-		auth.c remap_db.c		\
-		gtest				\
-		tests				\
+DISTFILES=	api crypt util auth remap_db	\
+		tsapi remap_db			\
+		gtest tests			\
 		configure			\
 		configure.ac			\
 		acinclude			\
