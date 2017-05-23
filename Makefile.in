@@ -89,7 +89,6 @@ TEST_SRCS=	ts_mockapi.cc		\
 
 TEST_OBJS=	gtest-all.o		\
 		gtest_main.o		\
-		ts_mockapi.o		\
 		base64.o		\
 		hash.o			\
 		auth.o			\
