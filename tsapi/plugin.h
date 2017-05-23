@@ -29,15 +29,6 @@ extern "C" {
 #endif
 
 /*
- * Store transient context during rebuild.
- */
-struct rebuild_ctx {
-	namespace_t	*ns;
-	ingress_t	*ingress;
-	remap_db_t	*db;
-};
-
-/*
  * Hold the current Kubernetes cluster state (populated by our watchers), as
  * well as the TLS map and remap maps.
  */

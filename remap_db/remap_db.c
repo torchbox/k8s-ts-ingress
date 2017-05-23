@@ -11,6 +11,12 @@
  * remap_db: store the remap database used by the remapping plugin.
  */
 
+#include	<sys/types.h>
+#include	<sys/socket.h>
+
+#include	<netinet/in.h>
+#include	<arpa/inet.h>
+
 #include	<stdlib.h>
 #include	<errno.h>
 #include	<string.h>
@@ -20,6 +26,9 @@
 #include	<ts/ts.h>
 
 #include	"remap.h"
+#include	"base64.h"
+
+static void remap_path_add_users(remap_path_t *, secret_t *);
 
 /*
  * remap_host stores a single hostname for remapping.
@@ -102,6 +111,33 @@ remap_host_get_default_path(remap_host_t *rh)
 }
 
 /*
+ * Configure a remap_host from the given Ingress annotations.
+ */
+void
+remap_host_annotate(remap_host_t *rh, hash_t annotations)
+{
+const char	*key, *value;
+
+	/*
+	 * There are two ways we could do this: use hash_get for each annotation
+	 * we support, or iterate over all annotations and compare them.  We use
+	 * the second method, because assuming we understand all (or most of)
+	 * the annotations on the Ingress, which should be the same, it saves
+	 * running a complete hash lookup for every string.
+	 *
+	 * It also makes the code a bit easier to read.
+	 */
+
+	hash_foreach(annotations, &key, &value) {
+		if (strcmp(key, IN_HSTS_MAX_AGE) == 0)
+			rh->rh_hsts_max_age = atoi(value);
+		else if (strcmp(key, IN_HSTS_INCLUDE_SUBDOMAINS) == 0 &&
+			 strcmp(value, "true") == 0)
+			rh->rh_hsts_subdomains = 1;
+	}
+}
+
+/*
  * remap_path: an individual path inside a remap_host
  */
 
@@ -170,6 +206,215 @@ struct remap_auth_addr	*rip, *nrip;
 	}
 
 	free(rp);
+}
+
+void
+remap_path_add_address(remap_path_t *rp, const char *host, int port)
+{
+char	*buf;
+size_t	 buflen = strlen(host) + 1 + 5 + 1;
+
+	buf = malloc(buflen);
+	snprintf(buf, buflen, "%s:%d", host, port);
+	rp->rp_addrs = realloc(rp->rp_addrs,
+			       sizeof(char *) * (rp->rp_naddrs + 1));
+	rp->rp_addrs[rp->rp_naddrs] = buf;
+	++rp->rp_naddrs;
+}
+
+/*
+ * Convert a string containing whitespace-separated IP addresses into a
+ * remap_auth_addr list.
+ */
+struct remap_auth_addr *
+remap_path_get_addresses(const char *str)
+{
+struct remap_auth_addr	*list = NULL;
+char			*mstr, *save, *saddr;
+
+	if ((mstr = strdup(str)) == NULL)
+		return NULL;
+
+	for (saddr = strtok_r(mstr, " \t\n\r", &save); saddr != NULL;
+	     saddr = strtok_r(NULL, " \t\n\r", &save)) {
+	struct remap_auth_addr	*entry;
+	char			*p = NULL;
+	
+		entry = calloc(1, sizeof(*entry));
+		if ((p = strchr(saddr, '/')) != NULL) {
+			*p++ = '\0';
+			entry->ra_prefix_length = atoi(p);
+		}
+
+		if (inet_pton(AF_INET6, saddr,
+			      entry->ra_addr_v6.s6_addr) == 1) {
+			entry->ra_family = AF_INET6;
+			if (p == NULL)
+				entry->ra_prefix_length = 128;
+		} else if (inet_pton(AF_INET, saddr, &entry->ra_addr_v4) == 1) {
+			entry->ra_family = AF_INET;
+			if (p == NULL)
+				entry->ra_prefix_length = 32;
+		} else {
+			free(entry);
+			continue;
+		}
+
+		entry->ra_next = list;
+		list = entry;
+	}
+	     
+	free(mstr);
+	return list;
+}
+
+static int
+truefalse(const char *str)
+{
+	if (strcmp(str, "true") == 0)
+		return 1;
+	return 0;
+}
+
+/*
+ * Configure a remap_path from the given Ingress annotations.
+ */
+void
+remap_path_annotate(namespace_t *ns, remap_path_t *rp, hash_t annotations)
+{
+const char	*key, *value;
+
+	/*
+	 * There are two ways we could do this: use hash_get for each annotation
+	 * we support, or iterate over all annotations and compare them.  We use
+	 * the second method, because assuming we understand all (or most of)
+	 * the annotations on the Ingress, which should be the same, it saves
+	 * running a complete hash lookup for every string.
+	 *
+	 * It also makes the code a bit easier to read.
+	 */
+
+	hash_foreach(annotations, &key, &value) {
+		/* cache-enable: turn caching on or off */
+		if (strcmp(key, IN_CACHE_ENABLE) == 0)
+			rp->rp_cache = truefalse(value);
+
+		/* cache-generation: set the TS cache generation id */
+		else if (strcmp(key, IN_CACHE_GENERATION) == 0)
+			rp->rp_cache_gen = atoi(value);
+
+		/* follow-redirects: if set, TS will resolve 3xx responses itself */
+		else if (strcmp(key, IN_FOLLOW_REDIRECTS) == 0)
+			rp->rp_follow_redirects = truefalse(value);
+
+		/* secure-backends: use TLS for backend connections */
+		else if (strcmp(key, IN_SECURE_BACKENDS) == 0)
+			rp->rp_secure_backends = truefalse(value);
+
+		/* ssl-redirect: if false, disable http->https redirect */
+		else if (strcmp(key, IN_SSL_REDIRECT) == 0)
+			rp->rp_no_ssl_redirect = !truefalse(value);
+
+		/*
+		 * force-ssl-redirect: redirect http->https even if the
+		 * Ingress doesn't have TLS configured.
+		 */
+		else if (strcmp(key, IN_FORCE_SSL_REDIRECT) == 0)
+			rp->rp_force_ssl_redirect = truefalse(value);
+
+		/* preserve-host: use origin request host header */
+		else if (strcmp(key, IN_PRESERVE_HOST) == 0)
+			rp->rp_preserve_host = truefalse(value);
+
+		/* app-root: enforce url prefix */
+		else if (strcmp(key, IN_APP_ROOT) == 0)
+			rp->rp_app_root = strdup(value);
+
+		/* rewrite-target: rewrite URL path */
+		else if (strcmp(key, IN_REWRITE_TARGET) == 0 && *value == '/')
+			rp->rp_rewrite_target = strdup(value + 1);
+
+		/*
+		 * Authentication.
+		 */
+
+		/* authentication type (basic/digest) */
+		else if (strcmp(key, IN_AUTH_TYPE) == 0) {
+			if (strcmp(value, IN_AUTH_TYPE_BASIC) == 0)
+				rp->rp_auth_type = REMAP_AUTH_BASIC;
+			else if (strcmp(value, IN_AUTH_TYPE_DIGEST) == 0)
+				rp->rp_auth_type = REMAP_AUTH_DIGEST;
+		}
+
+		/* authentication realm */
+		else if (strcmp(key, IN_AUTH_REALM) == 0)
+			rp->rp_auth_realm = strdup(value);
+
+		/* authentication user database */
+		else if (strcmp(key, IN_AUTH_SECRET) == 0) {
+		secret_t	*se;
+			if ((se = namespace_get_secret(ns, value)) != NULL) {
+				rp->rp_users = hash_new(127, free);
+				remap_path_add_users(rp, se);
+			}
+		}
+
+		/* authentication satisfy requirement (any, all) */
+		else if (strcmp(key, IN_AUTH_SATISFY) == 0) {
+			if (strcmp(value, IN_AUTH_SATISFY_ANY) == 0)
+				rp->rp_auth_satisfy = REMAP_SATISFY_ANY;
+			else
+				rp->rp_auth_satisfy = REMAP_SATISFY_ALL;
+		}
+
+		else if (strcmp(key, IN_AUTH_ADDRESS_LIST) == 0)
+			rp->rp_auth_addr_list = remap_path_get_addresses(value);
+
+	}
+}
+
+/*
+ * Add users from a secret to a remap_path.
+ */
+static void
+remap_path_add_users(remap_path_t *rp, secret_t *secret)
+{
+char	*authdata = NULL;
+char	*buf, *entry, *s;
+size_t	 dlen;
+ssize_t	 n;
+
+	if ((authdata = hash_get(secret->se_data, "auth")) == NULL)
+		return;
+
+	dlen = strlen(authdata);
+	s = buf = malloc(base64_decode_len(dlen) + 1);
+	n = base64_decode(authdata, dlen, (unsigned char *)buf);
+
+	if (n == -1) {
+		free(buf);
+		return;
+	}
+
+	buf[n] = '\0';
+
+	while ((entry = strsep(&s, "\r\n")) != NULL) {
+	char	*password, *rest;
+		if ((password = strchr(entry, ':')) == NULL)
+			continue;
+		*password++ = '\0';
+
+		if ((rest = strchr(password, ':')) != NULL)
+			*rest = '\0';
+
+		while (strchr("\r\n", password[strlen(password) - 1]))
+			password[strlen(password) - 1] = '\0';
+
+		TSDebug("kubernetes", "added user %s/%s", entry, password);
+		hash_set(rp->rp_users, entry, strdup(password));
+	}
+
+	free(buf);
 }
 
 /*

@@ -15,6 +15,7 @@
 #include	<cstdio>
 
 #include	<openssl/ssl.h>
+#include	<openssl/err.h>
 
 #include	<ts/ts.h>
 
@@ -49,4 +50,35 @@ TSSslContextDestroy(TSSslContext ctx)
 	SSL_CTX_free(sslctx);
 }
 
+TSSslContext
+TSSslServerContextCreate(void)
+{
+	SSL_CTX *ctx = SSL_CTX_new(SSLv23_server_method());
+	return reinterpret_cast<TSSslContext>(ctx);
+}
+
+char *
+_k8s_get_ssl_error(void)
+{
+BIO	*bio = BIO_new(BIO_s_mem());
+size_t	 len;
+char	*ret, *buf;
+
+	ERR_print_errors(bio);
+	len = BIO_get_mem_data(bio, &buf);
+	if (len == 0) {
+		BIO_free(bio);
+		return strdup("no error");
+	}
+
+	if ((ret = static_cast<char *>(malloc(len + 1))) == NULL) {
+		BIO_free(bio);
+		return NULL;
+	}
+
+	bcopy(buf, ret, len);
+	buf[len] = '\0';
+	BIO_free(bio);
+	return ret;
+}
 }	// extern "C"

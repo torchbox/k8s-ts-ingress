@@ -25,6 +25,13 @@ extern "C" {
 char	*_k8s_get_ssl_error(void);
 
 /*
+ * Annotation prefixes.  ingress.kubernetes.io is for standard annotations,
+ * ingress.torchbox.com is for TS-specific ones.
+ */
+#define	A_KUBERNETES	"ingress.kubernetes.io/"
+#define	A_TORCHBOX	"ingress.torchbox.com/"
+
+/*
  * Endpointses
  */
 typedef struct {
@@ -57,6 +64,9 @@ endpoints_t	*endpoints_make(json_object *obj);
 /*
  * Services
  */
+
+#define	SV_TYPE_EXTERNALNAME	"ExternalName"
+
 typedef enum {
 	SV_P_TCP,
 	SV_P_UDP,
@@ -82,10 +92,37 @@ typedef struct {
 
 void		 service_free(service_t *);
 service_t	*service_make(json_object *);
+service_port_t	*service_find_port(const service_t *, const char *name,
+				   service_proto_t);
 
 /*
  * Ingresses
  */
+
+/* Ingress annotations - Kubernetes */
+#define	IN_SECURE_BACKENDS		A_KUBERNETES "secure-backends"
+#define	IN_SSL_REDIRECT			A_KUBERNETES "ssl-redirect"
+#define	IN_FORCE_SSL_REDIRECT		A_KUBERNETES "force-ssl-redirect"
+#define	IN_APP_ROOT			A_KUBERNETES "app-root"
+#define	IN_REWRITE_TARGET		A_KUBERNETES "rewrite-target"
+#define	IN_AUTH_TYPE			A_KUBERNETES "auth-type"
+#define	IN_AUTH_TYPE_BASIC		"basic"
+#define	IN_AUTH_TYPE_DIGEST		"digest"
+#define	IN_AUTH_REALM			A_KUBERNETES "auth-realm"
+#define	IN_AUTH_SECRET			A_KUBERNETES "auth-secret"
+
+/* Ingress annotations - Torchbox */
+#define IN_HSTS_INCLUDE_SUBDOMAINS	A_TORCHBOX "hsts-include-subdomains"
+#define	IN_HSTS_MAX_AGE			A_TORCHBOX "hsts-max-age"
+#define	IN_CACHE_ENABLE			A_TORCHBOX "cache-enable"
+#define	IN_CACHE_GENERATION		A_TORCHBOX "cache-generation"
+#define	IN_PRESERVE_HOST		A_TORCHBOX "preserve-host"
+#define	IN_FOLLOW_REDIRECTS		A_TORCHBOX "follow-redirects"
+#define	IN_AUTH_SATISFY			A_TORCHBOX "auth-satisfy"
+#define	IN_AUTH_SATISFY_ANY		"any"
+#define	IN_AUTH_SATISFY_ALL		"all"
+#define	IN_AUTH_ADDRESS_LIST		A_TORCHBOX "auth-address-list"
+
 typedef struct {
 	char	*it_secret_name;
 	char	**it_hosts;
@@ -135,13 +172,14 @@ SSL_CTX		*secret_make_ssl_ctx(secret_t *);
  * Namespaces
  */
 typedef struct {
-	hash_t	ns_ingresses;
-	hash_t	ns_secrets;
-	hash_t	ns_services;
-	hash_t	ns_endpointses;
+	char	*ns_name;
+	hash_t	 ns_ingresses;
+	hash_t	 ns_secrets;
+	hash_t	 ns_services;
+	hash_t	 ns_endpointses;
 } namespace_t;
 
-namespace_t	*namespace_make(void);
+namespace_t	*namespace_make(const char *name);
 void		 namespace_free(namespace_t *);
 
 void		 namespace_put_ingress(namespace_t *, ingress_t *);
@@ -168,6 +206,7 @@ typedef struct {
 } cluster_t;
 
 cluster_t	*cluster_make(void);
+void		 cluster_free(cluster_t *cluster);
 namespace_t	*cluster_get_namespace(cluster_t *, const char *nsname);
 
 #ifdef __cplusplus

@@ -19,6 +19,7 @@
 #include	<openssl/ssl.h>
 
 #include	"hash.h"
+#include	"api.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,6 +74,9 @@ typedef struct {
 
 remap_path_t	*remap_path_new(const char *path);
 void		 remap_path_free(remap_path_t *);
+void		 remap_path_annotate(namespace_t *ns, remap_path_t *, hash_t);
+void		 remap_path_add_address(remap_path_t *, const char *host,
+					int port);
 
 /*
  * Store configuration for a particular hostname.  This contains the TLS
@@ -93,6 +97,7 @@ remap_path_t	*remap_host_find_path(const remap_host_t *,
 				      size_t *pfxsz);
 remap_path_t	*remap_host_new_path(remap_host_t *, const char *path);
 remap_path_t	*remap_host_get_default_path(remap_host_t *);
+void		 remap_host_annotate(remap_host_t *, hash_t);
 
 /*
  * remap_db stores a built remap database, i.e. remap_host objects.
@@ -103,6 +108,7 @@ typedef struct {
 
 /* create and destroy remap_dbs */
 remap_db_t	*remap_db_new(void);
+remap_db_t	*remap_db_from_cluster(cluster_t *);
 void		 remap_db_free(remap_db_t *);
 
 /* fetch hosts from a remap_db */

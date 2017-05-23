@@ -102,21 +102,6 @@ size_t	i;
 	free(hs);
 }
 
-void
-hash_foreach(hash_t hs, hash_foreach_fn fn, void *data)
-{
-size_t	i;
-
-	assert(hs);
-
-	for (i = 0; i < hs->hs_size; i++) {
-	struct hashbucket	*b;
-		for (b = hs->hs_buckets[i]; b; b = b->hb_next) {
-			fn(hs, b->hb_key, b->hb_value, data);
-		}
-	}
-}
-
 int
 hash_iterate(hash_t hs, struct hash_iter_state *state,
 	     const char **key, void **value)
@@ -131,8 +116,8 @@ struct hashbucket	*b = state->p;
 	if (b) {
 		if (b->hb_next) {
 			state->p = b = b->hb_next;
-			*key = b->hb_key;
-			*value = b->hb_value;
+			if (key) *key = b->hb_key;
+			if (value) *value = b->hb_value;
 			return 1;
 		}
 
@@ -145,8 +130,8 @@ struct hashbucket	*b = state->p;
 			continue;
 
 		state->p = b = hs->hs_buckets[state->i];
-		*key = b->hb_key;
-		*value = b->hb_value;
+		if (key) *key = b->hb_key;
+		if (value) *value = b->hb_value;
 		return 1;
 	}
 
@@ -255,69 +240,3 @@ struct hashbucket	*hb, *prev = NULL;
 	errno = ENOENT;
 	return NULL;
 }
-
-#ifdef TEST
-void
-foreach_print(hash_t hs, const char *key, void *value, void *data)
-{
-	printf("[%s]=[%s]\n", key, (const char *)value);
-}
-
-int
-main(int argc, char **argv)
-{
-	{
-	hash_t	hs;
-	struct hash_iter_state iterstate;
-	const char *k;
-	char *v;
-
-		hs = hash_new(1, NULL);
-
-		hash_set(hs, "foo", "key foo");
-		hash_set(hs, "bar", "bar key");
-		hash_set(hs, "quux", "quux key");
-
-		assert(strcmp(hash_get(hs, "foo"), "key foo") == 0);
-		assert(strcmp(hash_get(hs, "bar"), "bar key") == 0);
-		assert(strcmp(hash_get(hs, "quux"), "quux key") == 0);
-		hash_foreach(hs, foreach_print, NULL);
-
-		hash_del(hs, "bar");
-
-		assert(strcmp(hash_get(hs, "foo"), "key foo") == 0);
-		assert(hash_get(hs, "bar") == NULL);
-		assert(strcmp(hash_get(hs, "quux"), "quux key") == 0);
-		hash_foreach(hs, foreach_print, NULL);
-
-		bzero(&iterstate, sizeof(iterstate));
-		assert(hash_iterate(hs, &iterstate, &k, (void **)&v) == 1);
-		assert(strcmp(k, "quux") == 0);
-		assert(strcmp(v, "quux key") == 0);
-		assert(hash_iterate(hs, &iterstate, &k, (void **)&v) == 1);
-		assert(strcmp(k, "foo") == 0);
-		assert(strcmp(v, "key foo") == 0);
-		assert(hash_iterate(hs, &iterstate, &k, (void **)&v) == 0);
-	}
-
-	{
-	hash_t	hs;
-		hs = hash_new(1051, NULL);
-
-		hash_set(hs, "foo", "key foo");
-		hash_set(hs, "bar", "bar key");
-		hash_set(hs, "quux", "quux key");
-
-		assert(strcmp(hash_get(hs, "foo"), "key foo") == 0);
-		assert(strcmp(hash_get(hs, "bar"), "bar key") == 0);
-		assert(strcmp(hash_get(hs, "quux"), "quux key") == 0);
-
-		hash_del(hs, "bar");
-		assert(strcmp(hash_get(hs, "foo"), "key foo") == 0);
-		assert(hash_get(hs, "bar") == NULL);
-		assert(strcmp(hash_get(hs, "quux"), "quux key") == 0);
-	}
-
-	return 0;
-}
-#endif

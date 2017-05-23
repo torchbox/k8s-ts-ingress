@@ -11,12 +11,17 @@
 #include	"api.h"
 
 namespace_t *
-namespace_make(void)
+namespace_make(const char *name)
 {
 namespace_t	*ret;
 
 	if ((ret = calloc(1, sizeof(*ret))) == NULL)
 		return NULL;
+
+	if ((ret->ns_name = strdup(name)) == NULL) {
+		namespace_free(ret);
+		return NULL;
+	}
 
 	if ((ret->ns_ingresses = hash_new(127, (hash_free_fn) ingress_free)) == NULL) {
 		namespace_free(ret);
@@ -48,6 +53,7 @@ namespace_free(namespace_t *ns)
 	hash_free(ns->ns_secrets);
 	hash_free(ns->ns_services);
 	hash_free(ns->ns_endpointses);
+	free(ns->ns_name);
 	free(ns);
 }
 

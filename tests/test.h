@@ -21,4 +21,11 @@ extern int ts_api_errors;
 }
 #endif
 
+#ifdef __cplusplus
+#include	<json.h>
+#include	<string>
+
+json_object *test_load_json(std::string const& fname);
+#endif
+
 #endif  /* !TEST_H */

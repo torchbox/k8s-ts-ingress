@@ -138,3 +138,24 @@ error:
 	service_free(svc);
 	return NULL;
 }
+
+service_port_t *
+service_find_port(const service_t *service, const char *name,
+		  service_proto_t proto)
+{
+service_port_t	*port;
+int		 n = atoi(name);
+
+	hash_foreach(service->sv_ports, NULL, &port) {
+		if (port->sp_protocol != proto)
+			continue;
+
+		if (strcmp(name, port->sp_name) == 0)
+			return port;
+
+		if (n != 0 && n == port->sp_port)
+			return port;
+	}
+
+	return NULL;
+}

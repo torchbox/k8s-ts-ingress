@@ -35,32 +35,10 @@ using std::istreambuf_iterator;
 using std::size_t;
 using std::map;
 
-namespace {
-
-	json_object *load_json(string const& fname)
-	{
-		ifstream inf(fname);
-
-		if (!inf)
-			return nullptr;
-
-		string json_str(istreambuf_iterator<char>{inf}, {});
-		json_object *obj = json_tokener_parse(json_str.c_str());
-		return obj;
-	}
-
-	void
-	emplace_each(hash_t hs, const char *key, void *value, void *data)
-	{
-	map<string, string>	*actual = static_cast<map<string, string>*>(data);
-		actual->emplace(key, static_cast<char *>(value));
-	}
-}
-
 TEST(API, Ingress) {
 	ts_api_errors = 0;
 
-	json_object *obj = load_json("tests/ingress.json");
+	json_object *obj = test_load_json("tests/ingress.json");
 	ASSERT_TRUE(obj != NULL);
 
 	ingress_t *ing = ingress_make(obj);
@@ -79,7 +57,10 @@ TEST(API, Ingress) {
 		{ "ingress.kubernetes.io/rewrite-target",	"/dst" },
 	};
 
-	hash_foreach(ing->in_annotations, emplace_each, &actual_annotations);
+	const char *key, *value;
+	hash_foreach(ing->in_annotations, &key, &value)
+		actual_annotations[key] = value;
+
 	EXPECT_EQ(expected_annotations, actual_annotations);
 
 	EXPECT_EQ(0u, ing->in_ntls);
@@ -101,7 +82,7 @@ TEST(API, Ingress) {
 TEST(API, Service) {
 	ts_api_errors = 0;
 
-	json_object *obj = load_json("tests/service.json");
+	json_object *obj = test_load_json("tests/service.json");
 	ASSERT_TRUE(obj != NULL);
 
 	service_t *svc = service_make(obj);
@@ -121,11 +102,13 @@ TEST(API, Service) {
 		{ "app", "echoheaders" },
 	};
 
-	hash_foreach(svc->sv_selector, emplace_each, &actual_selectors);
+	const char *key, *value;
+	hash_foreach(svc->sv_selector, &key, &value)
+		actual_selectors[key] = value;
+
 	EXPECT_EQ(expected_selectors, actual_selectors);
 
-	service_port_t *port = static_cast<service_port_t *>(
-					hash_get(svc->sv_ports, "http"));
+	service_port_t *port = service_find_port(svc, "http", SV_P_TCP);
 	ASSERT_TRUE(port != NULL);
 
 	EXPECT_STREQ(port->sp_name, "http");
@@ -140,7 +123,7 @@ TEST(API, Service) {
 TEST(API, ExternalService) {
 	ts_api_errors = 0;
 
-	json_object *obj = load_json("tests/service_external.json");
+	json_object *obj = test_load_json("tests/service_external.json");
 	ASSERT_TRUE(obj != NULL);
 
 	service_t *svc = service_make(obj);
@@ -157,7 +140,11 @@ TEST(API, ExternalService) {
 	EXPECT_TRUE(svc->sv_cluster_ip == NULL);
 	
 	map<string, string> actual_selectors, expected_selectors;
-	hash_foreach(svc->sv_selector, emplace_each, &actual_selectors);
+
+	const char *label, *value;
+	hash_foreach(svc->sv_selector, &label, &value)
+		actual_selectors[label] = value;
+
 	EXPECT_EQ(expected_selectors, actual_selectors);
 
 	service_free(svc);
@@ -167,7 +154,7 @@ TEST(API, ExternalService) {
 TEST(API, Secret) {
 	ts_api_errors = 0;
 
-	json_object *obj = load_json("tests/secret.json");
+	json_object *obj = test_load_json("tests/secret.json");
 	ASSERT_TRUE(obj != NULL);
 
 	secret_t *srt = secret_make(obj);
@@ -183,7 +170,10 @@ TEST(API, Secret) {
 		{ "key2", "b3RoZXIgdmFsdWU=" },
 	};
 
-	hash_foreach(srt->se_data, emplace_each, &actual_data);
+	const char *key, *value;
+	hash_foreach(srt->se_data, &key, &value)
+		actual_data[key] = value;
+
 	EXPECT_EQ(expected_data, actual_data);
 
 	secret_free(srt);

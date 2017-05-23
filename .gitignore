@@ -23,3 +23,5 @@
 /kubernetes.config
 /release.tar.gz
 /k8s-ts-ingress-*
+/test
+/configure

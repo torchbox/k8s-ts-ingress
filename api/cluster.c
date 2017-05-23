@@ -29,10 +29,17 @@ cluster_get_namespace(cluster_t *cs, const char *name)
 namespace_t	*ret;
 
 	if ((ret = hash_get(cs->cs_namespaces, name)) == NULL) {
-		if ((ret = namespace_make()) == NULL)
+		if ((ret = namespace_make(name)) == NULL)
 			return NULL;
 		hash_set(cs->cs_namespaces, name, ret);
 	}
 
 	return ret;
+}
+
+void
+cluster_free(cluster_t *cs)
+{
+	hash_free(cs->cs_namespaces);
+	free(cs);
 }

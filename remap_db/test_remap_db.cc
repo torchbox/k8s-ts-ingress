@@ -20,6 +20,7 @@
 #include	"remap.h"
 
 #include	"gtest/gtest.h"
+#include	"tests/test.h"
 
 using std::vector;
 using std::map;
@@ -95,3 +96,41 @@ TEST(RemapDB, HostLookup)
 	remap_db_free(db);
 }
 
+TEST(RemapDB, Basic)
+{
+	json_object *obj;
+
+	cluster_t *cluster = cluster_make();
+	namespace_t *ns = cluster_get_namespace(cluster, "default");
+
+	obj = test_load_json("tests/1-basic/endpoints.json");
+	namespace_put_endpoints(ns, endpoints_make(obj));
+	json_object_put(obj);
+
+	obj = test_load_json("tests/1-basic/service.json");
+	namespace_put_service(ns, service_make(obj));
+	json_object_put(obj);
+
+	obj = test_load_json("tests/1-basic/ingress.json");
+	namespace_put_ingress(ns, ingress_make(obj));
+	json_object_put(obj);
+
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* fetch our host */
+	remap_host_t *rh = remap_db_get_host(db, "echoheaders.gce.t6x.uk");
+	ASSERT_TRUE(rh != nullptr);
+
+	/* fetch the path from this host */
+	remap_path_t *rp = remap_host_find_path(rh, "/what/ever", nullptr);
+	ASSERT_TRUE(rp != nullptr);
+
+	/* the path should have one address... */
+	ASSERT_EQ(1u, rp->rp_naddrs);
+	/* ... and it should be this one: */
+	ASSERT_STREQ("172.28.100.135:8080", rp->rp_addrs[0]);
+
+	remap_db_free(db);
+	cluster_free(cluster);
+}

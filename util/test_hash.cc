@@ -78,17 +78,6 @@ TEST(Hash, SetGet)
 	}
 }
 
-namespace {
-
-	void
-	foreach_incr(hash_t hs, const char *key, void *value, void *data)
-	{
-	map<string, string>	*actual = static_cast<map<string, string>*>(data);
-		actual->emplace(key, static_cast<char *>(value));
-	}
-
-} // anonymous namespace
-
 TEST(Hash, Foreach)
 {
 	for (int size: test_sizes) {
@@ -102,7 +91,10 @@ TEST(Hash, Foreach)
 		hs = hash_new(size, NULL);
 		populate_hash(hs);
 
-		hash_foreach(hs, foreach_incr, &actual);
+		const char *key, *value;
+		hash_foreach(hs, &key, &value)
+			actual[key] = value;
+
 		EXPECT_EQ(size_t(3), actual.size());
 		EXPECT_EQ(expected, actual);
 

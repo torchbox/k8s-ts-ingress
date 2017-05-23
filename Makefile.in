@@ -71,6 +71,7 @@ SRCS=		hash.c		\
 		synth.c		\
 		remap.c		\
 		remap_db.c	\
+		remap_build.c	\
 		tls.c		\
 		plugin.c	\
 		base64.c	\
@@ -80,6 +81,7 @@ SRCS=		hash.c		\
 OBJS=		${SRCS:.c=.o}
 
 TEST_SRCS=	ts_mockapi.cc		\
+		test_support.cc		\
 		test_auth.cc		\
 		test_remap_db.cc	\
 		test_api.cc		\
@@ -94,6 +96,7 @@ TEST_OBJS=	gtest-all.o		\
 		hash.o			\
 		auth.o			\
 		remap_db.o		\
+		remap_build.o		\
 		config.o		\
 		${TEST_SRCS:.cc=.o}	\
 		${API_OBJS}		\

@@ -59,13 +59,6 @@ void    *hash_get(const hash_t, const char *key);
 void    *hash_del(hash_t, const char *key);
 
 /*
- * Call the provided function with the key, value and provided data argument
- * for every entry in the map.
- */
-typedef void (*hash_foreach_fn) (hash_t, const char *key, void *value, void *data);
-void	 hash_foreach(hash_t, hash_foreach_fn, void *data);
-
-/*
  * Return the first entry in the hash where find_fn(value) returns true.
  */
 typedef int (*hash_find_fn) (hash_t, const char *key, void *value, void *data);
@@ -87,6 +80,10 @@ struct hash_iter_state {
 
 int	hash_iterate(hash_t, struct hash_iter_state *iterstate,
 		     const char **key, void **value);
+
+#define hash_foreach(HASH, KEY, VALUE)				\
+	for (struct hash_iter_state __s = {};			\
+	     hash_iterate(HASH, &__s, KEY, (void **)VALUE);)
 
 #ifdef __cplusplus
 }
