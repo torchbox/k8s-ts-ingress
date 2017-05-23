@@ -17,11 +17,7 @@ cd k8s-ts-ingress-$VERSION
 DOCKER_REPOSITORY=torchbox/k8s-ts-ingress
 docker build --pull -t $DOCKER_REPOSITORY:$COMMIT .
 
-if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-	docker push $DOCKER_REPOSITORY:$COMMIT
-
-	if [ -n "$TRAVIS_TAG" ]; then
-		docker tag $DOCKER_REPOSITORY:$COMMIT $DOCKER_REPOSITORY:$VERSION
-		docker push $DOCKER_REPOSITORY:$VERSION
-	fi
+if [ "$TRAVIS_PULL_REQUEST" = "false" -a -n "$TRAVIS_TAG" ]; then
+	docker tag $DOCKER_REPOSITORY:$COMMIT $DOCKER_REPOSITORY:$VERSION
+	docker push $DOCKER_REPOSITORY:$VERSION
 fi
