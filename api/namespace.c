@@ -8,6 +8,8 @@
  * warranty.
  */
 
+#include	<string.h>
+
 #include	"api.h"
 
 namespace_t *

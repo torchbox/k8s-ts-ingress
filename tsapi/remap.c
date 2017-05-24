@@ -15,6 +15,7 @@
 #include	<getopt.h>
 #include	<regex.h>
 #include	<ctype.h>
+#include	<assert.h>
 
 #include	<ts/ts.h>
 #include	<ts/remap.h>
@@ -166,6 +167,176 @@ char	*ret;
 }
 
 /*
+ * Called when the DNS lookup for an ExternalName has finished.
+ */
+static int
+external_lookup(TSCont contn, TSEvent event, void *data)
+{
+TSHttpTxn	txnp = TSContDataGet(contn);
+
+	assert(event == TS_EVENT_HOST_LOOKUP);
+
+	if (data)
+		TSHttpTxnServerAddrSet(txnp, data);
+
+	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
+	TSContDestroy(contn);
+	return TS_SUCCESS;
+}
+
+/*
+ * Build a remap_request to pass to remap_db from the TS request data.
+ */
+int
+request_from_txn(TSHttpTxn txnp, remap_request_t *req)
+{
+TSMLoc		 hdrs, url, auth_hdr;
+TSMBuffer	 reqp;
+const char	*cs;
+char		*s;
+int		 len;
+
+	bzero(req, sizeof(*req));
+
+	/* Fetch the request and the URL. */
+	TSHttpTxnClientReqGet(txnp, &reqp, &hdrs);
+	TSHttpHdrUrlGet(reqp, hdrs, &url);
+
+	/* scheme */
+	if ((cs = TSUrlSchemeGet(reqp, url, &len)) != NULL)
+		req->rr_proto = xstrndup(cs, len);
+
+	/* host - if missing, ignore this request */
+	if ((cs = TSHttpHdrHostGet(reqp, hdrs, &len)) != NULL) {
+		req->rr_host = xstrndup(cs, len);
+
+		/* remove port from host if present */
+		if ((s = strchr(req->rr_host, ':')) != NULL)
+			*s = '\0';
+	}
+
+	/* path */
+	if ((cs = TSUrlPathGet(reqp, url, &len)) != NULL)
+		req->rr_path = xstrndup(cs, len);
+
+	/* query string */
+	if ((cs = TSUrlHttpQueryGet(reqp, url, &len)) != NULL)
+		req->rr_query = xstrndup(cs, len);
+
+	/* client network address */
+	req->rr_addr = TSHttpTxnClientAddrGet(txnp);
+
+	/* Authorization header */
+	auth_hdr = TSMimeHdrFieldFind(reqp, hdrs,
+				      TS_MIME_FIELD_AUTHORIZATION,
+				      TS_MIME_LEN_AUTHORIZATION);
+	if (auth_hdr) {
+		cs = TSMimeHdrFieldValueStringGet(reqp, hdrs, auth_hdr, 0,
+						  &len);
+		if (cs)
+			req->rr_auth = xstrndup(cs, len);
+		TSHandleMLocRelease(reqp, hdrs, auth_hdr);
+	}
+
+	TSHandleMLocRelease(reqp, hdrs, url);
+	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
+	return 0;
+}
+
+/*
+ * Build a Traffic Server URL as a TSMLoc from the given remap result.
+ * Note that the URL doesn't have a host, because we use the Host: header
+ * for that.
+ */
+TSMLoc
+url_from_remap_result(TSHttpTxn txn, remap_request_t *req,
+		      remap_result_t *res)
+{
+TSMBuffer	reqp;
+TSMLoc		hdrs, newurl;
+
+	TSHttpTxnClientReqGet(txn, &reqp, &hdrs);
+
+	TSUrlCreate(reqp, &newurl);
+	TSUrlSchemeSet(reqp, newurl, res->rz_proto, -1);
+
+	if (res->rz_urlpath)
+		TSUrlPathSet(reqp, newurl, res->rz_urlpath, -1);
+	else
+		TSUrlPathSet(reqp, newurl, req->rr_path, -1);
+
+	if (res->rz_query)
+		TSUrlHttpParamsSet(reqp, newurl, res->rz_query, -1);
+	else
+		TSUrlHttpParamsSet(reqp, newurl, req->rr_query, -1);
+
+	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
+	return newurl;
+}
+
+/*
+ * Set or replace the Host header field on the request.
+ */
+void
+set_host_field(TSHttpTxn txnp, const char *host)
+{
+TSMBuffer	reqp;
+TSMLoc		hdrs, host_hdr;
+
+	TSHttpTxnClientReqGet(txnp, &reqp, &hdrs);
+
+	/*
+	 * Set the host header.
+	 */
+	if ((host_hdr = TSMimeHdrFieldFind(reqp, hdrs, "Host", 4)) != NULL) {
+		TSMimeHdrFieldRemove(reqp, hdrs, host_hdr);
+		TSHandleMLocRelease(reqp, hdrs, host_hdr);
+	}
+
+	TSMimeHdrFieldCreateNamed(reqp, hdrs, "Host", 4, &host_hdr);
+	TSMimeHdrFieldValueStringInsert(reqp, hdrs, host_hdr, 0, host, strlen(host));
+	TSMimeHdrFieldAppend(reqp, hdrs, host_hdr);
+
+	TSHandleMLocRelease(reqp, hdrs, host_hdr);
+	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
+}
+
+void
+add_xfp(TSHttpTxn txn)
+{
+TSMBuffer	reqp;
+TSMLoc		hdrs, xfp;
+
+	TSHttpTxnClientReqGet(txn, &reqp, &hdrs);
+
+	/* Remove any existing X-Forwarded-Proto header */
+	xfp = TSMimeHdrFieldFind(reqp, hdrs,
+		      REMAP_MIME_FIELD_X_FORWARDED_PROTO,
+		      REMAP_MIME_FIELD_X_FORWARDED_PROTO_LEN);
+	if (xfp != TS_NULL_MLOC) {
+		TSMimeHdrFieldRemove(reqp, hdrs, xfp);
+		TSHandleMLocRelease(reqp, hdrs, xfp);
+	}
+
+	TSMimeHdrFieldCreateNamed(reqp, hdrs,
+				REMAP_MIME_FIELD_X_FORWARDED_PROTO,
+				REMAP_MIME_FIELD_X_FORWARDED_PROTO_LEN,
+				&xfp);
+
+	if (TSHttpTxnClientProtocolStackContains(txn, "tls"))
+		TSMimeHdrFieldValueStringInsert(reqp, hdrs, xfp, 0,
+					     "https", 5);
+	else
+		TSMimeHdrFieldValueStringInsert(reqp, hdrs, xfp, 0,
+					     "http", 4);
+
+	TSMimeHdrFieldAppend(reqp, hdrs, xfp);
+
+	TSHandleMLocRelease(reqp, hdrs, xfp);
+	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
+}
+
+/*
  * handle_remap: called in READ_REQUEST_HDR_HOOK.  Match the incoming request
  * to an Ingress path (remap_path), apply any configurations from annotations,
  * and either set the host to proxy the request to the backend, or return
@@ -174,13 +345,7 @@ char	*ret;
 int
 handle_remap(TSCont contn, TSEvent event, void *edata)
 {
-int			 len;
-char			*requrl = NULL;
-const char		*cs;
-char			*hbuf = NULL, *pbuf = NULL, *s;
-TSMBuffer		 reqp;
-TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr = NULL,
-			 auth_hdr = NULL;
+TSMLoc			 newurl;
 TSHttpTxn		 txnp = (TSHttpTxn) edata;
 TSConfig		 map_cfg = NULL;
 const remap_db_t	*db;
@@ -188,70 +353,21 @@ struct state		*state = TSContDataGet(contn);
 remap_request_t		 req;
 remap_result_t		 res;
 synth_t			*sy;
+struct sockaddr_in	 addr;
+int			 reenable = 1;
 
 	map_cfg = TSConfigGet(state->cfg_slot);
 	db = TSConfigDataGet(map_cfg);
 
 	/* Not initialised yet? */
-	if (!db)
+	if (!db) {
+		TSDebug("kubernetes", "handle_remap: no database");
 		goto cleanup;
-
-	/* Fetch the request and the URL. */
-	TSHttpTxnClientReqGet(txnp, &reqp, &hdr_loc);
-	TSHttpHdrUrlGet(reqp, hdr_loc, &url_loc);
-
-	/*
-	 * Construct a remap_request from the TS request.
-	 */
-	bzero(&req, sizeof(req));
-
-	/* scheme */
-	if ((cs = TSUrlSchemeGet(reqp, url_loc, &len)) != NULL)
-		req.rr_proto = xstrndup(cs, len);
-
-	/* host */
-	host_hdr = TSMimeHdrFieldFind(reqp, hdr_loc, "Host", 4);
-
-	/*
-	 * If the request doesn't have a Host, copy it from the URL. If the URL
-	 * doesn't have one either, give up.
-	 */
-	if (!host_hdr) {
-		if ((cs = TSHttpHdrHostGet(reqp, hdr_loc, &len)) == NULL)
-			goto cleanup;
-
-		TSMimeHdrFieldCreateNamed(reqp, hdr_loc, "Host", 4, &host_hdr);
-		TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0, cs, len);
 	}
 
-	cs = TSMimeHdrFieldValueStringGet(reqp, hdr_loc, host_hdr, 0, &len);
-	req.rr_host = xstrndup(cs, len);
-
-	/* remove port from URL if present */
-	if ((s = strchr(req.rr_host, ':')) != NULL)
-		*s = '\0';
-
-	/* path */
-	if ((cs = TSUrlPathGet(reqp, url_loc, &len)) != NULL)
-		req.rr_path = xstrndup(cs, len);
-
-	/* query string */
-	if ((cs = TSUrlHttpQueryGet(reqp, url_loc, &len)) != NULL)
-		req.rr_query = xstrndup(cs, len);
-
-	/* client network address */
-	req.rr_addr = TSHttpTxnClientAddrGet(txnp);
-
-	/* Authorization header */
-	auth_hdr = TSMimeHdrFieldFind(reqp, hdr_loc,
-				      TS_MIME_FIELD_AUTHORIZATION,
-				      TS_MIME_LEN_AUTHORIZATION);
-	if (auth_hdr) {
-		cs = TSMimeHdrFieldValueStringGet(reqp, hdr_loc, auth_hdr, 0,
-						  &len);
-		if (cs)
-			req.rr_auth = xstrndup(cs, len);
-	}
+	/* Create a remap_request from the TS request */
+	if (request_from_txn(txnp, &req) != 0)
+		goto cleanup;
 
 	/* Do the remap */
 	switch (remap_run(db, &req, &res)) {
@@ -316,10 +432,8 @@ synth_t			*sy;
 	 * protocol, host:port and other request configuration.
 	 */
 
-	/* set URL path if different */
-	if (res.rz_urlpath)
-		TSUrlPathSet(reqp, url_loc, res.rz_urlpath,
-			     strlen(res.rz_urlpath));
+	if ((newurl = url_from_remap_result(txnp, &req, &res)) == NULL)
+		goto cleanup;
 
 	/* follow redirects if configured on the Ingress.  */
 	if (res.rz_path->rp_follow_redirects) {
@@ -351,67 +465,20 @@ synth_t			*sy;
 	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS,
 			      res.rz_host->rh_hsts_subdomains);
 
-
-	/*
-	 * Set the backend for this request.  This is the actual request
-	 * remapping.
-	 */
-	if (TSUrlHostSet(reqp, url_loc, res.rz_target->rt_host,
-			 strlen(res.rz_target->rt_host)) != TS_SUCCESS) {
-		TSError("[kubernetes] <%s>: could not set request host", requrl);
-		goto cleanup;
-	}
-
-	if (TSUrlPortSet(reqp, url_loc, res.rz_target->rt_port) != TS_SUCCESS) {
-		TSError("[kubernetes] <%s>: could not set request port", requrl);
-		goto cleanup;
-	}
-
-	/* set the backend URL scheme */
-	TSUrlSchemeSet(reqp, url_loc, res.rz_proto, strlen(res.rz_proto));
-
 	/*
 	 * Usually, we want to preserve the request host header so the backend
 	 * can use it.  If preserve-host is set to false on the Ingress, then
 	 * we instead replace any host header in the request with the backend
 	 * host.
 	 */
-	if (res.rz_path->rp_preserve_host) {
-		TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
-					     req.rr_host, strlen(req.rr_host));
-	} else {
-		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_URL_REMAP_PRISTINE_HOST_HDR, 0);
-		TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
-					     res.rz_target->rt_host,
-					     strlen(res.rz_target->rt_host));
-	}
+	if (res.rz_path->rp_preserve_host)
+		set_host_field(txnp, req.rr_host);
+	else
+		set_host_field(txnp, res.rz_target->rt_host);
 
-	if (state->config->co_xfp) {
-	TSMLoc	xfp;
-		/* Remove any existing X-Forwarded-Proto header */
-		xfp = TSMimeHdrFieldFind(reqp, hdr_loc,
-			      REMAP_MIME_FIELD_X_FORWARDED_PROTO,
-			      REMAP_MIME_FIELD_X_FORWARDED_PROTO_LEN);
-		if (xfp != TS_NULL_MLOC) {
-			TSMimeHdrFieldRemove(reqp, hdr_loc, xfp);
-			TSMimeHdrFieldValuesClear(reqp, hdr_loc, xfp);
-		} else {
-			TSMimeHdrFieldCreateNamed(reqp, hdr_loc,
-					REMAP_MIME_FIELD_X_FORWARDED_PROTO,
-					REMAP_MIME_FIELD_X_FORWARDED_PROTO_LEN,
-					&xfp);
-		}
-
-		if (TSHttpTxnClientProtocolStackContains(txnp, "tls"))
-			TSMimeHdrFieldValueStringInsert(reqp, hdr_loc, xfp, 0,
-						     "https", 5);
-		else
-			TSMimeHdrFieldValueStringInsert(reqp, hdr_loc, xfp, 0,
-						     "http", 4);
-
-		TSMimeHdrFieldAppend(reqp, hdr_loc, xfp);
-		TSHandleMLocRelease(reqp, hdr_loc, xfp);
-	}
+	/* Add an X-Forwarded-Proto header, if configured */
+	if (state->config->co_xfp)
+		add_xfp(txnp);
 
 	/*
 	 * We already remapped this request, so skip any further remapping.
@@ -420,16 +487,46 @@ synth_t			*sy;
 	 */
 	TSSkipRemappingSet(txnp, 1);
 
+	/*
+	 * If the target is an IP address (the usual case) we can pass it
+	 * to TS directly.
+	 */
+	bzero(&addr, sizeof(addr));
+	if (inet_pton(AF_INET, res.rz_target->rt_host, &addr.sin_addr) == 1) {
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(res.rz_target->rt_port);
+		TSHttpTxnServerAddrSet(txnp, (struct sockaddr *) &addr);
+	} else {
+	TSCont	ext_cont;
+
+		/*
+		 * We have a DNS name, so we need to do a host lookup to get the
+		 * IP address.
+		 */
+		if ((ext_cont = TSContCreate(external_lookup,
+					     TSMutexCreate())) == NULL) {
+			/* Well, that's unfortunate. */
+			TSDebug("kubernetes", "[%s] cannot create continuation",
+				res.rz_target->rt_host);
+			goto cleanup;
+		}
+
+		TSContDataSet(ext_cont, txnp);
+		TSHostLookup(ext_cont, res.rz_target->rt_host,
+			     strlen(res.rz_target->rt_host));
+		TSDebug("kubernetes", "[%s]: starting external name lookup",
+			res.rz_target->rt_host);
+		reenable = 0;
+	}
+
 cleanup:
 	TSConfigRelease(state->cfg_slot, map_cfg);
-	TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
-	if (host_hdr)
-		TSHandleMLocRelease(reqp, hdr_loc, host_hdr);
-	if (url_loc)
-		TSHandleMLocRelease(reqp, hdr_loc, url_loc);
-	if (hdr_loc)
-		TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdr_loc);
-	free(pbuf);
-	free(hbuf);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+
+	if (reenable)
+		TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
+
 	return TS_SUCCESS;
 }

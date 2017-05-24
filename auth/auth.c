@@ -12,6 +12,7 @@
  * TSAPI aside from TSDebug/TSError, to facilitate unit testing.
  */
 
+#include	<string.h>
 #include	<ctype.h>
 
 #include	"hash.h"

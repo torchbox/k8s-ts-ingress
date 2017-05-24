@@ -8,6 +8,8 @@
  * warranty.
  */
 
+#include	<string.h>
+
 #include	<ts/ts.h>
 
 #include	"hash.h"

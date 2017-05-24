@@ -215,7 +215,8 @@ void
 remap_path_add_address(remap_path_t *rp, const char *host, int port)
 {
 	rp->rp_addrs = realloc(rp->rp_addrs,
-			       sizeof(remap_target_t) * (rp->rp_naddrs + 1));
+			       sizeof(struct sockaddr_in) *
+				(rp->rp_naddrs + 1));
 	rp->rp_addrs[rp->rp_naddrs].rt_host = strdup(host);
 	rp->rp_addrs[rp->rp_naddrs].rt_port = port;
 	++rp->rp_naddrs;

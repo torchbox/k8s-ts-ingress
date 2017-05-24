@@ -165,6 +165,7 @@ typedef struct remap_result {
 	const remap_target_t	*rz_target;
 	const char		*rz_proto;
 	char			*rz_urlpath;
+	char			*rz_query;
 
 	/* redirect */
 	char		*rz_location;
