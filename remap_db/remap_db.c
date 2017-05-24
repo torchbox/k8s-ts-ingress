@@ -26,6 +26,7 @@
 #include	<ts/ts.h>
 
 #include	"remap.h"
+#include	"auth.h"
 #include	"base64.h"
 
 static void remap_path_add_users(remap_path_t *, secret_t *);
@@ -467,4 +468,232 @@ remap_host_t	*ret;
 	ret = remap_host_new();
 	hash_set(db->rd_hosts, hostname, ret);
 	return ret;
+}
+
+int
+rr_check_proto(const remap_db_t *db, const remap_request_t *req,
+	       remap_result_t *ret)
+{
+	if (!strcmp(req->rr_proto, "http") ||
+	    !strcmp(req->rr_proto, "https")) {
+
+		ret->rz_proto = ret->rz_path->rp_secure_backends ?
+			"https" : "http";
+		return RR_OK;
+	}
+
+	if (!strcmp(req->rr_proto, "ws") ||
+	    !strcmp(req->rr_proto, "wss")) {
+
+		ret->rz_proto = ret->rz_path->rp_secure_backends ?
+			"wss" : "ws";
+		return RR_OK;
+	}
+
+	return RR_ERR_INVALID_PROTOCOL;
+}
+
+int
+rr_check_app_root(const remap_db_t *db, const remap_request_t *req,
+		  remap_result_t *ret)
+{
+	if (!ret->rz_path->rp_app_root)
+		return RR_OK;
+
+	if (!strncmp(ret->rz_path->rp_app_root, req->rr_path,
+		     strlen(ret->rz_path->rp_app_root)))
+		return RR_OK;
+
+	/* The request is not in the app-root, so redirect it. */
+	ret->rz_location = strdup(ret->rz_path->rp_app_root);
+	ret->rz_status = 301;
+	return RR_REDIRECT;
+}
+
+int
+rr_check_tls(const remap_db_t *db, const remap_request_t *req,
+	     remap_result_t *ret)
+{
+const char	*newp;
+
+	/* If already TLS, do nothing */
+	if (!strcmp(req->rr_proto, "https") || !strcmp(req->rr_proto, "wss"))
+		return RR_OK;
+
+	/*
+	 * Skip redirect if no_ssl_redirect is set, or if the rh_ctx is null
+	 * and force_ssl_redirect is not set.
+	 */
+	if (ret->rz_path->rp_no_ssl_redirect)
+		return RR_OK;
+	if (!ret->rz_host->rh_ctx && !ret->rz_path->rp_force_ssl_redirect)
+		return RR_OK;
+
+	/* We will redirect */
+
+	/* Decide on the new protocol */
+	if (!strcmp(req->rr_proto, "ws"))
+		newp = "wss";
+	else
+		newp = "https";
+
+	/* Build new URL, replacing the protocol */
+	if (req->rr_query) {
+	size_t	blen =	strlen(newp) + 3 + strlen(req->rr_host)
+			+ 1 + strlen(req->rr_path)
+			+ 1 + strlen(req->rr_query) + 1;
+		ret->rz_location = malloc(blen);
+		snprintf(ret->rz_location, blen, "%s://%s/%s?%s",
+			 newp, req->rr_host, req->rr_path,
+			 req->rr_query);
+	} else {
+	size_t	blen =	strlen(newp) + 3 + strlen(req->rr_host)
+			+ 1 + strlen(req->rr_path) + 1;
+		ret->rz_location = malloc(blen);
+		snprintf(ret->rz_location, blen, "%s://%s/%s",
+			 newp, req->rr_host, req->rr_path);
+	}
+
+	ret->rz_status = 301;
+	return RR_REDIRECT;
+}
+
+int
+rr_check_auth(const remap_db_t *db, const remap_request_t *req,
+	      remap_result_t *res)
+{
+	/* No authentication? */
+	if (res->rz_path->rp_auth_type == REMAP_AUTH_NONE &&
+	    !res->rz_path->rp_auth_addr_list)
+		return RR_OK;
+
+	/* Only IP auth? */
+	if (res->rz_path->rp_auth_type == REMAP_AUTH_NONE) {
+		if (auth_check_address(req->rr_addr, res->rz_path))
+			return RR_OK;
+		return RR_ERR_FORBIDDEN;
+	}
+
+	/* Only basic auth? */
+	if (!res->rz_path->rp_auth_addr_list) {
+		if (!req->rr_auth)
+			return RR_ERR_UNAUTHORIZED;
+		if (auth_check_basic(req->rr_auth, strlen(req->rr_auth),
+				     res->rz_path) == 1)
+			return RR_OK;
+		return RR_ERR_UNAUTHORIZED;
+	}
+
+	/* Both; behaviour depends on auth-satisfy */
+	if (res->rz_path->rp_auth_satisfy == REMAP_SATISFY_ANY) {
+		if (auth_check_address(req->rr_addr, res->rz_path))
+			return RR_OK;
+		if (!req->rr_auth)
+			return RR_ERR_UNAUTHORIZED;
+		if (auth_check_basic(req->rr_auth, strlen(req->rr_auth),
+				     res->rz_path) == 1)
+			return RR_OK;
+		return RR_ERR_UNAUTHORIZED;
+	} else {
+		if (!auth_check_address(req->rr_addr, res->rz_path))
+			return RR_ERR_FORBIDDEN;
+		if (!req->rr_auth)
+			return RR_ERR_UNAUTHORIZED;
+		if (auth_check_basic(req->rr_auth, strlen(req->rr_auth),
+				     res->rz_path) != 1)
+			return RR_ERR_UNAUTHORIZED;
+		return RR_OK;
+	}
+}
+
+/*
+ * Remap a request.
+ */
+int
+remap_run(const remap_db_t *db, const remap_request_t *req, remap_result_t *ret)
+{
+int	 r;
+size_t	 pfxsz;
+
+	memset(ret, 0, sizeof(*ret));
+
+	/* Check host header is present */
+	if (!req->rr_host || !*req->rr_host) {
+		TSDebug("kubernetes", "missing or empty host header");
+		return RR_ERR_INVALID_HOST;
+	}
+
+	/* See if this host exists */
+	ret->rz_host = remap_db_get_host(db, req->rr_host);
+	if (ret->rz_host == NULL) {
+		TSDebug("kubernetes", "[%s] host not found", req->rr_host);
+		return RR_ERR_NO_HOST;
+	}
+
+	/* Find a matching path */
+	ret->rz_path = remap_host_find_path(ret->rz_host, req->rr_path, &pfxsz);
+	if (ret->rz_path == NULL) {
+		TSDebug("kubernetes", "[%s] path %s not found", req->rr_host,
+		        req->rr_path);
+		return RR_ERR_NO_PATH;
+	}
+
+	/* Check for TLS redirect */
+	if ((r = rr_check_tls(db, req, ret)) != RR_OK)
+		return r;
+
+	/* 
+	 * Check authentication; do this after TLS, to avoid prompting the user
+	 * to enter a password over insecure http.
+	 */
+	if ((r = rr_check_auth(db, req, ret)) != RR_OK)
+		return r;
+
+	/* Check for app-root */
+	if ((r = rr_check_app_root(db, req, ret)) != RR_OK)
+		return r;
+
+	/* Check for rewrite-target */
+	if (ret->rz_path->rp_rewrite_target) {
+	size_t	blen =	strlen(req->rr_path) - pfxsz
+			+ strlen(ret->rz_path->rp_rewrite_target) + 1;
+
+		ret->rz_urlpath = malloc(blen);
+		snprintf(ret->rz_urlpath, blen, "%s%s",
+			 ret->rz_path->rp_rewrite_target,
+			 req->rr_path + pfxsz);
+	}
+
+	/* Set backend protocol */
+	if ((r = rr_check_proto(db, req, ret)) != RR_OK)
+		return r;
+
+	/* Does this path have any backends? */
+	if (ret->rz_path->rp_naddrs == 0) {
+		TSDebug("kubernetes", "[%s] no backends", req->rr_host);
+		return RR_ERR_NO_BACKEND;
+	}
+
+	/* Pick and return a random backend */
+	ret->rz_target = remap_path_pick_target(ret->rz_path);
+	TSDebug("kubernetes", "[%s] rewrite -> %s:%d", req->rr_host,
+		ret->rz_target->rt_host, ret->rz_target->rt_port);
+	return RR_OK;
+}
+
+void
+remap_request_free(remap_request_t *req)
+{
+	free(req->rr_proto);
+	free(req->rr_host);
+	free(req->rr_path);
+	free(req->rr_query);
+	free(req->rr_auth);
+}
+
+void
+remap_result_free(remap_result_t *rz)
+{
+	free(rz->rz_location);
+	free(rz->rz_urlpath);
 }

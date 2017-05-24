@@ -89,14 +89,14 @@ Building
 Requirements:
 
 * Traffic Server 7.0 or later (including development headers).
-* A working C compiler and `make` utility.
+* A working C99 compiler and `make` utility.
 * json-c library
 * OpenSSL (or a compatible TLS library, e.g. LibreSSL)
 
 Build and install the plugin:
 
 ```
-$ autoreconf -if  # if building from a git checkout
+$ autoreconf -if            # only if building from a git checkout
 $ ./configure [--with-tsxs=/path/to/trafficserver/bin/tsxs]
 $ make
 # make install

@@ -123,6 +123,67 @@ void		 remap_db_free(remap_db_t *);
 remap_host_t	*remap_db_get_host(const remap_db_t *, const char *hostname);
 remap_host_t	*remap_db_get_or_create_host(remap_db_t *, const char *hostname);
 
+/*
+ * Request data for remap_run();
+ */
+typedef struct remap_request {
+	char		*rr_proto;	/* Request proto (http, https...) */
+	char		*rr_host;	/* Request Host: header */
+	char		*rr_path;	/* Request URL path, with leading '/' */
+	char		*rr_query;	/* Request URL query string, not
+					   including leading '/' */
+	const struct sockaddr
+			*rr_addr;	/* Client network address */
+	char		*rr_auth;	/* Request Authorization: header */
+} remap_request_t;
+
+/*
+ * Result of a remap_run().
+ *
+ * If the return code is RR_OK, then rz_target contains the backend host and
+ * port to remap the request to, and rz_proto contains the backend protocol.
+ * If rz_path is non-null, it contains the rewritten URL path that should be
+ * used for the request.
+ *
+ * If RR_REDIRECT, then rz_location contains a URL that the client should be
+ * redirected to and rz_status contains the HTTP status code.
+ *
+ * Otherwise, return will be equal to RR_ERR_* indicating that an error 
+ * occurred, and none of the struct fields are valid.
+ */
+typedef struct remap_result {
+	/* success */
+	const remap_target_t	*rz_target;
+	const char		*rz_proto;
+	char			*rz_urlpath;
+
+	/* redirect */
+	char		*rz_location;
+	int		 rz_status;
+
+	/* the host and path that matched the request, if any */
+	remap_host_t	*rz_host;
+	remap_path_t	*rz_path;
+} remap_result_t;
+
+#define	RR_OK			0	/* Successful remap */
+#define	RR_REDIRECT		1	/* Redirect client */
+#define	RR_ERR_INVALID_HOST	(-1)	/* Host: header missing or invalid */
+#define	RR_ERR_INVALID_PROTOCOL	(-2)	/* Unrecognised protocol */
+#define	RR_ERR_NO_HOST		(-3)	/* Host not found */
+#define	RR_ERR_NO_PATH		(-4)	/* Path not found */
+#define	RR_ERR_NO_BACKEND	(-5)	/* Path found, but has no functional
+					   backends */
+#define	RR_ERR_FORBIDDEN	(-6)	/* Request denied by IP address */
+#define	RR_ERR_UNAUTHORIZED	(-7)	/* Request denied by authentication */
+
+
+int	remap_run(const remap_db_t *db, const remap_request_t *,
+		  remap_result_t *);
+
+void	remap_request_free(remap_request_t *);
+void	remap_result_free(remap_result_t *);
+
 #ifdef __cplusplus
 }
 #endif

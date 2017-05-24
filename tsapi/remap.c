@@ -154,38 +154,15 @@ check_authz(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, const remap_path_t *rp)
 	return AUTHZ_DENY_AUTHN;
 }
 
-/*
- * Return 401 Unauthorized: the request was denied, but it might be permitted
- * if the client retries with an Authorization header field.
- */
-static void
-return_unauthorized(TSHttpTxn txnp, const remap_path_t *rp)
+static char *
+xstrndup(const char *s, size_t n)
 {
-synth_t	*sy;
-	sy = synth_new(401, "Authentication required");
-
-	if (rp->rp_auth_type == REMAP_AUTH_BASIC)
-		synth_add_header(sy, "WWW-Authenticate", "Basic realm=\"%s\"",
-				 rp->rp_auth_realm ? rp->rp_auth_realm :
-				   "Authentication required");
-
-	synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
-	synth_set_body(sy, "Authentication required.\r\n");
-	synth_intercept(sy, txnp);
-}
-
-/*
- * Return 403 Forbidden: the request was denied, and it will never be allowed.
- */
-static void
-return_forbidden(TSHttpTxn txnp, const remap_path_t *rp)
-{
-synth_t	*sy;
-	sy = synth_new(403, "Forbidden");
-
-	synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
-	synth_set_body(sy, "You do not have access to the requested resource.\r\n");
-	synth_intercept(sy, txnp);
+char	*ret;
+	if ((ret = malloc(n + 1)) == NULL)
+		return NULL;
+	bcopy(s, ret, n);
+	ret[n] = '\0';
+	return ret;
 }
 
 /*
@@ -205,16 +182,16 @@ int			 len;
 char			*requrl = NULL;
 const char		*cs;
 char			*hbuf = NULL, *pbuf = NULL, *s;
-const remap_host_t	*rh;
-const remap_path_t	*rp;
-const remap_target_t	*rt;
-size_t			 poffs;
 TSMBuffer		 reqp;
-TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr = NULL;
+TSMLoc			 hdr_loc = NULL, url_loc = NULL, host_hdr = NULL,
+			 auth_hdr = NULL;
 TSHttpTxn		 txnp = (TSHttpTxn) edata;
 TSConfig		 map_cfg = NULL;
 const remap_db_t	*db;
 struct state		*state = TSContDataGet(contn);
+remap_request_t		 req;
+remap_result_t		 res;
+synth_t			*sy;
 
 	map_cfg = TSConfigGet(state->cfg_slot);
 	db = TSConfigDataGet(map_cfg);
@@ -223,225 +200,135 @@ struct state		*state = TSContDataGet(contn);
 	if (!db)
 		goto cleanup;
 
-
 	/* Fetch the request and the URL. */
 	TSHttpTxnClientReqGet(txnp, &reqp, &hdr_loc);
 	TSHttpHdrUrlGet(reqp, hdr_loc, &url_loc);
 
 	/*
-	 * Fetch the host header, which could either be in the Host: header,
-	 * or in the request path for a proxy-style request (GET http://).
-	 * We need to handle both cases.
+	 * Construct a remap_request from the TS request.
+	 */
+	bzero(&req, sizeof(req));
+	
+	/* scheme */
+	if ((cs = TSUrlSchemeGet(reqp, url_loc, &len)) != NULL)
+		req.rr_proto = xstrndup(cs, len);
+
+	/* host */
+
+	/* 
+	 * We need to know if the Host came from a header field or from the 
+	 * URL, so we can change it later.
 	 */
 	host_hdr = TSMimeHdrFieldFind(reqp, hdr_loc,
 				      TS_MIME_FIELD_HOST,
 				      TS_MIME_LEN_HOST);
 	if (host_hdr) {
-		/*
-		 * TS fails a request for too many host headers anymore, but
-		 * check here just to be sure.
-		 */
-		if (TSMimeHdrFieldValuesCount(reqp, hdr_loc, host_hdr) != 1) {
-			TSDebug("kubernetes", "too many hosts in request?");
-			goto cleanup;
-		}
-
-		cs = TSMimeHdrFieldValueStringGet(reqp, hdr_loc, host_hdr, 0, &len);
+		cs = TSMimeHdrFieldValueStringGet(reqp, hdr_loc, host_hdr, 0,
+						  &len);
+		if (cs)
+			req.rr_host = xstrndup(cs, len);
 	} else {
-		cs = TSHttpHdrHostGet(reqp, hdr_loc, &len);
-		if (cs == NULL) {
-			/*
-			 * If there's no host in the URL and no host header
-			 * either, we can't do anything with this request.
-			 * Let TS fail it.
-			 */
-			TSDebug("kubernetes", "cannot get request host");
-			goto cleanup;
-		}
+		if ((cs = TSHttpHdrHostGet(reqp, hdr_loc, &len)) != NULL)
+			req.rr_host = xstrndup(cs, len);
 	}
 
-	/* create a mutable, nul-terminated copy of the host */
-	hbuf = malloc(len + 1);
-	bcopy(cs, hbuf, len);
-	hbuf[len] = 0;
-	if ((s = strchr(hbuf, ':')) != NULL)
+	/* remove port from URL if present */
+	if ((s = strchr(req.rr_host, ':')) != NULL)
 		*s = '\0';
 
-	/*
-	 * Look for a remap_host for this hostname.  If there isn't one, we
-	 * have no configuration for this host and there's nothing more to do.
-	 */
-	if ((rh = remap_db_get_host(db, hbuf)) == NULL) {
-		TSDebug("kubernetes", "host <%s> map not found", hbuf);
-		goto cleanup;
+	/* path */
+	if ((cs = TSUrlPathGet(reqp, url_loc, &len)) != NULL)
+		req.rr_path = xstrndup(cs, len);
+
+	/* query string */
+	if ((cs = TSUrlHttpQueryGet(reqp, url_loc, &len)) != NULL)
+		req.rr_query = xstrndup(cs, len);
+
+	/* client network address */
+	req.rr_addr = TSHttpTxnClientAddrGet(txnp);
+
+	/* Authorization header */
+	auth_hdr = TSMimeHdrFieldFind(reqp, hdr_loc,
+				      TS_MIME_FIELD_AUTHORIZATION,
+				      TS_MIME_LEN_AUTHORIZATION);
+	if (auth_hdr) {
+		cs = TSMimeHdrFieldValueStringGet(reqp, hdr_loc, auth_hdr, 0,
+						  &len);
+		if (cs)
+			req.rr_auth = xstrndup(cs, len);
 	}
 
-	/*
-	 * Fetch the URL path.
-	 */
-	cs = TSUrlPathGet(reqp, url_loc, &len);
-	if (cs) {
-		pbuf = malloc(len + 1);
-		bcopy(cs, pbuf, len);
-		pbuf[len] = 0;
-	} else {
-		pbuf = strdup("/");
-	}
-
-	/*
-	 * Find a remap_path for this host that matches the request path;
-	 * if no path is found, pass on this request and let the default
-	 * backend return a 404.
-	 */
-	if ((rp = remap_host_find_path(rh, pbuf, &poffs)) == NULL) {
-		TSDebug("kubernetes", "host <%s>, path <%s> not found",
-			hbuf, pbuf);
-		goto cleanup;
-	}
-
-	/*
-	 * If the Ingress has TLS configured, then redirect to TLS unless
-	 * ssl-redirect is set to false.
-	 *
-	 * If the Ingress does not have TLS configured, redirect to TLS if
-	 * force-ssl-redirect is set to true.
-	 */
-
-	if (!TSHttpTxnClientProtocolStackContains(txnp, "tls") &&
-	    ((rh->rh_ctx && !rp->rp_no_ssl_redirect)
-	     || rp->rp_force_ssl_redirect)) {
-	const char	*newp;
-	synth_t		*sy;
-	TSMBuffer	 newurl;
-	TSMLoc		 new_loc;
-
-		/*
-		 * Construct the URL to redirect to.
-		 */
-		newurl = TSMBufferCreate();
-		TSUrlClone(newurl, reqp, url_loc, &new_loc);
-		cs = TSUrlSchemeGet(newurl, new_loc, &len);
-
-		if (len == 4 && !memcmp(cs, "http", 4))
-			newp = "https";
-		else if (len == 2 && !memcmp(cs, "ws", 2))
-			newp = "wss";
-		else
-			newp = "https";
-
-		TSUrlSchemeSet(newurl, new_loc, newp, strlen(newp));
-		TSUrlHostSet(newurl, new_loc, hbuf, strlen(hbuf));
-		s = TSUrlStringGet(newurl, new_loc, &len);
-		TSHandleMLocRelease(newurl, TS_NULL_MLOC, new_loc);
-		TSMBufferDestroy(newurl);
-
-		/*
-		 * Return a synthetic response to redirect.
-		 */
+	/* Do the remap */
+	switch (remap_run(db, &req, &res)) {
+	case RR_REDIRECT:
 		sy = synth_new(301, "Moved");
-		synth_add_header(sy, "Location", "%s", s);
+		synth_add_header(sy, "Location", "%s", res.rz_location);
 		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
 		synth_set_body(sy, "The requested document has moved.\r\n");
 		synth_intercept(sy, txnp);
-		TSfree(s);
-
-		goto cleanup;
-	}
-
-	/*
-	 * Check authorization.  Do this after TLS redirect, so users aren't
-	 * prompted to enter passwords over a plaintext connection.
-	 */
-	switch (check_authz(txnp, reqp, hdr_loc, rp)) {
-	case AUTHZ_DENY_ADDRESS:
-		return_forbidden(txnp, rp);
 		goto cleanup;
 
-	case AUTHZ_DENY_AUTHN:
-		return_unauthorized(txnp, rp);
+		/* client errors */
+	case RR_ERR_INVALID_HOST:
+	case RR_ERR_INVALID_PROTOCOL:
+		sy = synth_new(400, "Bad request");
+		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
+		synth_set_body(sy, "The server could not undestand this request.\r\n");
+		synth_intercept(sy, txnp);
 		goto cleanup;
+
+		/* not found */
+	case RR_ERR_NO_HOST:
+	case RR_ERR_NO_PATH:
+		sy = synth_new(404, "Not found");
+		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
+		synth_set_body(sy, "The server could not find the requested"
+				   " resource.\r\n");
+		synth_intercept(sy, txnp);
+		goto cleanup;
+
+		/* no backend */
+	case RR_ERR_NO_BACKEND:
+		sy = synth_new(503, "Service unavailable");
+		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
+		synth_set_body(sy, "No backend is available to service this"
+				   " request.\r\n");
+		synth_intercept(sy, txnp);
+		goto cleanup;
+
+	case RR_ERR_FORBIDDEN:
+		sy = synth_new(403, "Forbidden");
+		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
+		synth_set_body(sy, "Access denied.\r\n");
+		synth_intercept(sy, txnp);
+		goto cleanup;
+
+	case RR_ERR_UNAUTHORIZED:
+		sy = synth_new(401, "Unauthorized");
+		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
+		synth_set_body(sy, "Unauthorized.\r\n");
+		synth_intercept(sy, txnp);
+		goto cleanup;
+
+	case RR_OK:
+		break;
 
 	default:
-		break;
-	}
-
-	/*
-	 * If the ingress has no backends, return an error.
-	 */
-	if (rp->rp_naddrs == 0) {
-	synth_t	*sy;
-		TSDebug("kubernetes", "host <%s>: no addrs", hbuf);
-		sy = synth_new(503, "Service unavailable");
-		synth_add_header(sy, "Content-Type", "text/plain; charset=UTF-8");
-		synth_set_body(sy, "No backends are available to service this "
-				"request.  Please try again later.\r\n");
-		synth_intercept(sy, txnp);
 		goto cleanup;
 	}
 
 	/*
-	 * Set cache generation if it's set on the Ingress.  If it's not set,
-	 * just set it to zero.
+	 * The remap succeeded, so we need to set the new backend
+	 * protocol, host:port and other request configuration.
 	 */
-	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_GENERATION, rp->rp_cache_gen);
 
-	/*
-	 * Enable caching, unless it's been cached on the Ingress.
-	 */
-	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_HTTP, rp->rp_cache);
+	/* set URL path if different */
+	if (res.rz_urlpath)
+		TSUrlPathSet(reqp, url_loc, res.rz_urlpath,
+			     strlen(res.rz_urlpath));
 
-	/*
-	 * Send HSTS headers.
-	 */
-	if (rh->rh_hsts_max_age)
-		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_MAX_AGE,
-				      rh->rh_hsts_max_age);
-	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS,
-			      rh->rh_hsts_subdomains);
-
-	/*
-	 * If the Ingress has app-root set, then any request not inside the
-	 * app root should be redirected.
-	 */
-	cs = TSUrlPathGet(reqp, url_loc, &len);
-
-	if (rp->rp_app_root && (!cs
-	    || (size_t)len < strlen(rp->rp_app_root + 1)
-	    || memcmp(cs, rp->rp_app_root + 1, strlen(rp->rp_app_root + 1)))) {
-	synth_t	*sy;
-	TSMBuffer	 newurl;
-	TSMLoc		 new_loc;
-
-		/*
-		 * Construct the URL to redirect to.
-		 */
-		newurl = TSMBufferCreate();
-		TSUrlClone(newurl, reqp, url_loc, &new_loc);
-
-		/* Strip the leading / from the path */
-		TSUrlPathSet(newurl, new_loc, rp->rp_app_root + 1,
-			     strlen(rp->rp_app_root) - 1);
-
-		s = TSUrlStringGet(newurl, new_loc, &len);
-		sy = synth_new(301, "Redirected");
-		synth_add_header(sy, "Location", "%s", s);
-		synth_add_header(sy, "Content-Type",
-				 "text/plain; charset=UTF-8");
-		synth_set_body(sy, "The requested document is found "
-				"elsewhere.\r\n");
-		synth_intercept(sy, txnp);
-
-		TSHandleMLocRelease(newurl, TS_NULL_MLOC, new_loc);
-		TSMBufferDestroy(newurl);
-		TSfree(s);
-
-		goto cleanup;
-	}
-
-	/*
-	 * Tell TS to follow redirects if configured on the Ingress.
-	 */
-	if (rp->rp_follow_redirects) {
+	/* follow redirects if configured on the Ingress.  */
+	if (res.rz_path->rp_follow_redirects) {
 		TSHttpTxnConfigIntSet(txnp,
 				TS_CONFIG_HTTP_ENABLE_REDIRECTION, 1);
 		TSHttpTxnConfigIntSet(txnp,
@@ -449,80 +336,59 @@ struct state		*state = TSContDataGet(contn);
 	}
 
 	/*
-	 * Pick a random backend endpoint to route the request to.
+	 * Set cache generation if it's set on the Ingress.  If it's not set,
+	 * just set it to zero.
 	 */
-	rt = remap_path_pick_target(rp);
-	TSDebug("kubernetes", "remapped to %s:%d", rt->rt_host, rt->rt_port);
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_GENERATION,
+			      res.rz_path->rp_cache_gen);
+
+	/*
+	 * Enable caching, unless it's been cached on the Ingress.
+	 */
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_HTTP,
+			      res.rz_path->rp_cache);
+
+	/*
+	 * Send HSTS headers.
+	 */
+	if (res.rz_host->rh_hsts_max_age)
+		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_MAX_AGE,
+				      res.rz_host->rh_hsts_max_age);
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS,
+			      res.rz_host->rh_hsts_subdomains);
+
 
 	/*
 	 * Usually, we want to preserve the request host header so the backend
-	 * can use it.  If preserve-host is set on the Ingress, then we instead
-	 * replace any host header in the request with the backend host.
+	 * can use it.  If preserve-host is set to false on the Ingress, then
+	 * we instead replace any host header in the request with the backend
+	 * host.
 	 */
-	if (!rp->rp_preserve_host) {
+	if (!res.rz_path->rp_preserve_host) {
 		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_URL_REMAP_PRISTINE_HOST_HDR, 0);
 		if (host_hdr)
 			TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
-						     rt->rt_host,
-						     strlen(rt->rt_host));
-	}
-
-	/*
-	 * If the Ingress has rewrite-target set, then replace the matched
-	 * part of the path (stored in poffs by find_path()) with the target.
-	 */
-	if (rp->rp_rewrite_target) {
-	char	*newp;
-	size_t	 nlen = strlen(pbuf) + strlen(rp->rp_rewrite_target) - poffs;
-		newp = malloc(nlen + 1);
-		snprintf(newp, nlen + 1, "%s%s", rp->rp_rewrite_target,
-			 pbuf + poffs);
-		TSUrlPathSet(reqp, url_loc, newp, nlen);
-		free(newp);
+					     res.rz_target->rt_host,
+					     strlen(res.rz_target->rt_host));
 	}
 
 	/*
 	 * Set the backend for this request.  This is the actual request
 	 * remapping.
 	 */
-	if (TSUrlHostSet(reqp, url_loc, rt->rt_host,
-			 strlen(rt->rt_host)) != TS_SUCCESS) {
+	if (TSUrlHostSet(reqp, url_loc, res.rz_target->rt_host,
+			 strlen(res.rz_target->rt_host)) != TS_SUCCESS) {
 		TSError("[kubernetes] <%s>: could not set request host", requrl);
 		goto cleanup;
 	}
 
-	if (TSUrlPortSet(reqp, url_loc, rt->rt_port) != TS_SUCCESS) {
+	if (TSUrlPortSet(reqp, url_loc, res.rz_target->rt_port) != TS_SUCCESS) {
 		TSError("[kubernetes] <%s>: could not set request port", requrl);
 		goto cleanup;
 	}
 
-	/*
-	 * Decide what protocol to use to communicate with the backend.  By
-	 * default we use http or ws, even if the request was https or wss.
-	 * If the Ingress has secure-backends set, then we always use https
-	 * or wss, even if the request was http or ws.
-	 *
-	 * Currently, there's no way to indicate that the protocol from the
-	 * request should be preserved.
-	 */
-	if ((cs = TSUrlSchemeGet(reqp, url_loc, &len)) != NULL) {
-	const char	*newp = NULL;
-
-		if (len >= 4 && !memcmp(cs, "http", 4)) {
-			if (rp->rp_secure_backends)
-				newp = "https";
-			else
-				newp = "http";
-		} else if (len >= 2 && !memcmp(cs, "ws", 2)) {
-			if (rp->rp_secure_backends)
-				newp = "wss";
-			else
-				newp = "ws";
-		}
-
-		if (newp)
-			TSUrlSchemeSet(reqp, url_loc, newp, strlen(newp));
-	}
+	/* set the backend URL scheme */
+	TSUrlSchemeSet(reqp, url_loc, res.rz_proto, strlen(res.rz_proto));
 
 	/*
 	 * We already remapped this request, so skip any further remapping.

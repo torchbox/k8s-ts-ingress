@@ -12,6 +12,11 @@
  * Tests for remap_db.c: the remap database.
  */
 
+#include	<sys/types.h>
+#include	<sys/socket.h>
+#include	<netinet/in.h>
+#include	<arpa/inet.h>
+
 #include	<string>
 #include	<vector>
 #include	<map>
@@ -27,6 +32,32 @@ using std::map;
 using std::string;
 using std::pair;
 
+namespace {
+	cluster_t *load_test_ingress(std::string const &fname) {
+		json_object *obj;
+
+		cluster_t *cluster = cluster_make();
+		namespace_t *ns = cluster_get_namespace(cluster, "default");
+
+		obj = test_load_json("tests/endpoints.json");
+		namespace_put_endpoints(ns, endpoints_make(obj));
+		json_object_put(obj);
+
+		obj = test_load_json("tests/service.json");
+		namespace_put_service(ns, service_make(obj));
+		json_object_put(obj);
+
+		obj = test_load_json("tests/secret-htauth.json");
+		namespace_put_secret(ns, secret_make(obj));
+		json_object_put(obj);
+
+		obj = test_load_json(fname);
+		namespace_put_ingress(ns, ingress_make(obj));
+		json_object_put(obj);
+
+		return cluster;
+	}
+} // anonymous namespace
 
 TEST(RemapDB, PathLookup)
 {
@@ -98,45 +129,435 @@ TEST(RemapDB, HostLookup)
 
 TEST(RemapDB, Basic)
 {
-	json_object *obj;
-
-	cluster_t *cluster = cluster_make();
-	namespace_t *ns = cluster_get_namespace(cluster, "default");
-
-	obj = test_load_json("tests/1-basic/endpoints.json");
-	namespace_put_endpoints(ns, endpoints_make(obj));
-	json_object_put(obj);
-
-	obj = test_load_json("tests/1-basic/service.json");
-	namespace_put_service(ns, service_make(obj));
-	json_object_put(obj);
-
-	obj = test_load_json("tests/1-basic/ingress.json");
-	namespace_put_ingress(ns, ingress_make(obj));
-	json_object_put(obj);
-
+	cluster_t *cluster = load_test_ingress("tests/ingress-basic.json");
 	remap_db_t *db = remap_db_from_cluster(cluster);
 	ASSERT_TRUE(db != nullptr);
 
-	/* fetch our host */
-	remap_host_t *rh = remap_db_get_host(db, "echoheaders.gce.t6x.uk");
-	ASSERT_TRUE(rh != nullptr);
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
 
-	/* fetch the path from this host */
-	remap_path_t *rp = remap_host_find_path(rh, "/what/ever", nullptr);
-	ASSERT_TRUE(rp != nullptr);
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
 
-	/* the path should have one address... */
-	ASSERT_EQ(1u, rp->rp_naddrs);
-	/* ... and it should be this one: */
-	ASSERT_STREQ("172.28.100.135", rp->rp_addrs[0].rt_host);
-	ASSERT_EQ(8080, rp->rp_addrs[0].rt_port);
+	/* Make sure pick_target returns the right host */
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("http", res.rz_proto);
 
-	/* Make sure pick_target returns the same host */
-	remap_target_t const *target = remap_path_pick_target(rp);
-	ASSERT_STREQ("172.28.100.135", target->rt_host);
-	ASSERT_EQ(8080, target->rt_port);
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
 
+TEST(RemapDB, ForceTLSRedirect)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-force-tls.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_REDIRECT, ret);
+	EXPECT_STREQ("https://echoheaders.gce.t6x.uk/what/ever",
+		     res.rz_location);
+	EXPECT_EQ(301, res.rz_status);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AppRoot)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-app-root.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_REDIRECT, ret);
+	EXPECT_STREQ("/app/", res.rz_location);
+	EXPECT_EQ(301, res.rz_status);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, RewriteTarget)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-rewrite-target.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("app/bar", res.rz_urlpath);
+	EXPECT_STREQ("http", res.rz_proto);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, SecureBackends)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-secure-backends.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("https", res.rz_proto);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AuthAddressPermit)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-auth-address.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	inet_pton(AF_INET, "127.0.0.1", &sin.sin_addr);
+
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("http", res.rz_proto);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AuthAddressDeny)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-auth-address.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	inet_pton(AF_INET, "10.0.0.1", &sin.sin_addr);
+
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_ERR_FORBIDDEN, ret);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AuthBasicPermit)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-auth-basic.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	inet_pton(AF_INET, "127.0.0.1", &sin.sin_addr);
+
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
+	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWludGVzdA==");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("http", res.rz_proto);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AuthBasicDenyNoCredentials)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-auth-basic.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	inet_pton(AF_INET, "10.0.0.1", &sin.sin_addr);
+
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_ERR_UNAUTHORIZED, ret);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AuthBasicDenyInvalidCredentials)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-auth-basic.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	inet_pton(AF_INET, "10.0.0.1", &sin.sin_addr);
+
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
+	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWlueHRlc3Q=");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_ERR_UNAUTHORIZED, ret);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AuthAllPermit)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-auth-all.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	inet_pton(AF_INET, "127.0.0.1", &sin.sin_addr);
+
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
+	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWludGVzdA==");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("http", res.rz_proto);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AuthAllDenyNoCredentials)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-auth-all.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	inet_pton(AF_INET, "127.0.0.1", &sin.sin_addr);
+
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_ERR_UNAUTHORIZED, ret);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AuthAllDenyInvalidCredentials)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-auth-all.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	inet_pton(AF_INET, "127.0.0.1", &sin.sin_addr);
+
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
+	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWlueHRlc3Q=");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_ERR_UNAUTHORIZED, ret);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AuthAllDenyInvalidAddress)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-auth-all.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	struct sockaddr_in sin;
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	inet_pton(AF_INET, "10.0.0.1", &sin.sin_addr);
+
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("foo/bar");
+	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
+	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWludGVzdA==");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_ERR_FORBIDDEN, ret);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
 	remap_db_free(db);
 	cluster_free(cluster);
 }
