@@ -49,7 +49,7 @@ Using the Docker image
 We provide a pre-built version of Traffic Server, including the plugin.  If you
 use this pre-built image, you do not need to build the plugin manually.
 
-Current image: `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha3`
+Current image: `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha4`
 
 Deploying the Docker image on Kubernetes
 ----------------------------------------
@@ -435,6 +435,9 @@ for questions or support, or to report bugs.
 Release history
 ---------------
 
+* 1.0.0-alpha4:
+    * Do not return a client error if the requested host or path was not
+      found, to allow use with other plugins like healthchecks.
 * 1.0.0-alpha3:
     * Greatly improved unit test coverage.
     * Several minor bugs fixed.
