@@ -170,10 +170,6 @@ char	*ret;
  * to an Ingress path (remap_path), apply any configurations from annotations,
  * and either set the host to proxy the request to the backend, or return
  * our own error or redirect response.
- *
- * This function takes the map lock on every request, so it is a contention
- * point.  The map could be made refcounted to reduce the amount of time we
- * have to hold the map lock.
  */
 int
 handle_remap(TSCont contn, TSEvent event, void *edata)
@@ -208,29 +204,28 @@ synth_t			*sy;
 	 * Construct a remap_request from the TS request.
 	 */
 	bzero(&req, sizeof(req));
-	
+
 	/* scheme */
 	if ((cs = TSUrlSchemeGet(reqp, url_loc, &len)) != NULL)
 		req.rr_proto = xstrndup(cs, len);
 
 	/* host */
+	host_hdr = TSMimeHdrFieldFind(reqp, hdr_loc, "Host", 4);
 
-	/* 
-	 * We need to know if the Host came from a header field or from the 
-	 * URL, so we can change it later.
+	/*
+	 * If the request doesn't have a Host, copy it from the URL. If the URL
+	 * doesn't have one either, give up.
 	 */
-	host_hdr = TSMimeHdrFieldFind(reqp, hdr_loc,
-				      TS_MIME_FIELD_HOST,
-				      TS_MIME_LEN_HOST);
-	if (host_hdr) {
-		cs = TSMimeHdrFieldValueStringGet(reqp, hdr_loc, host_hdr, 0,
-						  &len);
-		if (cs)
-			req.rr_host = xstrndup(cs, len);
-	} else {
-		if ((cs = TSHttpHdrHostGet(reqp, hdr_loc, &len)) != NULL)
-			req.rr_host = xstrndup(cs, len);
+	if (!host_hdr) {
+		if ((cs = TSHttpHdrHostGet(reqp, hdr_loc, &len)) == NULL)
+			goto cleanup;
+
+		TSMimeHdrFieldCreateNamed(reqp, hdr_loc, "Host", 4, &host_hdr);
+		TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0, cs, len);
 	}
+
+	cs = TSMimeHdrFieldValueStringGet(reqp, hdr_loc, host_hdr, 0, &len);
+	req.rr_host = xstrndup(cs, len);
 
 	/* remove port from URL if present */
 	if ((s = strchr(req.rr_host, ':')) != NULL)
@@ -359,20 +354,6 @@ synth_t			*sy;
 
 
 	/*
-	 * Usually, we want to preserve the request host header so the backend
-	 * can use it.  If preserve-host is set to false on the Ingress, then
-	 * we instead replace any host header in the request with the backend
-	 * host.
-	 */
-	if (!res.rz_path->rp_preserve_host) {
-		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_URL_REMAP_PRISTINE_HOST_HDR, 0);
-		if (host_hdr)
-			TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
-					     res.rz_target->rt_host,
-					     strlen(res.rz_target->rt_host));
-	}
-
-	/*
 	 * Set the backend for this request.  This is the actual request
 	 * remapping.
 	 */
@@ -389,6 +370,23 @@ synth_t			*sy;
 
 	/* set the backend URL scheme */
 	TSUrlSchemeSet(reqp, url_loc, res.rz_proto, strlen(res.rz_proto));
+
+	/*
+	 * Usually, we want to preserve the request host header so the backend
+	 * can use it.  If preserve-host is set to false on the Ingress, then
+	 * we instead replace any host header in the request with the backend
+	 * host.
+	 */
+	if (res.rz_path->rp_preserve_host) {
+		TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
+					     req.rr_host, strlen(req.rr_host));
+	} else {
+		TSHttpTxnConfigIntSet(txnp, TS_CONFIG_URL_REMAP_PRISTINE_HOST_HDR, 0);
+		TSMimeHdrFieldValueStringSet(reqp, hdr_loc, host_hdr, 0,
+					     res.rz_target->rt_host,
+					     strlen(res.rz_target->rt_host));
+	}
+
 
 	/*
 	 * We already remapped this request, so skip any further remapping.

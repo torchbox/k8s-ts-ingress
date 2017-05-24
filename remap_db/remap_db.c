@@ -152,6 +152,8 @@ int		 rerr;
 	if ((ret = calloc(1, sizeof(*ret))) == NULL)
 		return NULL;
 
+	ret->rp_preserve_host = 1;
+
 	if (!path)
 		return ret;
 
