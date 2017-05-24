@@ -482,6 +482,9 @@ Release history
 * 1.0.0-alpha5 (unreleased):
     * Feature: Implement Ingress classes.
     * Bug fix: TLS redirects with an empty URL path could crash.
+    * Bug fix: with some combinations of Traffic Server and OpenSSL versions,
+               TLS certificates might not be loaded correctly.  Use the new
+               TS_SSL_CERT_HOOK hook to ensure this works properly in all cases.
 * 1.0.0-alpha4:
     * Do not return a client error if the requested host or path was not
       found, to allow use with other plugins like healthchecks.
