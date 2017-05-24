@@ -65,7 +65,7 @@ AC_SUBST([JSON_LIBS])
 
 ACX_PTHREAD
 
-AC_CHECK_LIB(ssl, SSL_library_init, [], [AC_ERROR([could not find OpenSSL])])
+AC_CHECK_LIB(ssl, SSL_CTX_new, [], [AC_ERROR([could not find OpenSSL])])
 AC_CHECK_LIB(crypto, MD5_Update, [], [AC_ERROR([could not find OpenSSL])])
 
 AC_OUTPUT(Makefile)
