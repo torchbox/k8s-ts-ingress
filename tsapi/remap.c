@@ -275,11 +275,10 @@ synth_t			*sy;
 		/* not found */
 	case RR_ERR_NO_HOST:
 	case RR_ERR_NO_PATH:
-		sy = synth_new(404, "Not found");
-		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
-		synth_set_body(sy, "The server could not find the requested"
-				   " resource.\r\n");
-		synth_intercept(sy, txnp);
+		/*
+		 * Don't return an error here; let other plugins (like
+		 * healthchecks) handle the request.
+		 */
 		goto cleanup;
 
 		/* no backend */
