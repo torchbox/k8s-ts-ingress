@@ -13,6 +13,8 @@
 
 #include	<cstdarg>
 #include	<cstdio>
+#include	<cstring>
+#include	<string.h>	// for strdup
 
 #include	<openssl/ssl.h>
 #include	<openssl/err.h>
@@ -76,7 +78,7 @@ char	*ret, *buf;
 		return NULL;
 	}
 
-	bcopy(buf, ret, len);
+	std::memcpy(ret, buf, len);
 	buf[len] = '\0';
 	BIO_free(bio);
 	return ret;
