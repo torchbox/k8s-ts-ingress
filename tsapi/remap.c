@@ -386,6 +386,32 @@ synth_t			*sy;
 					     strlen(res.rz_target->rt_host));
 	}
 
+	if (state->config->co_xfp) {
+	TSMLoc	xfp;
+		/* Remove any existing X-Forwarded-Proto header */
+		xfp = TSMimeHdrFieldFind(reqp, hdr_loc,
+			      REMAP_MIME_FIELD_X_FORWARDED_PROTO,
+			      REMAP_MIME_FIELD_X_FORWARDED_PROTO_LEN);
+		if (xfp != TS_NULL_MLOC) {
+			TSMimeHdrFieldRemove(reqp, hdr_loc, xfp);
+			TSMimeHdrFieldValuesClear(reqp, hdr_loc, xfp);
+		} else {
+			TSMimeHdrFieldCreateNamed(reqp, hdr_loc,
+					REMAP_MIME_FIELD_X_FORWARDED_PROTO,
+					REMAP_MIME_FIELD_X_FORWARDED_PROTO_LEN,
+					&xfp);
+		}
+
+		if (TSHttpTxnClientProtocolStackContains(txnp, "tls"))
+			TSMimeHdrFieldValueStringInsert(reqp, hdr_loc, xfp, 0,
+						     "https", 5);
+		else
+			TSMimeHdrFieldValueStringInsert(reqp, hdr_loc, xfp, 0,
+						     "http", 4);
+
+		TSMimeHdrFieldAppend(reqp, hdr_loc, xfp);
+		TSHandleMLocRelease(reqp, hdr_loc, xfp);
+	}
 
 	/*
 	 * We already remapped this request, so skip any further remapping.

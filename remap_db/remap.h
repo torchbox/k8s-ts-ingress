@@ -27,6 +27,13 @@ extern "C" {
 #endif
 
 /*
+ * Header fields.
+ */
+#define	REMAP_MIME_FIELD_X_FORWARDED_PROTO	"X-Forwarded-Proto"
+#define	REMAP_MIME_FIELD_X_FORWARDED_PROTO_LEN	\
+	(sizeof(REMAP_MIME_FIELD_X_FORWARDED_PROTO) - 1)
+
+/*
  * Stores one path entry in an Ingress.
  */
 #define REMAP_AUTH_NONE		0x0

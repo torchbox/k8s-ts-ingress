@@ -4,7 +4,7 @@
 # which will override anything set here.
 
 ### API server configuration
-# 
+#
 # This is required when running outside the cluster, but not necessary when
 # running in-cluster; the pod's service account will be used by default.
 
@@ -25,10 +25,19 @@ keyfile: /mnt/c/Users/ft/.kube/kube-prod.key
 # (Environment: $TS_TOKEN.)
 #token: ABCD1234
 
+# If you want to change the default ingress class(es), set this.
+# (Environment: $TS_INGRESS_CLASSES.)
+#ingress_classes: trafficserver nginx
+
 ### TLS configuration
 
 # Set this to false to disable TLS.  (Environment: $TS_TLS.)
 #tls: false
+
+# Set this to false to disable sending the X-Forwarded-Proto header to the
+# backend, indicating the client protocol ("http" or "https").  If this is
+# enabled (the default), any existing header in the request will be removed.
+#x_forwarded_proto: false
 
 ### Remap configuration
 

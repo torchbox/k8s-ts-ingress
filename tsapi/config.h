@@ -33,6 +33,7 @@ typedef struct k8s_config {
 	int	 co_tls;
 	int	 co_remap;
 	hash_t	 co_classes;
+	int	 co_xfp;
 } k8s_config_t;
 
 k8s_config_t	*k8s_config_new(void);

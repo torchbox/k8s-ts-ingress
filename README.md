@@ -475,12 +475,13 @@ Support
 Please open a [Github issue](https://github.com/torchbox/k8s-ts-ingress/issues)
 for questions or support, or to report bugs.
 
-
 Release history
 ---------------
 
 * 1.0.0-alpha5 (unreleased):
-    * Feature: Implement Ingress classes.
+    * Feature: Support Ingress classes.
+    * Feature: The X-Forwarded-Proto header is now (optionally) sent to the
+               backend.
     * Bug fix: TLS redirects with an empty URL path could crash.
     * Bug fix: with some combinations of Traffic Server and OpenSSL versions,
                TLS certificates might not be loaded correctly.  Use the new

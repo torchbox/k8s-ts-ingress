@@ -59,6 +59,7 @@ k8s_config_t	*ret;
 	ret->co_tls = 1;
 	ret->co_remap = 1;
 	ret->co_port = 443;
+	ret->co_xfp = 1;
 
 	cfg_set_ingress_classes(ret, "trafficserver");
 	return ret;
@@ -164,6 +165,16 @@ int		 lineno = 0;
 				ret->co_remap = 1;
 			else if (strcmp(value, "false") == 0)
 				ret->co_remap = 0;
+			else {
+				TSError("%s:%d: expected \"true\" or \"false\"",
+					file, lineno);
+				goto error;
+			}
+		} else if (strcmp(opt, "x_forwarded_proto") == 0) {
+			if (strcmp(value, "true") == 0)
+				ret->co_xfp = 1;
+			else if (strcmp(value, "false") == 0)
+				ret->co_xfp = 0;
 			else {
 				TSError("%s:%d: expected \"true\" or \"false\"",
 					file, lineno);
