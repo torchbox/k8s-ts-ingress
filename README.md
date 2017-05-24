@@ -480,7 +480,8 @@ Release history
 ---------------
 
 * 1.0.0-alpha5 (unreleased):
-    * Implement Ingress classes.
+    * Feature: Implement Ingress classes.
+    * Bug fix: TLS redirects with an empty URL path could crash.
 * 1.0.0-alpha4:
     * Do not return a client error if the requested host or path was not
       found, to allow use with other plugins like healthchecks.

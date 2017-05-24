@@ -518,6 +518,7 @@ rr_check_tls(const remap_db_t *db, const remap_request_t *req,
 	     remap_result_t *ret)
 {
 const char	*newp;
+size_t		 blen;
 
 	/* If already TLS, do nothing */
 	if (!strcmp(req->rr_proto, "https") || !strcmp(req->rr_proto, "wss"))
@@ -541,21 +542,18 @@ const char	*newp;
 		newp = "https";
 
 	/* Build new URL, replacing the protocol */
-	if (req->rr_query) {
-	size_t	blen =	strlen(newp) + 3 + strlen(req->rr_host)
-			+ 1 + strlen(req->rr_path)
-			+ 1 + strlen(req->rr_query) + 1;
-		ret->rz_location = malloc(blen);
-		snprintf(ret->rz_location, blen, "%s://%s/%s?%s",
-			 newp, req->rr_host, req->rr_path,
-			 req->rr_query);
-	} else {
-	size_t	blen =	strlen(newp) + 3 + strlen(req->rr_host)
-			+ 1 + strlen(req->rr_path) + 1;
-		ret->rz_location = malloc(blen);
-		snprintf(ret->rz_location, blen, "%s://%s/%s",
-			 newp, req->rr_host, req->rr_path);
-	}
+	blen = strlen(newp) + 3 + strlen(req->rr_host) + 1 + 1;
+	if (req->rr_path)
+		blen += strlen(req->rr_path);
+	if (req->rr_query)
+		blen += strlen(req->rr_query) + 1;
+
+	ret->rz_location = malloc(blen);
+	snprintf(ret->rz_location, blen, "%s://%s/%s%s%s",
+		 newp, req->rr_host,
+		 req->rr_path ? req->rr_path : "",
+		 req->rr_query ? "?" : "",
+		 req->rr_query ? req->rr_query : "");
 
 	ret->rz_status = 301;
 	return RR_REDIRECT;

@@ -161,6 +161,38 @@ TEST(RemapDB, Basic)
 	cluster_free(cluster);
 }
 
+TEST(RemapDB, EmptyPath)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-basic.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = NULL;
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+
+	/* Make sure pick_target returns the right host */
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("http", res.rz_proto);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
 TEST(RemapDB, IngressClass1)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-class1.json");
@@ -250,6 +282,7 @@ TEST(RemapDB, IngressClass3)
 	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
+
 TEST(RemapDB, ForceTLSRedirect)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-force-tls.json");
@@ -270,6 +303,36 @@ TEST(RemapDB, ForceTLSRedirect)
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_REDIRECT, ret);
 	EXPECT_STREQ("https://echoheaders.gce.t6x.uk/what/ever",
+		     res.rz_location);
+	EXPECT_EQ(301, res.rz_status);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, ForceTLSRedirectEmptyPath)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-force-tls.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = NULL;
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_REDIRECT, ret);
+	EXPECT_STREQ("https://echoheaders.gce.t6x.uk/",
 		     res.rz_location);
 	EXPECT_EQ(301, res.rz_status);
 
