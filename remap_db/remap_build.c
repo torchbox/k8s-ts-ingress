@@ -56,7 +56,20 @@ ingress_t		*ingress;
 static void
 build_ingress(remap_db_t *db, namespace_t *ns, ingress_t *ing)
 {
+char	*cls;
+
 	TSDebug("kubernetes", "  ingress %s:", ing->in_name);
+	
+	/*
+	 * Only handle this Ingress if it has no class, or the class is set to
+	 * "trafficserver".
+	 */
+	if ((cls = hash_get(ing->in_annotations, IN_CLASS)) != NULL) {
+		TSDebug("kubernetes", "ingress class is [%s], we expect [%s]",
+			cls, IN_CLASS_TRAFFICSERVER);
+		if (strcmp(cls, IN_CLASS_TRAFFICSERVER)) 
+			return;
+	}
 
 	/* Rebuild TLS state */
 	for (size_t i = 0; i < ing->in_ntls; i++)

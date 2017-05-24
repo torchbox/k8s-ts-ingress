@@ -28,7 +28,8 @@ char	*_k8s_get_ssl_error(void);
  * Annotation prefixes.  ingress.kubernetes.io is for standard annotations,
  * ingress.torchbox.com is for TS-specific ones.
  */
-#define	A_KUBERNETES	"ingress.kubernetes.io/"
+#define	A_KUBERNETES	"kubernetes.io/"
+#define	A_INGRESS	"ingress.kubernetes.io/"
 #define	A_TORCHBOX	"ingress.torchbox.com/"
 
 /*
@@ -100,16 +101,19 @@ service_port_t	*service_find_port(const service_t *, const char *name,
  */
 
 /* Ingress annotations - Kubernetes */
-#define	IN_SECURE_BACKENDS		A_KUBERNETES "secure-backends"
-#define	IN_SSL_REDIRECT			A_KUBERNETES "ssl-redirect"
-#define	IN_FORCE_SSL_REDIRECT		A_KUBERNETES "force-ssl-redirect"
-#define	IN_APP_ROOT			A_KUBERNETES "app-root"
-#define	IN_REWRITE_TARGET		A_KUBERNETES "rewrite-target"
-#define	IN_AUTH_TYPE			A_KUBERNETES "auth-type"
+#define	IN_SECURE_BACKENDS		A_INGRESS "secure-backends"
+#define	IN_SSL_REDIRECT			A_INGRESS "ssl-redirect"
+#define	IN_FORCE_SSL_REDIRECT		A_INGRESS "force-ssl-redirect"
+#define	IN_APP_ROOT			A_INGRESS "app-root"
+#define	IN_REWRITE_TARGET		A_INGRESS "rewrite-target"
+#define	IN_AUTH_TYPE			A_INGRESS "auth-type"
 #define	IN_AUTH_TYPE_BASIC		"basic"
 #define	IN_AUTH_TYPE_DIGEST		"digest"
-#define	IN_AUTH_REALM			A_KUBERNETES "auth-realm"
-#define	IN_AUTH_SECRET			A_KUBERNETES "auth-secret"
+#define	IN_AUTH_REALM			A_INGRESS "auth-realm"
+#define	IN_AUTH_SECRET			A_INGRESS "auth-secret"
+
+#define	IN_CLASS			A_KUBERNETES "ingress.class"
+#define	IN_CLASS_TRAFFICSERVER		"trafficserver"
 
 /* Ingress annotations - Torchbox */
 #define IN_HSTS_INCLUDE_SUBDOMAINS	A_TORCHBOX "hsts-include-subdomains"

@@ -127,6 +127,28 @@ Debugging
 To debug problems with the plugin, enable the debug tags `kubernetes` (for the
 plugin itself) or `watcher` (for the Kubernetes API code).
 
+Use with multiple Ingress controllers
+-------------------------------------
+
+The TS Ingress controller will handle any Ingress resource which does not have
+an Ingress class set, or where the Ingress class is set to "trafficserver".
+
+If this is the only Ingress controller you are using, you do not need to set the
+Ingress class; TS will handle all ingress resources.
+
+Otherwise, to ensure an Ingress resource is only handled by this controller, set
+the class:
+
+```
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: "trafficserver"
+```
+
+For more information, see
+[Using Multiple Ingress Controller](https://github.com/nginxinc/kubernetes-ingress/tree/master/examples/multiple-ingress-controllers)
+in the Kubernetes documentation.
+
 Ingress annotations
 -------------------
 
@@ -435,6 +457,8 @@ for questions or support, or to report bugs.
 Release history
 ---------------
 
+* 1.0.0-alpha5 (unreleased):
+    * Implement Ingress classes.
 * 1.0.0-alpha4:
     * Do not return a client error if the requested host or path was not
       found, to allow use with other plugins like healthchecks.

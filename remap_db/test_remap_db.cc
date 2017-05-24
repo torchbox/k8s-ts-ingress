@@ -157,6 +157,61 @@ TEST(RemapDB, Basic)
 	cluster_free(cluster);
 }
 
+TEST(RemapDB, IngressClass1)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-class1.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+
+	/* Make sure pick_target returns the right host */
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("http", res.rz_proto);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, IngressClass2)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-class2.json");
+	remap_db_t *db = remap_db_from_cluster(cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_ERR_NO_HOST, ret);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	cluster_free(cluster);
+}
+
 TEST(RemapDB, ForceTLSRedirect)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-force-tls.json");
