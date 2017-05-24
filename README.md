@@ -145,9 +145,31 @@ metadata:
     kubernetes.io/ingress.class: "trafficserver"
 ```
 
+To change the Ingress classes that TS will handle, set `ingress_classes` in
+`kubernetes.config` (or the `$TS_INGRESS_CLASSES` environment variable) to a
+whitespace-separate list of values, e.g. `"trafficserver ts-staging"`.  This
+can be used to run multiple copies of the TS Ingress controller in one cluster.
+If you do this, the `trafficserver` class will not be handled unless you
+explicitly include it in the list.
+
 For more information, see
 [Using Multiple Ingress Controller](https://github.com/nginxinc/kubernetes-ingress/tree/master/examples/multiple-ingress-controllers)
 in the Kubernetes documentation.
+
+Use with kube-lego
+------------------
+
+kube-lego currently
+[doesn't support](https://github.com/jetstack/kube-lego/issues/189) any
+Ingress controllers other than nginx and GCE.  To use the TS Ingress controller
+with kube-lego, you should tell it to handle the `"nginx"` Ingress class in
+`kubernetes.config`:
+
+```
+ingress_classes: trafficserver nginx
+```
+
+Or by setting `$TS_INGRESS_CLASSES` to `"trafficserver nginx"`.
 
 Ingress annotations
 -------------------

@@ -28,7 +28,40 @@ k8s_config_free(k8s_config_t *cfg)
 	free(cfg->co_tls_certfile);
 	free(cfg->co_tls_keyfile);
 	free(cfg->co_tls_cafile);
+	hash_free(cfg->co_classes);
 	free(cfg);
+}
+
+void
+cfg_set_ingress_classes(k8s_config_t *cfg, const char *classes)
+{
+char	*s = strdup(classes), *p, *r;
+
+	hash_free(cfg->co_classes);
+	cfg->co_classes = hash_new(11, NULL);
+
+	for (p = strtok_r(s, " \t\r\n", &r); p != NULL;
+	     p = strtok_r(NULL, " \t\r\n", &r))
+		hash_set(cfg->co_classes, p, HASH_PRESENT);
+	free(s);
+}
+
+k8s_config_t *
+k8s_config_new(void)
+{
+k8s_config_t	*ret;
+
+	if ((ret = calloc(1, sizeof(*ret))) == NULL) {
+		TSError("calloc: %s", strerror(errno));
+		return NULL;
+	}
+
+	ret->co_tls = 1;
+	ret->co_remap = 1;
+	ret->co_port = 443;
+
+	cfg_set_ingress_classes(ret, "trafficserver");
+	return ret;
 }
 
 k8s_config_t *
@@ -39,14 +72,8 @@ FILE		*f = NULL;
 k8s_config_t	*ret = NULL;
 int		 lineno = 0;
 
-	if ((ret = calloc(1, sizeof(*ret))) == NULL) {
-		TSError("calloc: %s", strerror(errno));
-		goto error;
-	}
-
-	ret->co_tls = 1;
-	ret->co_remap = 1;
-	ret->co_port = 443;
+	if ((ret = k8s_config_new()) == NULL)
+		return NULL;
 
 	/*
 	 * Check for in-cluster service account config.
@@ -142,6 +169,8 @@ int		 lineno = 0;
 					file, lineno);
 				goto error;
 			}
+		} else if (strcmp(opt, "ingress_classes") == 0) {
+			cfg_set_ingress_classes(ret, value);
 		} else {
 			TSError("%s:%d: unknown option \"%s\"",
 				file, lineno, opt);
@@ -203,6 +232,9 @@ int		 lineno = 0;
 			goto error;
 		}
 	}
+
+	if ((s = getenv("TS_INGRESS_CLASSES")) != NULL)
+		cfg_set_ingress_classes(ret, s);
 
 	if (ret->co_tls_keyfile) {
 		free(ret->co_token);

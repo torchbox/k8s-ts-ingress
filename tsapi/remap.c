@@ -43,7 +43,7 @@ remap_db_t	*db;
 	}
 
 	TSDebug("kubernetes", "rebuild_maps: running");
-	db = remap_db_from_cluster(state->cluster);
+	db = remap_db_from_cluster(state->config, state->cluster);
 	state->changed = 0;
 	TSMutexUnlock(state->cluster_lock);
 

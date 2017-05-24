@@ -23,6 +23,7 @@
 #include	"api.h"
 #include	"watcher.h"
 #include	"remap.h"
+#include	"config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,9 +34,12 @@ extern "C" {
  * well as the TLS map and remap maps.
  */
 struct state {
+	k8s_config_t	*config;
+
 	/* current cluster state */
 	TSMutex		 cluster_lock;
 	cluster_t	*cluster;
+
 	/* watchers */
 	watcher_t	 ingress_watcher;
 	watcher_t	 secret_watcher;

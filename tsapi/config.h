@@ -11,6 +11,8 @@
 #ifndef	CONFIG_H
 #define	CONFIG_H
 
+#include	"hash.h"
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -30,10 +32,13 @@ typedef struct k8s_config {
 	char	*co_token;
 	int	 co_tls;
 	int	 co_remap;
+	hash_t	 co_classes;
 } k8s_config_t;
 
+k8s_config_t	*k8s_config_new(void);
 k8s_config_t	*k8s_config_load(const char *file);
 k8s_config_t	*k8s_incluster_config(void);
+void		 cfg_set_ingress_classes(k8s_config_t *, const char *classes);
 void		 k8s_config_free(k8s_config_t *);
 
 #ifdef	__cplusplus

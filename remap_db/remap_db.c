@@ -431,7 +431,7 @@ int	n = rand() / (RAND_MAX / rp->rp_naddrs + 1);
  */
 
 remap_db_t *
-remap_db_new(void)
+remap_db_new(k8s_config_t *cfg)
 {
 remap_db_t	*ret;
 
@@ -443,6 +443,7 @@ remap_db_t	*ret;
 		return NULL;
 	}
 
+	ret->rd_config = cfg;
 	return ret;
 }
 

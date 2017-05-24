@@ -44,7 +44,6 @@ void
 TSPluginInit(int argc, const char **argv)
 {
 TSPluginRegistrationInfo	 info;
-k8s_config_t			*conf = NULL;
 size_t				 i;
 struct state			*state;
 struct {
@@ -60,19 +59,19 @@ struct {
 	SSL_library_init();
 	SSL_load_error_strings();
 
-	if (argc >= 2)
-		conf = k8s_config_load(argv[1]);
-	else
-		conf = k8s_config_load(NULL);
-
-	if (conf == NULL) {
-		TSError("[kubernetes] failed to load configuration");
-		return;
-	}
-
 	if ((state = calloc(1, sizeof(*state))) == NULL) {
 		TSError("[kubernetes] cannot create state: %s",
 			strerror(errno));
+		return;
+	}
+
+	if (argc >= 2)
+		state->config = k8s_config_load(argv[1]);
+	else
+		state->config = k8s_config_load(NULL);
+
+	if (state->config == NULL) {
+		TSError("[kubernetes] failed to load configuration");
 		return;
 	}
 
@@ -85,7 +84,7 @@ struct {
 	 */
 	for (i = 0; i < sizeof(watchers) / sizeof(*watchers); i++) {
 	watcher_t	wt;
-		wt = watcher_create(conf, watchers[i].resource);
+		wt = watcher_create(state->config, watchers[i].resource);
 
 		if (wt == NULL) {
 			TSError("[kubernetes] cannot create watcher for %s: %s",
@@ -113,7 +112,7 @@ struct {
 	 * Create SNI hook to associate Kubernetes SSL_CTXs with incoming
 	 * connections.
 	 */
-	if (conf->co_tls) {
+	if (state->config->co_tls) {
 		state->tls_cont = TSContCreate(handle_tls, NULL);
 		TSContDataSet(state->tls_cont, state);
 		TSHttpHookAdd(TS_SSL_SNI_HOOK, state->tls_cont);
@@ -122,7 +121,7 @@ struct {
 	/*
 	 * Create remap hook to map incoming requests to pods.
 	 */
-	if (conf->co_remap) {
+	if (state->config->co_remap) {
 		state->remap_cont = TSContCreate(handle_remap, NULL);
 		TSContDataSet(state->remap_cont, state);
 		TSHttpHookAdd(TS_HTTP_READ_REQUEST_HDR_HOOK, state->remap_cont);

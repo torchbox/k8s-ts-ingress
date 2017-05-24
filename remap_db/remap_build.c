@@ -24,12 +24,12 @@ static void build_add_endpoints(remap_db_t *db, namespace_t *ns,
 				const char *port_name);
 
 remap_db_t *
-remap_db_from_cluster(cluster_t *cluster)
+remap_db_from_cluster(k8s_config_t *cfg, cluster_t *cluster)
 {
 namespace_t		*namespace;
 remap_db_t		*db;
 
-	db = remap_db_new();
+	db = remap_db_new(cfg);
 	hash_foreach(cluster->cs_namespaces, NULL, &namespace)
 		build_namespace(db, namespace);
 
@@ -61,13 +61,10 @@ char	*cls;
 	TSDebug("kubernetes", "  ingress %s:", ing->in_name);
 	
 	/*
-	 * Only handle this Ingress if it has no class, or the class is set to
-	 * "trafficserver".
+	 * Check whether we should handle this class.
 	 */
 	if ((cls = hash_get(ing->in_annotations, IN_CLASS)) != NULL) {
-		TSDebug("kubernetes", "ingress class is [%s], we expect [%s]",
-			cls, IN_CLASS_TRAFFICSERVER);
-		if (strcmp(cls, IN_CLASS_TRAFFICSERVER)) 
+		if (hash_get(db->rd_config->co_classes, cls) != HASH_PRESENT)
 			return;
 	}
 

@@ -23,6 +23,11 @@ extern "C" {
 typedef struct hash *hash_t;
 
 /*
+ * If using a hash as a set, this can be used as the value.
+ */
+#define	HASH_PRESENT	((void *)(uintptr_t)-1)
+
+/*
  * Create a new hash table with the specified number of buckets.  The number of
  * items which can be stored in the hash table is not limited by its size, but
  * performance will reduce as the number of items exceeds the size.

@@ -116,7 +116,8 @@ TEST(RemapDB, HostLookup)
 		{ "example.com.otherdomain.com",	nullptr },
 	};
 
-	remap_db_t *db = remap_db_new();
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_new(cfg);
 
 	for (auto &host: hosts)
 		host.second = remap_db_get_or_create_host(db, host.first.c_str());
@@ -125,12 +126,14 @@ TEST(RemapDB, HostLookup)
 		EXPECT_EQ(host.second, remap_db_get_host(db, host.first.c_str()));
 
 	remap_db_free(db);
+	k8s_config_free(cfg);
 }
 
 TEST(RemapDB, Basic)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-basic.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -139,7 +142,7 @@ TEST(RemapDB, Basic)
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -154,13 +157,15 @@ TEST(RemapDB, Basic)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, IngressClass1)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-class1.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -169,14 +174,12 @@ TEST(RemapDB, IngressClass1)
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
-
-	/* Make sure pick_target returns the right host */
 	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("http", res.rz_proto);
@@ -184,13 +187,15 @@ TEST(RemapDB, IngressClass1)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, IngressClass2)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-class2.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -199,7 +204,7 @@ TEST(RemapDB, IngressClass2)
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -209,13 +214,18 @@ TEST(RemapDB, IngressClass2)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
-TEST(RemapDB, ForceTLSRedirect)
+TEST(RemapDB, IngressClass3)
 {
-	cluster_t *cluster = load_test_ingress("tests/ingress-force-tls.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	cluster_t *cluster = load_test_ingress("tests/ingress-class2.json");
+
+	k8s_config_t *cfg = k8s_config_new();
+	cfg_set_ingress_classes(cfg, "nginx");
+
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -224,7 +234,36 @@ TEST(RemapDB, ForceTLSRedirect)
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
-	
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("http", res.rz_proto);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+TEST(RemapDB, ForceTLSRedirect)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-force-tls.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -237,13 +276,15 @@ TEST(RemapDB, ForceTLSRedirect)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AppRoot)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-app-root.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -252,7 +293,7 @@ TEST(RemapDB, AppRoot)
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -264,13 +305,15 @@ TEST(RemapDB, AppRoot)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, RewriteTarget)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-rewrite-target.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -279,7 +322,7 @@ TEST(RemapDB, RewriteTarget)
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -293,13 +336,15 @@ TEST(RemapDB, RewriteTarget)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, SecureBackends)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-secure-backends.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -308,7 +353,7 @@ TEST(RemapDB, SecureBackends)
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -321,13 +366,15 @@ TEST(RemapDB, SecureBackends)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthAddressPermit)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-address.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -342,7 +389,7 @@ TEST(RemapDB, AuthAddressPermit)
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -355,13 +402,15 @@ TEST(RemapDB, AuthAddressPermit)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthAddressDeny)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-address.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -376,7 +425,7 @@ TEST(RemapDB, AuthAddressDeny)
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -386,13 +435,15 @@ TEST(RemapDB, AuthAddressDeny)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthBasicPermit)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-basic.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -408,7 +459,7 @@ TEST(RemapDB, AuthBasicPermit)
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
 	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWludGVzdA==");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -421,13 +472,15 @@ TEST(RemapDB, AuthBasicPermit)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthBasicDenyNoCredentials)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-basic.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -442,7 +495,7 @@ TEST(RemapDB, AuthBasicDenyNoCredentials)
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -452,13 +505,15 @@ TEST(RemapDB, AuthBasicDenyNoCredentials)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthBasicDenyInvalidCredentials)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-basic.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -474,7 +529,7 @@ TEST(RemapDB, AuthBasicDenyInvalidCredentials)
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
 	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWlueHRlc3Q=");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -484,13 +539,15 @@ TEST(RemapDB, AuthBasicDenyInvalidCredentials)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthAllPermit)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-all.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -506,7 +563,7 @@ TEST(RemapDB, AuthAllPermit)
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
 	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWludGVzdA==");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -519,13 +576,15 @@ TEST(RemapDB, AuthAllPermit)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthAllDenyNoCredentials)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-all.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -540,7 +599,7 @@ TEST(RemapDB, AuthAllDenyNoCredentials)
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -550,13 +609,15 @@ TEST(RemapDB, AuthAllDenyNoCredentials)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthAllDenyInvalidCredentials)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-all.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -572,7 +633,7 @@ TEST(RemapDB, AuthAllDenyInvalidCredentials)
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
 	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWlueHRlc3Q=");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -582,13 +643,15 @@ TEST(RemapDB, AuthAllDenyInvalidCredentials)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthAllDenyInvalidAddress)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-all.json");
-	remap_db_t *db = remap_db_from_cluster(cluster);
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
 
 	/* Build a request */
@@ -604,7 +667,7 @@ TEST(RemapDB, AuthAllDenyInvalidAddress)
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
 	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWludGVzdA==");
-	
+
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
 
@@ -614,5 +677,6 @@ TEST(RemapDB, AuthAllDenyInvalidAddress)
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);
+	k8s_config_free(cfg);
 	cluster_free(cluster);
 }

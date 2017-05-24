@@ -18,6 +18,7 @@
 
 #include	<openssl/ssl.h>
 
+#include	"config.h"
 #include	"hash.h"
 #include	"api.h"
 
@@ -111,12 +112,13 @@ void		 remap_host_annotate(remap_host_t *, hash_t);
  * remap_db stores a built remap database, i.e. remap_host objects.
  */
 typedef struct {
-	hash_t	rd_hosts;
+	k8s_config_t	*rd_config;
+	hash_t		 rd_hosts;
 } remap_db_t;
 
 /* create and destroy remap_dbs */
-remap_db_t	*remap_db_new(void);
-remap_db_t	*remap_db_from_cluster(cluster_t *);
+remap_db_t	*remap_db_new(k8s_config_t *cfg);
+remap_db_t	*remap_db_from_cluster(k8s_config_t *cfg, cluster_t *);
 void		 remap_db_free(remap_db_t *);
 
 /* fetch hosts from a remap_db */
