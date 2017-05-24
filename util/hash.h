@@ -87,7 +87,7 @@ int	hash_iterate(hash_t, struct hash_iter_state *iterstate,
 		     const char **key, void **value);
 
 #define hash_foreach(HASH, KEY, VALUE)				\
-	for (struct hash_iter_state __s = {};			\
+	for (struct hash_iter_state __s = {0, NULL};		\
 	     hash_iterate(HASH, &__s, KEY, (void **)VALUE);)
 
 #ifdef __cplusplus

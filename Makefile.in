@@ -66,6 +66,7 @@ API_SRCS=	cluster.c	\
 API_OBJS=	${API_SRCS:.c=.o}
 
 SRCS=		hash.c		\
+		strmatch.c	\
 		config.c	\
 		watcher.c	\
 		synth.c		\
@@ -94,6 +95,7 @@ TEST_OBJS=	gtest-all.o		\
 		gtest_main.o		\
 		base64.o		\
 		hash.o			\
+		strmatch.o		\
 		auth.o			\
 		remap_db.o		\
 		remap_build.o		\

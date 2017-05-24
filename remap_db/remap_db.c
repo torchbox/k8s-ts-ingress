@@ -28,6 +28,7 @@
 #include	"remap.h"
 #include	"auth.h"
 #include	"base64.h"
+#include	"strmatch.h"
 
 static void remap_path_add_users(remap_path_t *, secret_t *);
 
@@ -117,7 +118,7 @@ remap_host_get_default_path(remap_host_t *rh)
 void
 remap_host_annotate(remap_host_t *rh, hash_t annotations)
 {
-const char	*key, *value;
+const char	*key = NULL, *value = NULL;
 
 	/*
 	 * There are two ways we could do this: use hash_get for each annotation
@@ -201,6 +202,8 @@ struct remap_auth_addr	*rip, *nrip;
 	free(rp->rp_rewrite_target);
 	free(rp->rp_auth_realm);
 	hash_free(rp->rp_users);
+	hash_free(rp->rp_whitelist_params);
+	hash_free(rp->rp_ignore_params);
 	regfree(&rp->rp_regex);
 
 	for (rip = rp->rp_auth_addr_list; rip; rip = nrip) {
@@ -282,7 +285,7 @@ truefalse(const char *str)
 void
 remap_path_annotate(namespace_t *ns, remap_path_t *rp, hash_t annotations)
 {
-const char	*key, *value;
+const char	*key = NULL, *value = NULL;
 
 	/*
 	 * There are two ways we could do this: use hash_get for each annotation
@@ -302,6 +305,36 @@ const char	*key, *value;
 		/* cache-generation: set the TS cache generation id */
 		else if (strcmp(key, IN_CACHE_GENERATION) == 0)
 			rp->rp_cache_gen = atoi(value);
+
+		/* cache-ignore-params: query parameters to ignore for cache */
+		else if (strcmp(key, IN_CACHE_IGNORE_PARAMS) == 0) {
+		char	*v = strdup(value);
+		char	*r = NULL, *sr;
+
+			hash_free(rp->rp_ignore_params);
+			rp->rp_ignore_params = hash_new(127, NULL);
+
+			for (r = strtok_r(v, " \t", &sr); r;
+			     r = strtok_r(NULL, " \t", &sr))
+				hash_set(rp->rp_ignore_params, r, HASH_PRESENT);
+
+			free(v);
+		}
+
+		/* cache-whitelist-params: query parameters whitelist for cache */
+		else if (strcmp(key, IN_CACHE_WHITELIST_PARAMS) == 0) {
+		char	*v = strdup(value);
+		char	*r, *sr = NULL;
+
+			hash_free(rp->rp_whitelist_params);
+			rp->rp_whitelist_params = hash_new(127, NULL);
+
+			for (r = strtok_r(v, " \t", &sr); r;
+			     r = strtok_r(NULL, " \t", &sr))
+				hash_set(rp->rp_whitelist_params, r, HASH_PRESENT);
+
+			free(v);
+		}
 
 		/* follow-redirects: if set, TS will resolve 3xx responses itself */
 		else if (strcmp(key, IN_FOLLOW_REDIRECTS) == 0)
@@ -608,6 +641,95 @@ rr_check_auth(const remap_db_t *db, const remap_request_t *req,
 	}
 }
 
+int
+qstrcmp(const void *a, const void *b)
+{
+	return strcmp(*(char **)a, *(char **)b);
+}
+
+int
+keep_parameter(const remap_path_t *path, const char *param)
+{
+const char	*pend;
+	if ((pend = strchr(param, '=')) == NULL)
+		pend = param + strlen(param);
+
+	/* If there's an ignore list, discard anything on it */
+	if (path->rp_ignore_params) {
+	const char	*p = NULL;
+		hash_foreach(path->rp_ignore_params, &p, NULL) {
+			if (strmatch(param, pend, p, p + strlen(p)))
+				return 0;
+		}
+	}
+
+	/* If there's a whitelist, discard anything not on the whitelist */
+	if (path->rp_whitelist_params) {
+	const char	*p = NULL;
+		hash_foreach(path->rp_whitelist_params, &p, NULL) {
+			if (strmatch(param, pend, p, p + strlen(p)))
+				return 1;
+		}
+
+		/* Not on whitelist */
+		return 0;
+	}
+
+	/* Not on ignore list and not rejected by whitelist */
+	return 1;
+}
+
+void
+make_query(const remap_request_t *req, remap_result_t *res)
+{
+char		**params = NULL;
+size_t		  nparams = 0;
+
+char		*sr, *p, *q, *ret;
+size_t		 len = 0;
+
+	q = strdup(req->rr_query);
+
+	/*
+	 * Extract the query parameters we actually want into a hash.
+	 */
+	for (p = strtok_r(q, "&", &sr); p; p = strtok_r(NULL, "&", &sr)) {
+		if (!keep_parameter(res->rz_path, p))
+			continue;
+
+		params = realloc(params, sizeof(char *) * (nparams + 1));
+		params[nparams] = strdup(p);
+		++nparams;
+
+		len += strlen(p) + 1;
+	}
+
+	free(q);
+
+	if (!len) {
+		free(params);
+		return;
+	}
+
+	qsort(params, nparams, sizeof(char *), qstrcmp);
+
+	/* Join the hash back into a query string. */
+	ret = malloc(len + 1);
+	ret[0] = '\0';
+
+	for (size_t i = 0; i < nparams; ++i) {
+		strcat(ret, params[i]);
+		strcat(ret, "&");
+		free(params[i]);
+	}
+
+	if (len)
+		ret[len - 1] = '\0';
+
+	res->rz_query = ret;
+	free(params);
+}
+
 /*
  * Remap a request.
  */
@@ -664,7 +786,14 @@ size_t	 pfxsz;
 		snprintf(ret->rz_urlpath, blen, "%s%s",
 			 ret->rz_path->rp_rewrite_target,
 			 req->rr_path + pfxsz);
+	} else {
+		if (req->rr_path)
+			ret->rz_urlpath = strdup(req->rr_path);
 	}
+
+	/* Set query string */
+	if (req->rr_query)
+		make_query(req, ret);
 
 	/* Set backend protocol */
 	if ((r = rr_check_proto(db, req, ret)) != RR_OK)
@@ -698,4 +827,50 @@ remap_result_free(remap_result_t *rz)
 {
 	free(rz->rz_location);
 	free(rz->rz_urlpath);
+	free(rz->rz_query);
+}
+
+void
+remap_make_cache_key(remap_request_t *req, remap_result_t *res,
+		     char **key, size_t *keylen)
+{	
+uint8_t		 protolen, hostlen;
+uint16_t	 pathlen = 0, querylen = 0;
+char		*p;
+
+	*keylen = 0;
+
+	protolen = (uint8_t) strlen(req->rr_proto);
+	hostlen = (uint8_t) strlen(req->rr_host);
+
+	*keylen += 1 + protolen + 1 + hostlen;
+
+	if (req->rr_path)
+		pathlen = (uint16_t) strlen(req->rr_path);
+	if (res->rz_query)
+		querylen = (uint16_t) strlen(res->rz_query);
+
+	*keylen += 2 + pathlen + 2 + querylen;
+
+	p = *key = malloc(*keylen);
+
+	*p++ = protolen;
+	memcpy(p, req->rr_proto, protolen);
+	p += protolen;
+
+	*p++ = hostlen;
+	memcpy(p, req->rr_host, hostlen);
+	p += hostlen;
+
+	*p++ = pathlen & 0xFF;
+	*p++ = (pathlen >> 8) & 0xFF;
+	if (req->rr_path)
+		memcpy(p, req->rr_path, pathlen);
+	p += pathlen;
+
+	*p++ = querylen & 0xFF;
+	*p++ = (querylen >> 8) & 0xFF;
+	if (res->rz_query)
+		memcpy(p, res->rz_query, querylen);
+	p += querylen;
 }

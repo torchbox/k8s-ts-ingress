@@ -260,15 +260,10 @@ TSMLoc		hdrs, newurl;
 	TSUrlCreate(reqp, &newurl);
 	TSUrlSchemeSet(reqp, newurl, res->rz_proto, -1);
 
-	if (res->rz_urlpath)
-		TSUrlPathSet(reqp, newurl, res->rz_urlpath, -1);
-	else
-		TSUrlPathSet(reqp, newurl, req->rr_path, -1);
+	TSUrlPathSet(reqp, newurl, res->rz_urlpath, -1);
 
 	if (res->rz_query)
 		TSUrlHttpParamsSet(reqp, newurl, res->rz_query, -1);
-	else
-		TSUrlHttpParamsSet(reqp, newurl, req->rr_query, -1);
 
 	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
 	return newurl;
@@ -479,6 +474,18 @@ int			 reenable = 1;
 	/* Add an X-Forwarded-Proto header, if configured */
 	if (state->config->co_xfp)
 		add_xfp(txnp);
+
+	/*
+	 * If caching is enabled on this path, set the effective cache URL.
+	 */
+	if (res.rz_path->rp_cache) {
+	char	*cacheurl;
+	size_t	 urllen;
+
+		remap_make_cache_key(&req, &res, &cacheurl, &urllen);
+		TSCacheUrlSet(txnp, cacheurl, urllen);
+		free(cacheurl);
+	}
 
 	/*
 	 * We already remapped this request, so skip any further remapping.

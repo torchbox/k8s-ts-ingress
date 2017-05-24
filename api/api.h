@@ -120,6 +120,8 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_HSTS_MAX_AGE			A_TORCHBOX "hsts-max-age"
 #define	IN_CACHE_ENABLE			A_TORCHBOX "cache-enable"
 #define	IN_CACHE_GENERATION		A_TORCHBOX "cache-generation"
+#define	IN_CACHE_IGNORE_PARAMS		A_TORCHBOX "cache-ignore-params"
+#define	IN_CACHE_WHITELIST_PARAMS	A_TORCHBOX "cache-whitelist-params"
 #define	IN_PRESERVE_HOST		A_TORCHBOX "preserve-host"
 #define	IN_FOLLOW_REDIRECTS		A_TORCHBOX "follow-redirects"
 #define	IN_AUTH_SATISFY			A_TORCHBOX "auth-satisfy"

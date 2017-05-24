@@ -82,6 +82,8 @@ typedef struct {
 	uint	  rp_auth_type:2;
 	uint	  rp_auth_satisfy:1;
 	char	 *rp_auth_realm;
+	hash_t	  rp_ignore_params;
+	hash_t	  rp_whitelist_params;
 
 	struct remap_auth_addr *rp_auth_addr_list;
 } remap_path_t;
@@ -194,6 +196,11 @@ int	remap_run(const remap_db_t *db, const remap_request_t *,
 void	remap_request_free(remap_request_t *);
 void	remap_result_free(remap_result_t *);
 
+/*
+ * Create a Traffic Server cache key for the given request.
+ */
+void	remap_make_cache_key(remap_request_t *, remap_result_t *,
+			     char **, size_t *);
 #ifdef __cplusplus
 }
 #endif

@@ -743,3 +743,166 @@ TEST(RemapDB, AuthAllDenyInvalidAddress)
 	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
+
+TEST(RemapDB, QueryString)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-basic.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	req.rr_query = strdup("a=1&b=2&c=3");
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+
+	/* Make sure pick_target returns the right host */
+	EXPECT_STREQ(res.rz_query, "a=1&b=2&c=3");
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, QueryStringIgnore)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-ignore-params.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	req.rr_query = strdup("foo=1&bar=2&baz=3&quux=4&xyzzy=5");
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+
+	/* Make sure pick_target returns the right host */
+	EXPECT_STREQ(res.rz_query, "quux=4&xyzzy=5");
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, QueryStringWhitelist)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-whitelist-params.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	req.rr_query = strdup("foo=x&bar=2&baz=3&quux=4&xyzzy=5");
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+
+	/* Make sure pick_target returns the right host */
+	EXPECT_STREQ(res.rz_query, "quux=4&xyzzy=5");
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, QueryStringIgnoreAndWhitelist)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-ignore-whitelist-params.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	req.rr_query = strdup("fox=x&bar=2&bax=3&quux=4&xyzzy=5");
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+
+	/* Make sure pick_target returns the right host */
+	EXPECT_STREQ(res.rz_query, "quux=4&xyzzy=5");
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, CacheKey)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-ignore-whitelist-params.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("what/ever");
+	req.rr_query = strdup("fox=x&bar=2&bax=3&quux=4&xyzzy=5");
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+
+	/* Make sure pick_target returns the right host */
+	EXPECT_STREQ(res.rz_query, "quux=4&xyzzy=5");
+
+	char *cachekey;
+	size_t keysize;
+	remap_make_cache_key(&req, &res, &cachekey, &keysize);
+	EXPECT_EQ(55u, keysize);
+	EXPECT_TRUE(memcmp(cachekey,
+		"\004http\026echoheaders.gce.t6x.uk\011\000what/ever\016\000quux=4&xyzzy=5", keysize) == 0);
+
+	free(cachekey);
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
