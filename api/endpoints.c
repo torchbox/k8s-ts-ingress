@@ -133,7 +133,7 @@ size_t			 i, j;
 		    && json_object_is_type(addresses, json_type_array)) {
 
 			eps->ep_subsets[i].es_naddrs = 
-				json_object_array_length(ports);
+				json_object_array_length(addresses);
 			eps->ep_subsets[i].es_addrs = calloc(
 						eps->ep_subsets[i].es_naddrs,
 						sizeof(endpoints_address_t));

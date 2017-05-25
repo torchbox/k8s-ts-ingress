@@ -548,6 +548,8 @@ Release history
     * Bug fix: with some combinations of Traffic Server and OpenSSL versions,
                TLS certificates might not be loaded correctly.  Use the new
                TS_SSL_CERT_HOOK hook to ensure this works properly in all cases.
+    * Bug fix: An Endpoints with more than one port or address could be parsed
+               incorrectly or cause a crash.
 * 1.0.0-alpha4:
     * Do not return a client error if the requested host or path was not
       found, to allow use with other plugins like healthchecks.
