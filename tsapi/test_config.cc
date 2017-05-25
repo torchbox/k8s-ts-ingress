@@ -32,6 +32,7 @@ TEST(Config, Load)
 	EXPECT_STREQ("/path/to/kube-prod.key", cfg->co_tls_keyfile);
 	EXPECT_EQ(static_cast<const char *>(nullptr), cfg->co_token);
 	EXPECT_EQ(1, cfg->co_tls);
+	EXPECT_EQ(1, cfg->co_tls_verify);
 	EXPECT_EQ(0, cfg->co_remap);	
 
 	k8s_config_free(cfg);
@@ -42,6 +43,7 @@ TEST(Config, Load)
 	setenv("TS_KEYFILE", "/other/keyfile.pem", 1);
 	setenv("TS_TOKEN", "WXYZ9876", 1);
 	setenv("TS_TLS", "false", 1);
+	setenv("TS_TLS_VERIFY", "false", 1);
 	setenv("TS_REMAP", "true", 1);
 
 	cfg = k8s_config_load("tests/kubernetes.config");
@@ -53,6 +55,7 @@ TEST(Config, Load)
 	EXPECT_STREQ("/other/keyfile.pem", cfg->co_tls_keyfile);
 	EXPECT_EQ(static_cast<const char *>(nullptr), cfg->co_token);
 	EXPECT_EQ(0, cfg->co_tls);
+	EXPECT_EQ(0, cfg->co_tls_verify);
 	EXPECT_EQ(1, cfg->co_remap);	
 
 	k8s_config_free(cfg);

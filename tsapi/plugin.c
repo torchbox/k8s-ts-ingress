@@ -17,6 +17,7 @@
 #include	<string.h>
 
 #include	<json.h>
+#include	<curl/curl.h>
 #include	<ts/ts.h>
 
 #include	"hash.h"
@@ -58,6 +59,8 @@ struct {
 
 	SSL_library_init();
 	SSL_load_error_strings();
+
+	curl_global_init(CURL_GLOBAL_ALL);
 
 	if ((state = calloc(1, sizeof(*state))) == NULL) {
 		TSError("[kubernetes] cannot create state: %s",

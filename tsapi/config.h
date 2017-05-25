@@ -28,6 +28,7 @@ typedef struct k8s_config {
 	char	*co_tls_certfile;
 	char	*co_tls_keyfile;
 	char	*co_tls_cafile;
+	int	 co_tls_verify;
 	char	*co_token;
 	int	 co_tls;
 	int	 co_remap;

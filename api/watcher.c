@@ -111,11 +111,12 @@ struct curl_slist	*hdrs = NULL;
 				 wt->wt_config->co_tls_keyfile);
 	}
 
-	if (wt->wt_config->co_tls_cafile) {
+	if (wt->wt_config->co_tls_cafile)
 		curl_easy_setopt(wt->wt_curl, CURLOPT_CAINFO,
 				 wt->wt_config->co_tls_cafile);
+
+	if (wt->wt_config->co_tls_verify)
 		curl_easy_setopt(wt->wt_curl, CURLOPT_SSL_VERIFYPEER, 1L);
-	}
 
 	curl_easy_setopt(wt->wt_curl, CURLOPT_WRITEFUNCTION,
 			 watcher_handle_read);

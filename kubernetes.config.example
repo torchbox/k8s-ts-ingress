@@ -29,6 +29,11 @@ keyfile: /mnt/c/Users/ft/.kube/kube-prod.key
 # (Environment: $TS_TOKEN.)
 #token: ABCD1234
 
+# If true (the default), the TLS server certificate of the API server will be
+# verified.  This is strongly recommended and there should be no reason to
+# disable it.  (Environment: $TS_VERIFY_TLS.)
+#verify_tls: true
+
 # If you want to change the default ingress class(es), set this.
 # (Environment: $TS_INGRESS_CLASSES.)
 #ingress_classes: trafficserver nginx

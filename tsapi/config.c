@@ -59,6 +59,7 @@ k8s_config_t	*ret;
 	ret->co_tls = 1;
 	ret->co_remap = 1;
 	ret->co_xfp = 1;
+	ret->co_tls_verify = 1;
 
 	cfg_set_ingress_classes(ret, "trafficserver");
 	return ret;
@@ -158,6 +159,16 @@ int		 lineno = 0;
 					file, lineno);
 				goto error;
 			}
+		} else if (strcmp(opt, "tls_verify") == 0) {
+			if (strcmp(value, "true") == 0)
+				ret->co_tls_verify = 1;
+			else if (strcmp(value, "false") == 0)
+				ret->co_tls_verify = 0;
+			else {
+				TSError("%s:%d: expected \"true\" or \"false\"",
+					file, lineno);
+				goto error;
+			}
 		} else if (strcmp(opt, "remap") == 0) {
 			if (strcmp(value, "true") == 0)
 				ret->co_remap = 1;
@@ -219,6 +230,18 @@ int		 lineno = 0;
 			ret->co_tls = 0;
 		else {
 			TSError("$TS_TLS: expected \"true\" or \"false\","
+				" not \"%s\"", s);
+			goto error;
+		}
+	}
+
+	if ((s = getenv("TS_TLS_VERIFY")) != NULL) {
+		if (strcmp(s, "true") == 0)
+			ret->co_tls_verify = 1;
+		else if (strcmp(s, "false") == 0)
+			ret->co_tls_verify = 0;
+		else {
+			TSError("$TS_TLS_VERIFY: expected \"true\" or \"false\","
 				" not \"%s\"", s);
 			goto error;
 		}
