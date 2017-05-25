@@ -91,6 +91,7 @@ Requirements:
 * Traffic Server 7.0 or later (including development headers).
 * A working C99 compiler and `make` utility.
 * json-c library
+* cURL library
 * OpenSSL (or a compatible TLS library, e.g. LibreSSL)
 
 Build and install the plugin:
@@ -541,16 +542,18 @@ Release history
 * 1.0.0-alpha5 (unreleased):
     * Feature: Support Ingress classes.
     * Feature: The X-Forwarded-Proto header is now (optionally) sent to the
-               backend.
+        backend.
     * Feature: The `cache-whitelist-params` and `cache-ignore-params`
-               annotations were implemented.
+        annotations were implemented.
+    * Improvement: The API server connection code was reimplemented using cURL,
+        making it more reliable and featureful.
     * Bug fix: TLS redirects with an empty URL path could crash.
     * Bug fix: TLS secret handling could leak memory.
     * Bug fix: with some combinations of Traffic Server and OpenSSL versions,
-               TLS certificates might not be loaded correctly.  Use the new
-               TS_SSL_CERT_HOOK hook to ensure this works properly in all cases.
+        TLS certificates might not be loaded correctly.  Use the new
+        TS_SSL_CERT_HOOK hook to ensure this works properly in all cases.
     * Bug fix: An Endpoints with more than one port or address could be parsed
-               incorrectly or cause a crash.
+        incorrectly or cause a crash.
 * 1.0.0-alpha4:
     * Do not return a client error if the requested host or path was not
       found, to allow use with other plugins like healthchecks.

@@ -26,8 +26,7 @@ TEST(Config, Load)
 	cfg = k8s_config_load("tests/kubernetes.config");
 	ASSERT_NE(static_cast<k8s_config_t *>(nullptr), cfg);
 
-	EXPECT_STREQ("apiserver.mycluster.com", cfg->co_host);
-	EXPECT_EQ(8443, cfg->co_port);
+	EXPECT_STREQ("https://apiserver.mycluster.com:8443", cfg->co_server);
 	EXPECT_STREQ("/path/to/kube-prod.ca", cfg->co_tls_cafile);
 	EXPECT_STREQ("/path/to/kube-prod.crt", cfg->co_tls_certfile);
 	EXPECT_STREQ("/path/to/kube-prod.key", cfg->co_tls_keyfile);
@@ -37,7 +36,7 @@ TEST(Config, Load)
 
 	k8s_config_free(cfg);
 
-	setenv("TS_SERVER", "other.apiserver.com:7432", 1);
+	setenv("TS_SERVER", "https://other.apiserver.com:7432", 1);
 	setenv("TS_CAFILE", "/other/cafile.pem", 1);
 	setenv("TS_CERTFILE", "/other/certfile.pem", 1);
 	setenv("TS_KEYFILE", "/other/keyfile.pem", 1);
@@ -48,8 +47,7 @@ TEST(Config, Load)
 	cfg = k8s_config_load("tests/kubernetes.config");
 	ASSERT_NE(static_cast<k8s_config_t *>(nullptr), cfg);
 
-	EXPECT_STREQ("other.apiserver.com", cfg->co_host);
-	EXPECT_EQ(7432, cfg->co_port);
+	EXPECT_STREQ("https://other.apiserver.com:7432", cfg->co_server);
 	EXPECT_STREQ("/other/cafile.pem", cfg->co_tls_cafile);
 	EXPECT_STREQ("/other/certfile.pem", cfg->co_tls_certfile);
 	EXPECT_STREQ("/other/keyfile.pem", cfg->co_tls_keyfile);

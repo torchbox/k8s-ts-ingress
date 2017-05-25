@@ -24,7 +24,7 @@ k8s_config_free(k8s_config_t *cfg)
 	if (!cfg)
 		return;
 
-	free(cfg->co_host);
+	free(cfg->co_server);
 	free(cfg->co_tls_certfile);
 	free(cfg->co_tls_keyfile);
 	free(cfg->co_tls_cafile);
@@ -58,7 +58,6 @@ k8s_config_t	*ret;
 
 	ret->co_tls = 1;
 	ret->co_remap = 1;
-	ret->co_port = 443;
 	ret->co_xfp = 1;
 
 	cfg_set_ingress_classes(ret, "trafficserver");
@@ -81,17 +80,22 @@ int		 lineno = 0;
 	 */
 	if ((f = fopen(SA_TOKEN_FILE, "r")) != NULL) {
 		if (fgets(line, sizeof(line), f) != NULL) {
-		char	*e;
+		char	*host, *port;
+
 			while (strchr("\r\n", line[strlen(line) - 1]))
 				line[strlen(line) - 1] = '\0';
 
 			ret->co_token = strdup(line);
-			if ((e = getenv("KUBERNETES_SERVICE_HOST")) != NULL)
-				ret->co_host = strdup(e);
-			else
-				ret->co_host = strdup("kubernetes.default.svc");
-			if ((e = getenv("KUBERNETES_SERVICE_PORT")) != NULL)
-				ret->co_port = atoi(e);
+
+			host = getenv("KUBERNETES_SERVICE_HOST");
+			port = getenv("KUBERNETES_SERVICE_PORT");
+
+			if (host && port) {
+			char	 buf[256];
+				snprintf(buf, sizeof(buf), "https://%s:%s",
+					 host, port);
+				ret->co_server = strdup(buf);
+			}
 		}
 
 		fclose(f);
@@ -130,14 +134,8 @@ int		 lineno = 0;
 			value++;
 
 		if (strcmp(opt, "server") == 0) {
-		char	*port;
-			free(ret->co_host);
-			ret->co_host = strdup(value);
-			if ((port = strchr(ret->co_host, ':')) != NULL) {
-				*port++ = '\0';
-				ret->co_port = atoi(port);
-			} else
-				ret->co_port = 443;
+			free(ret->co_server);
+			ret->co_server = strdup(value);
 		} else if (strcmp(opt, "token") == 0) {
 			free(ret->co_token);
 			ret->co_token = strdup(value);
@@ -190,14 +188,8 @@ int		 lineno = 0;
 	}
 
 	if ((s = getenv("TS_SERVER")) != NULL) {
-	char	*port;
-		free(ret->co_host);
-		ret->co_host = strdup(s);
-		if ((port = strchr(ret->co_host, ':')) != NULL) {
-			*port++ = '\0';
-			ret->co_port = atoi(port);
-		} else
-			ret->co_port = 443;
+		free(ret->co_server);
+		ret->co_server = strdup(s);
 	}
 
 	if ((s = getenv("TS_CAFILE")) != NULL) {
@@ -262,13 +254,7 @@ int		 lineno = 0;
 		goto error;
 	}
 
-	if (!ret->co_token && !ret->co_tls_keyfile) {
-		TSError("%s: must specify either (keyfile, certfile) or token",
-			file);
-		goto error;
-	}
-
-	if (!ret->co_host) {
+	if (!ret->co_server) {
 		TSError("%s: must specify server", file);
 		goto error;
 	}

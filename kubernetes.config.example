@@ -8,9 +8,13 @@
 # This is required when running outside the cluster, but not necessary when
 # running in-cluster; the pod's service account will be used by default.
 
-# Set the hostname and port of the API server to connect to.  Only TLS (https)
-# connections are supported.  (Environment variable: $TS_SERVER.)
-server: apiserver.mycluster.com:8443
+# Set the URL of the Kubernetes API server.  (Environment variable: $TS_SERVER.)
+#
+# To re-use existing kubectl credentials, you can run "kubectl proxy" and use
+# http://localhost:8001 as the server.  In that case, do not configure a TLS
+# certificate or token.
+#
+server: https://apiserver.mycluster.com:8443
 
 # Optional (but recommended): configure the certificate authority to verify the
 # API server connection.  (Environment: $TS_CAFILE.)

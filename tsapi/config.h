@@ -24,8 +24,7 @@ extern "C" {
 #define SA_CACERT_FILE	"/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
 typedef struct k8s_config {
-	char	*co_host;
-	int	 co_port;
+	char	*co_server;
 	char	*co_tls_certfile;
 	char	*co_tls_keyfile;
 	char	*co_tls_cafile;

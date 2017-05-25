@@ -161,7 +161,6 @@ EVP_PKEY	*key = NULL;
 		X509_free(cert); cert = NULL;
 	}
 
-	X509_free(cert); cert = NULL;
 	BIO_free(bio); bio = NULL;
 	free(certstr); certstr = NULL;
 

@@ -68,4 +68,8 @@ ACX_PTHREAD
 AC_CHECK_LIB(ssl, SSL_CTX_new, [], [AC_ERROR([could not find OpenSSL])])
 AC_CHECK_LIB(crypto, MD5_Update, [], [AC_ERROR([could not find OpenSSL])])
 
+LIBCURL_CHECK_CONFIG([], [], [], [
+	AC_MSG_ERROR([libcurl is required to build])
+])
+
 AC_OUTPUT(Makefile)

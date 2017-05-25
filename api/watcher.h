@@ -25,6 +25,7 @@ typedef enum {
 typedef void (*watcher_callback_t) (watcher_t, wt_event_type_t, json_object *, void *);
 
 watcher_t	watcher_create(struct k8s_config *, const char *resource);
+void		watcher_free(watcher_t);
 int		watcher_run(watcher_t, int);
 void		watcher_set_callback(watcher_t, watcher_callback_t, void *);
 int		watcher_set_client_tls(watcher_t, const char *keyfile, const char *certfile);

@@ -142,11 +142,13 @@ secret_t		*secret;
 		if (!secret)
 			continue;
 
+#if 0
 		if ((rh->rh_ctx = secret_make_ssl_ctx(secret)) == NULL) {
 			TSDebug("kubernetes", "      %s: can't make ctx",
 				hostname);
 			continue;
 		}
+#endif
 		TSDebug("kubernetes", "      %s: added with CTX[%p]",
 			hostname, rh->rh_ctx);
 	}
