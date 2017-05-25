@@ -15,6 +15,7 @@
 #include	<ts/ts.h>
 
 #include	"api.h"
+#include	"base64.h"
 
 void
 secret_free(secret_t *secret)
@@ -98,24 +99,32 @@ SSL_CTX *
 secret_make_ssl_ctx(secret_t *secret)
 {
 SSL_CTX		*ctx = NULL;
-const char	*certstr, *keystr;
-BIO		*cert_bio = NULL, *key_bio = NULL, *tmp_bio;
-X509		*cert;
-EVP_PKEY	*key;
-char		 buf[1024];
-int		 n;
+const char	*certb64, *keyb64;
+unsigned char	*certstr = NULL, *keystr = NULL;
+size_t		 certlen, keylen;
+BIO		*bio = NULL;
+X509		*cert = NULL;
+EVP_PKEY	*key = NULL;
 
-	if ((certstr = hash_get(secret->se_data, "tls.crt")) == NULL) {
+	if ((certb64 = hash_get(secret->se_data, "tls.crt")) == NULL) {
 		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: no cert",
 			secret->se_namespace, secret->se_name);
 		return NULL;
 	}
 
-	if ((keystr = hash_get(secret->se_data, "tls.key")) == NULL) {
+	certlen = strlen(certb64);
+	certstr = malloc(base64_decode_len(certlen));
+	certlen = base64_decode(certb64, certlen, certstr);
+
+	if ((keyb64 = hash_get(secret->se_data, "tls.key")) == NULL) {
 		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: no key",
 			secret->se_namespace, secret->se_name);
 		return NULL;
 	}
+
+	keylen = strlen(keyb64);
+	keystr = malloc(base64_decode_len(keylen));
+	keylen = base64_decode(keyb64, keylen, keystr);
 
 	if ((ctx = (SSL_CTX *)TSSslServerContextCreate()) == NULL) {
 		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: SSL_CTX_new failed",
@@ -123,21 +132,9 @@ int		 n;
 		goto error;
 	}
 
-	if ((tmp_bio = BIO_new_mem_buf((char *)certstr, -1)) == NULL) {
-		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: BIO_new failed",
-			secret->se_namespace, secret->se_name);
-		goto error;
-	}
+	bio = BIO_new_mem_buf(certstr, certlen);
 
-	tmp_bio = BIO_push(BIO_new(BIO_f_base64()), tmp_bio);
-	BIO_set_flags(tmp_bio, BIO_FLAGS_BASE64_NO_NL);
-
-	cert_bio = BIO_new(BIO_s_mem());
-	while ((n = BIO_read(tmp_bio, buf, sizeof(buf))) > 0)
-		BIO_write(cert_bio, buf, n);
-	BIO_free(tmp_bio);
-
-	if ((cert = PEM_read_bio_X509(cert_bio, NULL, NULL, NULL)) == NULL) {
+	if ((cert = PEM_read_bio_X509(bio, NULL, NULL, NULL)) == NULL) {
 	char	*err = _k8s_get_ssl_error();
 		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: "
 			"PEM_read_bio_X509_AUX failed: %s",
@@ -147,60 +144,59 @@ int		 n;
 	}
 
 	if (SSL_CTX_use_certificate(ctx, cert) != 1) {
-		X509_free(cert);
 		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: "
 			"SSL_CTX_use_certificate failed",
 			secret->se_namespace, secret->se_name);
 		goto error;
 	}
+	X509_free(cert); cert = NULL;
 
-	while ((cert = PEM_read_bio_X509(cert_bio, NULL, NULL, NULL)) != NULL) {
+	while ((cert = PEM_read_bio_X509(bio, NULL, NULL, NULL)) != NULL) {
 		if (SSL_CTX_add_extra_chain_cert(ctx, cert) != 1) {
 			TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: "
 				"SSL_CTX_add_extra_chain_cert failed",
 				secret->se_namespace, secret->se_name);
 			goto error;
 		}
+		X509_free(cert); cert = NULL;
 	}
 
-	BIO_free(cert_bio);
-	cert_bio = NULL;
+	X509_free(cert); cert = NULL;
+	BIO_free(bio); bio = NULL;
+	free(certstr); certstr = NULL;
 
-	if ((tmp_bio = BIO_new_mem_buf((char *)keystr, -1)) == NULL) {
-		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: BIO_new failed",
+	bio = BIO_new_mem_buf(keystr, keylen);
+
+	if ((key = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL)) == NULL) {
+		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: "
+			"PEM_read_bio_PrivateKey failed",
 			secret->se_namespace, secret->se_name);
 		goto error;
 	}
 
-	tmp_bio = BIO_push(BIO_new(BIO_f_base64()), tmp_bio);
-	BIO_set_flags(tmp_bio, BIO_FLAGS_BASE64_NO_NL);
-
-	key_bio = BIO_new(BIO_s_mem());
-	while ((n = BIO_read(tmp_bio, buf, sizeof(buf))) > 0)
-		BIO_write(key_bio, buf, n);
-	BIO_free(tmp_bio);
-
-	if ((key = PEM_read_bio_PrivateKey(key_bio, NULL, NULL, NULL)) == NULL) {
-		TSError("[kubernetes_tls] cannot read private key");
-		goto error;
-	}
-
 	if (SSL_CTX_use_PrivateKey(ctx, key) != 1) {
-		EVP_PKEY_free(key);
 		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: "
 			"SSL_CTX_use_PrivateKey failed",
 			secret->se_namespace, secret->se_name);
 		goto error;
 	}
 
+	EVP_PKEY_free(key); key = NULL;
+	BIO_free(bio); bio = NULL;
+	free(keystr); keystr = NULL;
+
 	return ctx;
 
 error:
-    if (cert_bio)
-        BIO_free(cert_bio);
-    if (key_bio)
-        BIO_free(key_bio);
-    if (ctx)
-        SSL_CTX_free(ctx);
-    return NULL;
+	free(certstr);
+	free(keystr);
+	if (cert)
+		X509_free(cert);
+	if (key)
+		EVP_PKEY_free(key);
+	if (bio)
+		BIO_free(bio);
+	if (ctx)
+		SSL_CTX_free(ctx);
+	return NULL;
 }

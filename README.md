@@ -545,6 +545,7 @@ Release history
     * Feature: The `cache-whitelist-params` and `cache-ignore-params`
                annotations were implemented.
     * Bug fix: TLS redirects with an empty URL path could crash.
+    * Bug fix: TLS secret handling could leak memory.
     * Bug fix: with some combinations of Traffic Server and OpenSSL versions,
                TLS certificates might not be loaded correctly.  Use the new
                TS_SSL_CERT_HOOK hook to ensure this works properly in all cases.
