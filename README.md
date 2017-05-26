@@ -109,6 +109,12 @@ Optionally, run the test suite (requires a C++11 compiler):
 $ make test
 ```
 
+To run the end-to-end tests (requires Linux/amd64):
+
+```
+$ tests/e2erun.sh
+```
+
 Configuration
 -------------
 
