@@ -144,9 +144,10 @@ install_ts() {
 		if [ $TS_AUTORECONF = true ]; then
 			autoreconf -if >log 2>&1 || (cat log; exit 1)
 		fi
-		./configure --prefix=$idir --enable-asan >log 2>&1 || (cat log; exit 1)
-		make >log 2>&1 || (cat log; exit 1)
-		make install >log 2>&1 || (cat log; exit 1)
+		./configure --prefix=$idir --enable-asan >>$TESTDIR/log 2>&1 || \
+			(cat $TESTDIR/log; exit 1)
+		make >>$TESTDIR/log 2>&1 || (cat $TESTDIR/log; exit 1)
+		make install >>$TESTDIR/log 2>&1 || (cat $TESTDIR/log; exit 1)
 	)
 }
 
@@ -157,9 +158,9 @@ install_plugin() {
 		rm -rf _testbuild
 		mkdir _testbuild
 		cd _testbuild
-		../configure --with-tsxs=$idir/bin/tsxs >$TESTDIR/blog 2>&1 \
-			|| (cat $TESTDIR/blog; exit 1)
-		make >$TESTDIR/blog 2>&1 || (cat $TESTDIR/blog; exit 1)
+		../configure --with-tsxs=$idir/bin/tsxs >>$TESTDIR/log 2>&1 \
+			|| (cat $TESTDIR/log; exit 1)
+		make >>$TESTDIR/log 2>&1 || (cat $TESTDIR/log; exit 1)
 		cp kubernetes.so $idir/libexec/trafficserver/
 		cd ..
 		rm -rf _testbuild

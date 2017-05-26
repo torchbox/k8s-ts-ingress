@@ -117,7 +117,7 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_CLASS_TRAFFICSERVER		"trafficserver"
 
 /* Ingress annotations - Torchbox */
-#define IN_HSTS_INCLUDE_SUBDOMAINS	A_TORCHBOX "hsts-include-subdomains"
+#define	IN_HSTS_INCLUDE_SUBDOMAINS	A_TORCHBOX "hsts-include-subdomains"
 #define	IN_HSTS_MAX_AGE			A_TORCHBOX "hsts-max-age"
 #define	IN_CACHE_ENABLE			A_TORCHBOX "cache-enable"
 #define	IN_CACHE_GENERATION		A_TORCHBOX "cache-generation"

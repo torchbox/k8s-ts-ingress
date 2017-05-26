@@ -5,8 +5,6 @@
 # and makes no attempt to validate its input or conform to any HTTP
 # specification.
 
-set -x 
-
 # Travis-CI won't let us remove netcat-openbsd, so instead check for the
 # normal version explicitly.
 NETCAT=nc
