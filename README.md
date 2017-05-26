@@ -49,7 +49,7 @@ Using the Docker image
 We provide a pre-built version of Traffic Server, including the plugin.  If you
 use this pre-built image, you do not need to build the plugin manually.
 
-Current image: `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha4`
+Current image: `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha5`
 
 Deploying the Docker image on Kubernetes
 ----------------------------------------
