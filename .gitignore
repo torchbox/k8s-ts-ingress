@@ -24,4 +24,5 @@
 /release.tar.gz
 /k8s-ts-ingress-*
 /test
+/_test
 /configure
