@@ -57,7 +57,6 @@ release:
 	@ls -oh k8s-ts-ingress-${VERSION}.tar.gz
 
 docs:
-	mkdocs build
-	mkdocs gh-deploy
+	mkdocs gh-deploy --clean
 
 .PHONY: docker-build docker-push release docs
