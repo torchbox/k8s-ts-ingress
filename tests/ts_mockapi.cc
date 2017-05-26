@@ -40,7 +40,7 @@ va_list	args;
 	++ts_api_errors;
 }
 
-void 
+void
 TSDebug(char const *tag, char const *fmt, ...)
 {
 }
@@ -50,6 +50,13 @@ TSSslContextDestroy(TSSslContext ctx)
 {
 	SSL_CTX *sslctx = reinterpret_cast<SSL_CTX *>(ctx);
 	SSL_CTX_free(sslctx);
+}
+
+const char *
+TSConfigDirGet(void)
+{
+	/* Not actually used for anything in tests. */
+	return "/usr/local/etc";
 }
 
 TSSslContext
