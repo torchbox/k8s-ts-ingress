@@ -196,8 +196,6 @@ const char	*cs;
 char		*s;
 int		 len;
 
-	bzero(req, sizeof(*req));
-
 	/* Fetch the request and the URL. */
 	TSHttpTxnClientReqGet(txnp, &reqp, &hdrs);
 	TSHttpHdrUrlGet(reqp, hdrs, &url);
@@ -350,6 +348,9 @@ remap_result_t		 res;
 synth_t			*sy;
 struct sockaddr_in	 addr;
 int			 reenable = 1;
+
+	bzero(&req, sizeof(req));
+	bzero(&res, sizeof(res));
 
 	map_cfg = TSConfigGet(state->cfg_slot);
 	db = TSConfigDataGet(map_cfg);

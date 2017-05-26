@@ -549,6 +549,9 @@ frame, or ever.
   removed from TS core in some later release)
 * Per-Ingress timeout configuration
 * HTTP/2 server push
+* Custom error bodies
+* Improve API watch support by first retrieving all objects, then watching with
+  resourceVersion.
 
 Support
 -------
