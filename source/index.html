@@ -100,6 +100,13 @@
     </li>
 
         
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../config/">Configuration</a>
+        
+    </li>
+
+        
     </ul>
 <li>
           
@@ -197,6 +204,9 @@ instead.</p>
 <li>cURL library</li>
 <li>OpenSSL (or a compatible TLS library, e.g. LibreSSL)</li>
 </ul>
+<p>If you want to run the unit tests, a C++11 compiler is required.  If you want to
+run the end-to-end tests, a Linux/amd64 host is required (because those tests
+require running the Kubernetes API server).</p>
 <h2 id="building">Building</h2>
 <p>To build and install the plugin:</p>
 <pre><code class="sh">$ autoreconf -if            # only if building from a git checkout
@@ -207,15 +217,18 @@ $ make install
 
 <p>This will put <code>kubernetes.so</code> in your Traffic Server plugins directory.  Edit
 <code>plugin.config</code> to tell Traffic Server to load the plugin.</p>
-<h2 id="configuration">Configuration</h2>
-<p>If Traffic Server is not running inside the cluster, you will need to provide a
-configuration file.  Copy <code>kubernetes.config.example</code> to the Traffic Server
-configuration directory, rename it to <code>kubernetes.config</code>, and edit it as
-appropriate.</p>
-<p>You will need to tell the plugin to load the configuration file in <code>plugin.config</code>:</p>
-<pre><code>kubernetes.so kubernetes.conf
+<p>To run the unit tests:</p>
+<pre><code class="sh">$ make test
 </code></pre>
 
+<p>To run the end-to-end tests:</p>
+<pre><code class="sh">$ tests/e2erun.sh
+</code></pre>
+
+<h2 id="configuration">Configuration</h2>
+<p>If Traffic Server is not running inside the cluster, you will need to provide a
+<code>kubernetes.config</code> configuration file.  See <a href="../config/">Configuration</a> for
+details.</p>
 <p>If TS is running inside the cluster, it will pick up its service account details
 automatically and the configuration file is not required, but you will need to
 ensure it has access to the resources it needs to run.  If you're using RBAC

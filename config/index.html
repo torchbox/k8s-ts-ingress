@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  
+  <title>Configuration - TS Ingress Controller</title>
+  
+
+  <link rel="shortcut icon" href="../img/favicon.ico">
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="../css/highlight.css">
+
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Configuration";
+    var mkdocs_page_input_path = "config.md";
+    var mkdocs_page_url = "/config/";
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js"></script>
+  <script src="../js/modernizr-2.8.3.min.js"></script>
+  <script type="text/javascript" src="../js/highlight.pack.js"></script>
+  <script src="../js/theme.js"></script> 
+
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> TS Ingress Controller</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        <ul class="current">
+          
+            <li>
+    <li class="toctree-l1 ">
+        <a class="" href="..">Home</a>
+        
+    </li>
+<li>
+          
+            <li>
+    <ul class="subnav">
+    <li><span>Installation</span></li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../source/">Installing from source</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../docker/">Using the Docker Image</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../classes/">Using multiple Ingress controllers</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 current">
+        <a class="current" href="./">Configuration</a>
+        
+            <ul>
+            
+                <li class="toctree-l3"><a href="#configuration">Configuration</a></li>
+                
+                    <li><a class="toctree-l4" href="#kubernetes-api-server-configuration">Kubernetes API server configuration</a></li>
+                
+                    <li><a class="toctree-l4" href="#global-configuration">Global configuration</a></li>
+                
+            
+            </ul>
+        
+    </li>
+
+        
+    </ul>
+<li>
+          
+            <li>
+    <ul class="subnav">
+    <li><span>Usage</span></li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../annotations/">Annotations</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../caching/">Caching</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../auth/">Authentication</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../external/">External proxying</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../tls/">TLS</a>
+        
+    </li>
+
+        
+    </ul>
+<li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">TS Ingress Controller</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Installation &raquo;</li>
+        
+      
+    
+    <li>Configuration</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="configuration">Configuration</h1>
+<p>There are two ways to configure the controller: you can pass a configuration
+file to the plugin in <code>plugin.config</code>, or you can set the configuration in the
+environment.  If a configuration option is set in both the configuration file
+and the environment, the value from the environment takes precedence.</p>
+<p>To load a configuration file, pass its name as an argument to the plugin in
+<code>plugin.config</code>:</p>
+<pre><code>kubernetes.so /path/to/kubernetes.config
+</code></pre>
+
+<p>If the configuration filename is a relative pathname, it will be loaded from
+TS's configuration directory (the place where <code>records.config</code> is located).</p>
+<p>If you're deploying from the Docker image, using environment variables is the
+recommended method; you would have to rebuild the Docker image to add a
+configuration file.</p>
+<h2 id="kubernetes-api-server-configuration">Kubernetes API server configuration</h2>
+<p>If TS is running inside the cluster, you do not need to configure the API
+server connection details; they will be picked up automatically from the pod's
+service account.  However, if you are running outside the cluster you need to
+specify the API server URL and any credentials required to authenticate to it.</p>
+<ul>
+<li>
+<p><code>server: &lt;url&gt;</code>: set the URL (http or https) of the API server the controller
+  should connect to.  (<code>$TS_SERVER</code>)</p>
+</li>
+<li>
+<p><code>cafile: &lt;filename&gt;</code>: the filename of a PEM-encoded certificate file or
+  bundle that will be used to validate a TLS connection to the API server.
+  Ignored if the connection to the API server does not use TLS.  (<code>$TS_CAFILE</code>)</p>
+</li>
+<li>
+<p><code>verify_tls: &lt;true|false&gt;</code>: whether to verify the API server's TLS certificate.
+  There should be no need to disable this.  (<code>$TS_VERIFY_TLS</code>)</p>
+</li>
+<li>
+<p><code>certfile: &lt;filename&gt;</code>: the filename of a PEM-encoded TLS certificate that
+  will be used to authenticate to the API server.  If set, you must supply a TLS
+  key as well. (<code>$TS_CERTFILE</code>)</p>
+</li>
+<li>
+<p><code>keyfile: &lt;filename&gt;</code>: the filename of a PEM-encoded TLS key that will be used
+  to authenticate to the API server.  If set, you must supply a TLS certificate
+  as well.  (<code>$TS_KEYFILE</code>)</p>
+</li>
+<li>
+<p><code>token: &lt;token&gt;</code>: an authentication Bearer token that will be used to
+  authenticate to the API server, if using token authentication.  (<code>$TS_TOKEN</code>)</p>
+</li>
+</ul>
+<h2 id="global-configuration">Global configuration</h2>
+<ul>
+<li>
+<p><code>ingress_classes: &lt;class&gt; [&lt;class&gt; ...]</code>: a list of Ingress classes that the
+  controller will process.  See <a href="../classes/">Using multiple Ingress classes</a> for
+  more information on this option. Default: <code>trafficserver</code>.
+  (<code>$TS_INGRESS_CLASSES</code>)</p>
+</li>
+<li>
+<p><code>tls: &lt;true|false&gt;</code>: whether to handle TLS certificates.  If set to <code>false</code>,
+  you will need to load TLS certificates by some other mechanism.  Default:
+  <code>true</code>.  (<code>$TS_TLS</code>)</p>
+</li>
+<li>
+<p><code>remap: &lt;true|false&gt;</code>: whether to handle host and path remapping.  If set to
+  <code>false</code>, only TLS certificate loading will be done.  Default: <code>true</code>.
+  (<code>$TS_REMAP</code>)</p>
+</li>
+<li>
+<p><code>x_forwarded_proto: &lt;true|false&gt;</code>: whether to send an <code>X-Forwarded-Proto</code>
+  header to backends, containing the client protocol (<code>http</code> or <code>https</code>).
+  Default: <code>true</code>.  (<code>$TS_X_FORWARDED_PROTO</code>)</p>
+</li>
+</ul>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../annotations/" class="btn btn-neutral float-right" title="Annotations">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../classes/" class="btn btn-neutral" title="Using multiple Ingress controllers"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+	  
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+<div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../classes/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../annotations/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+
+</body>
+</html>
