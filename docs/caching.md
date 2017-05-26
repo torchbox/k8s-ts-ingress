@@ -33,22 +33,10 @@ time is reached.  `Expires` is not recommended for new applications, since
 
 ## Disabling caching
 
-To disable caching entirely on an Ingress, even if it sends `Cache-Control` or
-`Expires` header fields, use the `ingress.kubernetes.io/cache-enable` annotation:
+If you want to prevent certain pages from being cached, you can indicate this
+using `Cache-Control`:
 
-```
-metadata:
-  annotations:
-    ingress.kubernetes.io/cache-enable: "false"
-```
-
-If only some paths should have caching disabled, you can create another Ingress
-resource with `path` set to that path, and set the annotation on that Ingress.
-
-If you only want to prevent certain pages from being cached, you can indicate
-this using `Cache-Control`:
-
-```
+```http
 HTTP/1.1 200 OK
 Cache-Control: no-cache, no-store
 ```
@@ -58,19 +46,49 @@ logged-in users, or pages containing a `Set-Cookie` header field.  By default,
 TS will not use the cache for requests containing a `Cookie` header field or
 cache responses containing a `Set-Cookie` field, but it's better to be explicit.
 
+To disable caching entirely on an Ingress, even if it sends `Cache-Control` or
+`Expires` header fields, use the `ingress.kubernetes.io/cache-enable` annotation:
+
+```yaml
+metadata:
+  annotations:
+    ingress.kubernetes.io/cache-enable: "false"
+```
+
+If only some paths should have caching disabled, you can create another Ingress
+resource for that particular path:
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    ingress.kubernetes.io/cache-enable: "false"
+  name: echoheaders
+spec:
+  rules:
+  - host: www.mysite.path
+    http:
+      paths:
+      - path: /admin
+        backend:
+          serviceName: myapp
+          servicePort: http
+```
+
 ## Caching and URL parameters
 
 When a page is cached, its URL parameters are stored in the cache to ensure that
 a request with different URL parameters returns the correct content.  For
 example, the URL:
 
-```
+```plain
 http://www.mysite.com/listings/?page=1
 ```
 
 will be cached differently from the URL:
 
-```
+```plain
 http://www.mysite.com/listings/?page=2
 ```
 
@@ -110,9 +128,9 @@ reversed: any URL parameter not matched will be ignored.
 
 When using either of these annotations, you probably also want to set
 `ingress.kubernetes.io/cache-sort-query-params: "true"`, which will cause the
-URL parameters to be lexically sorted.  These means that a request for `/?a=1&b=2`
-will be cached the same as a request for `/?b=2&a=1`, improving cache hit rate
-across clients.
+URL parameters to be lexically sorted.  This means that a request for
+`/?a=1&b=2` can be served a cached response for`/?b=2&a=1`, improving cache hit
+rate across clients.
 
 These annotations also change the query string sent to the application.  This is
 to ensure the application doesn't accidentally vary the page content based on a
