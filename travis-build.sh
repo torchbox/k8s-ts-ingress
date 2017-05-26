@@ -20,7 +20,8 @@ docker build --pull -t $DOCKER_REPOSITORY:$COMMIT .
 
 # Run e2e tests.
 sudo apt-get -qq update
-sudo apt-get -qy install libjson-c-dev libcurl4-openssl-dev libssl-dev pkg-config 
+sudo apt-get -qy install libjson-c-dev libcurl4-openssl-dev libssl-dev \
+	     netcat-traditional pkg-config 
 tests/e2erun.sh
 
 # If this is a release, push the Docker image to Docker Hub.
