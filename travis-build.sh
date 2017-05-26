@@ -19,7 +19,6 @@ DOCKER_REPOSITORY=torchbox/k8s-ts-ingress
 docker build --pull -t $DOCKER_REPOSITORY:$COMMIT .
 
 # Run e2e tests.
-sudo dpkg -r netcat-openbsd
 sudo apt-get -qq update
 sudo apt-get -qy install libjson-c-dev libcurl4-openssl-dev libssl-dev \
 	     netcat-traditional pkg-config 

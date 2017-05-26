@@ -7,6 +7,13 @@
 
 set -x 
 
+# Travis-CI won't let us remove netcat-openbsd, so instead check for the
+# normal version explicitly.
+NETCAT=nc
+if [ -e /bin/nc.traditional ]; then
+	NETCAT=/bin/nc.traditional
+fi
+
 if [ -z "$1" ]; then
 	echo >&2 "usage: $0 <handle|address>"
 	exit 1
@@ -36,7 +43,7 @@ fi
 trap '[ $ncpid != 0 ] && kill $ncpid; exit 0' INT TERM EXIT 0
 
 while :; do
-	nc -l -p 48080 -c "$0 handle" "$1" & ncpid=$!
+	$NETCAT -l -p 48080 -c "$0 handle" "$1" & ncpid=$!
 	wait $ncpid
 	ncpid=0
 done

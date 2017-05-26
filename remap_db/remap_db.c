@@ -685,7 +685,7 @@ make_query(const remap_request_t *req, remap_result_t *res)
 char		**params = NULL;
 size_t		  nparams = 0;
 
-char		*sr, *p, *q, *ret;
+char		*sr = NULL, *p, *q, *ret;
 size_t		 len = 0;
 
 	q = strdup(req->rr_query);
