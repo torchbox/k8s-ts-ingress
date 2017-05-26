@@ -272,7 +272,6 @@ cleanup() {
 	stop_httpd || true
 	stop_apiserver || true
 	stop_etcd || true
-
 	rm -rf $TESTDIR
 }
 trap cleanup TERM INT
@@ -286,13 +285,16 @@ for test in $(cd tests/e2e; echo * | sort); do
 	_runtest $test
 done
 
-cleanup
 
 printf '>>> Ran %d tests, %d ok, %d failed\n' $TESTS_RUN $TESTS_OK $TESTS_FAILED
+exit=0
 if [ $TESTS_RUN -ne $TESTS_OK ]; then
 	printf '*** FAILED.\n\n'
 	echo '------------------- log output: -------------------'
 	cat $TESTDIR/log
 	echo '---------------------------------------------------'
-	exit 1
+	exit=1
 fi
+
+cleanup
+exit $exit
