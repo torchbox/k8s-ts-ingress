@@ -16,6 +16,7 @@
 #include	<string.h>
 #include	<errno.h>
 #include	<ctype.h>
+#include	<limits.h>
 
 #include	<ts/ts.h>
 
@@ -71,7 +72,7 @@ k8s_config_t	*ret;
 k8s_config_t *
 k8s_config_load(const char *file)
 {
-char		 line[1024], *s;
+char		 line[1024], *s, ffile[PATH_MAX + 1];
 FILE		*f = NULL;
 k8s_config_t	*ret = NULL;
 int		 lineno = 0;
@@ -114,6 +115,11 @@ struct stat	 sb;
 
 	if (file == NULL)
 		return ret;
+
+	if (strchr(file, '/') == NULL) {
+		snprintf(ffile, sizeof(ffile), "%s/%s", TSConfigDirGet(), file);
+		file = ffile;
+	}
 
 	if ((f = fopen(file, "r")) == NULL) {
 		TSError("%s: %s", file, strerror(errno));
