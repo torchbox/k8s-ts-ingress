@@ -19,6 +19,8 @@ DOCKER_REPOSITORY=torchbox/k8s-ts-ingress
 docker build --pull -t $DOCKER_REPOSITORY:$COMMIT .
 
 # Run e2e tests.
+apt-get update
+apt-get -qy install libjson-c-dev libcurl4-openssl-dev libssl-dev pkg-config 
 tests/e2erun.sh
 
 # If this is a release, push the Docker image to Docker Hub.
