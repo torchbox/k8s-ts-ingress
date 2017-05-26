@@ -149,16 +149,15 @@ EVP_PKEY	*key = NULL;
 			secret->se_namespace, secret->se_name);
 		goto error;
 	}
-	X509_free(cert); cert = NULL;
 
 	while ((cert = PEM_read_bio_X509(bio, NULL, NULL, NULL)) != NULL) {
 		if (SSL_CTX_add_extra_chain_cert(ctx, cert) != 1) {
 			TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: "
 				"SSL_CTX_add_extra_chain_cert failed",
 				secret->se_namespace, secret->se_name);
+			X509_free(cert); cert = NULL;
 			goto error;
 		}
-		X509_free(cert); cert = NULL;
 	}
 
 	BIO_free(bio); bio = NULL;
@@ -180,7 +179,6 @@ EVP_PKEY	*key = NULL;
 		goto error;
 	}
 
-	EVP_PKEY_free(key); key = NULL;
 	BIO_free(bio); bio = NULL;
 	free(keystr); keystr = NULL;
 

@@ -430,6 +430,14 @@ int			 reenable = 1;
 
 	if ((newurl = url_from_remap_result(txnp, &req, &res)) == NULL)
 		goto cleanup;
+	else {
+	TSMBuffer	reqp;
+	TSMLoc		hdrs;
+
+		TSHttpTxnClientReqGet(txnp, &reqp, &hdrs);
+		TSHttpHdrUrlSet(reqp, hdrs, newurl);
+		TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
+	}
 
 	/* follow redirects if configured on the Ingress.  */
 	if (res.rz_path->rp_follow_redirects) {
