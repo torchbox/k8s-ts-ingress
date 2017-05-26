@@ -608,6 +608,9 @@ domain.
 `crypt_des.c` is copyright (c) 1989, 1993 The Regents of the University of
 California, based on code written by Tom Truscott.
 
+`strmatch.c` is copyright (c) 1989, 1993, 1994 The Regents of the University
+of California, based on code written by Guido van Rossum.
+
 `crypt_md5.c` was written by Poul-Henning Kamp, and is released under the
 "beer-ware" license.
 

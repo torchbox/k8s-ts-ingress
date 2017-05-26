@@ -26,7 +26,6 @@
 #include	"watcher.h"
 #include	"config.h"
 #include	"plugin.h"
-#include	"tls.h"
 
 int
 handle_tls(TSCont contn, TSEvent evt, void *edata)
