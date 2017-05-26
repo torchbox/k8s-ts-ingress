@@ -136,4 +136,7 @@ depend: ${SRCS} ${TEST_SRCS}
 	${CC} ${CPPFLAGS} ${JSON_CFLAGS} -MM $^ >> Makefile.tmp
 	mv Makefile.tmp Makefile
 
-.PHONY: test install clean depend lint
+docs:
+	$(MAKE) -f Makefile.dist docs
+
+.PHONY: test install clean depend lint docs

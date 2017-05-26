@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trafficserver
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: trafficserver
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - ingresses
+  - secrets
+  - services
+  - pods
+  - namespaces
+  - replicationcontrollers
+  - endpoints
+  verbs:
+  - get
+  - list
+  - watch
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: trafficserver
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: trafficserver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: trafficserver

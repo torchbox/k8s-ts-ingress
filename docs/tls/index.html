@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  
+  <title>TLS - TS Ingress Controller</title>
+  
+
+  <link rel="shortcut icon" href="../img/favicon.ico">
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="../css/highlight.css">
+
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "TLS";
+    var mkdocs_page_input_path = "tls.md";
+    var mkdocs_page_url = "/tls/";
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js"></script>
+  <script src="../js/modernizr-2.8.3.min.js"></script>
+  <script type="text/javascript" src="../js/highlight.pack.js"></script>
+  <script src="../js/theme.js"></script> 
+
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> TS Ingress Controller</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        <ul class="current">
+          
+            <li>
+    <li class="toctree-l1 ">
+        <a class="" href="..">Home</a>
+        
+    </li>
+<li>
+          
+            <li>
+    <ul class="subnav">
+    <li><span>Installation</span></li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../source/">Installing from source</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../docker/">Using the Docker Image</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../classes/">Using multiple Ingress controllers</a>
+        
+    </li>
+
+        
+    </ul>
+<li>
+          
+            <li>
+    <ul class="subnav">
+    <li><span>Usage</span></li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../annotations/">Annotations</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../caching/">Caching</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../auth/">Authentication</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../external/">External proxying</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 current">
+        <a class="current" href="./">TLS</a>
+        
+            <ul>
+            
+                <li class="toctree-l3"><a href="#using-tls">Using TLS</a></li>
+                
+                    <li><a class="toctree-l4" href="#configuration">Configuration</a></li>
+                
+                    <li><a class="toctree-l4" href="#connecting-to-pods-via-https">Connecting to pods via HTTPS</a></li>
+                
+                    <li><a class="toctree-l4" href="#hsts">HSTS</a></li>
+                
+                    <li><a class="toctree-l4" href="#kube-lego">kube-lego</a></li>
+                
+            
+            </ul>
+        
+    </li>
+
+        
+    </ul>
+<li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">TS Ingress Controller</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Usage &raquo;</li>
+        
+      
+    
+    <li>TLS</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="using-tls">Using TLS</h1>
+<h2 id="configuration">Configuration</h2>
+<p>TLS keys and certificates are taken from Kubernetes Secret resources according
+to <code>tls</code> attribute of each Ingress resource.  TLS Server Name Indication support
+is required for this to work; clients without SNI support will receive a TLS
+negotiation error.</p>
+<p>If you don't want to use Kubernetes for TLS, set <code>tls: false</code> in
+<code>kubernetes.config</code> or set the <code>$TS_TLS</code> environment variable to <code>"false"</code>.
+You will need to provide TLS configuration some other way, like
+<code>ssl_multicert.config</code> or the <code>ssl-cert-loader</code> plugin, or else terminate TLS
+before traffic reaches Traffic Server.</p>
+<p>By default, non-TLS HTTP requests to an Ingress host with TLS configured will
+be 301 redirected to HTTPS.  To disable this behaviour, set the
+<code>ingress.kubernetes.io/ssl-redirect</code> annotation to <code>false</code>.</p>
+<p>To force a redirect to HTTPS even when TLS is not configured on the Ingress, set
+the <code>ingress.kubernetes.io/force-ssl-redirect</code> annotation to <code>"true"</code>.  This
+will not work unless you are offloading TLS termination in front of Traffic
+Server.</p>
+<h2 id="connecting-to-pods-via-https">Connecting to pods via HTTPS</h2>
+<p>Usually, communication between Traffic Server and backends (e.g. pods) is via
+non-TLS HTTP, even if the request was made over HTTPS.  To use HTTPS to
+communicate with the backend, set the <code>ingress.kubernetes.io/secure-backends</code>
+annotation to <code>"true"</code>.  This is not very useful when the backend is a pod,
+because TS connects to the pod by its IP address, and it's extremely unlikely
+the pod will have a TLS certificate for that IP address.  However, this can be
+useful when using external proxying (described below).</p>
+<p>A better method to secure traffic between Traffic Server and pods is to use a
+network CNI plugin that supports encryption, such as Weave Net.</p>
+<h2 id="hsts">HSTS</h2>
+<p>To enable HTTP Strict Transport Security (HSTS), set the
+<code>ingress.kubernetes.io/hsts-max-age</code> annotation on the Ingress to the HSTS
+max-age time in seconds.  To be useful, this should be set to at least six
+months (15768000 seconds), but you should start with a lower value and gradually
+increase it.  Do not set it to a large value without testing it first, because,
+by design, it cannot be turned off for browsers that already saw the HSTS
+header until the max-age expires.</p>
+<p>HSTS headers are per-hostname, not per-host.  Therefore, <code>hsts-max-age</code> can only
+be set on the Ingress that includes the root path for a particular hostname
+(i.e., where the Ingress rule has no <code>path</code> attribute).</p>
+<p>To apply HSTS to subdomains as well, set the
+<code>ingress.kubernetes.io/hsts-include-subdomains</code> annotation.</p>
+<h2 id="kube-lego">kube-lego</h2>
+<p>kube-lego, a Kubernetes controller that automatically provisions TLS
+certificates using an ACME provider such as Let's Encrypt, currently
+<a href="https://github.com/jetstack/kube-lego/issues/189">doesn't support</a> any
+Ingress controllers other than nginx and GCE.  To use the TS Ingress controller
+with kube-lego, you should tell it to handle the <code>"nginx"</code> Ingress class,
+either in <code>kubernetes.config</code>:</p>
+<pre><code>ingress_classes: trafficserver nginx
+</code></pre>
+
+<p>Or by setting the <code>TS_INGRESS_CLASSES</code> environment variabe to
+<code>"trafficserver nginx"</code>.</p>
+<p>Then configure kube-lego as if you were using the nginx Ingress controller.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="../external/" class="btn btn-neutral" title="External proxying"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+	  
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+<div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../external/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+    </span>
+</div>
+
+</body>
+</html>

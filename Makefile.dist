@@ -56,4 +56,7 @@ release:
 	gzip -f k8s-ts-ingress-${VERSION}.tar
 	@ls -oh k8s-ts-ingress-${VERSION}.tar.gz
 
-.PHONY: docker-build docker-push release
+docs:
+	mkdocs build
+
+.PHONY: docker-build docker-push release docs

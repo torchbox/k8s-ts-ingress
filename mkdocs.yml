@@ -1,0 +1,16 @@
+site_name: TS Ingress Controller
+theme: readthedocs
+docs_dir: mddocs
+site_dir: docs
+pages:
+- Home: index.md
+- Installation:
+  - Installing from source: source.md
+  - Using the Docker Image: docker.md
+  - Using multiple Ingress controllers: classes.md
+- Usage:
+  - Annotations: annotations.md
+  - Caching: caching.md
+  - Authentication: auth.md
+  - External proxying: external.md
+  - TLS: tls.md

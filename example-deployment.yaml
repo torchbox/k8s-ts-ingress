@@ -1,12 +1,20 @@
-# Example Kubernetes DaemonSet configuration for running the Traffic Server
-# ingress controller.  It will listed on hostPort 8080 for HTTP requests, and
-# hostPor 8443 for TLS requests.  It will only run on nodes with the label
-# node-role.kubernetes.io/master: "true".
+# Example Kubernetes Deployment configuration for running the Traffic Server
+# ingress controller.  It will listen internally on ports 8080 and 8443, and
+# expose ports 30080 and 30443 as a NodePort service.  Use an external load
+# balancer of some sort to route incoming traffic to those ports.
+#
+# For an example using a DaemonSet and a hostPort, see example-daemonset.yaml.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trafficserver
+
+---
 
 apiVersion: extensions/v1beta1
-kind: DaemonSet
+kind: Deployment
 metadata:
-  annotations:
   labels:
     app: trafficserver
   name: trafficserver
@@ -18,44 +26,31 @@ spec:
     matchLabels:
       app: trafficserver
 
+  # Run two copies, for redundancy.
+  replicas: 2
+
   # TS is safe to use with rolling updates, allowing it to be upgraded without
   # any downtime as long as you run more than one copy.
-  updateStrategy:
+  strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 1
+      maxUnavailable: 0
+      maxSurge: 1
 
   template:
     metadata:
       labels:
         app: trafficserver
     spec:
-      # Ensure that we run only on master nodes.  This uses the newer style
-      # "node-role.kubernetes.io/master" label; you may need to change this if
-      # your cluster has different annotations, or remove it entirely if you
-      # don't want TS running on master nodes.
-      nodeSelector:
-        node-role.kubernetes.io/master: "true"
-      tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-
       # Create a volume for the TS cache.  We use an emptyDir here.  Each
       # instance requires its own cache volume, so you cannot use a persistent
-      # volume (or hostPath, etc.) if deploying as a DaemonSet.  Use a
+      # volume (or hostPath, etc.) if deploying as a Deployment.  Use a
       # StatefulSet with a PV claim template if you want a fully persistent
       # cache; but node that this emptyDir will only be emptied when the pod is
       # deleted.
       volumes:
       - name: ts-storage
         emptyDir: {}
-
-      # Depending on your cluster setup, you may need to use hostNetwork here if
-      # you want to use hostPort to expose TS.  In particular, as of Kubernetes
-      # 1.6.1, clusters using a CNI plugin cannot use hostPort without
-      # hostNetwork.  An alternative way to expose TS is to use a Service,
-      # with either NodePort or type: LoadBalancer.
-      hostNetwork: true
 
       containers:
       - name: trafficserver
@@ -72,8 +67,6 @@ spec:
             cpu: 100m
             memory: 196Mi
 
-        # By default we listen on 8080 and 8443; you can use any port you like
-        # here, or remove the hostPort entirely and use a Service instead.
         ports:
         - containerPort: 8080
           hostPort: 8080
@@ -129,3 +122,24 @@ spec:
         volumeMounts:
         - mountPath: /var/lib/trafficserver
           name: ts-storage
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: trafficserver
+  namespace: trafficserver
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+    nodePort: 30080
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
+    nodePort: 30443
