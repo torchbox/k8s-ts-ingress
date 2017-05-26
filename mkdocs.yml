@@ -8,6 +8,7 @@ pages:
   - Installing from source: source.md
   - Using the Docker Image: docker.md
   - Using multiple Ingress controllers: classes.md
+  - Configuration: config.md
 - Usage:
   - Annotations: annotations.md
   - Caching: caching.md

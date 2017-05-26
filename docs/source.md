@@ -16,6 +16,10 @@ The following are required to build:
 * cURL library
 * OpenSSL (or a compatible TLS library, e.g. LibreSSL)
 
+If you want to run the unit tests, a C++11 compiler is required.  If you want to
+run the end-to-end tests, a Linux/amd64 host is required (because those tests
+require running the Kubernetes API server).
+
 ## Building
 
 To build and install the plugin:
@@ -30,19 +34,24 @@ $ make install
 This will put `kubernetes.so` in your Traffic Server plugins directory.  Edit
 `plugin.config` to tell Traffic Server to load the plugin.
 
+To run the unit tests:
+
+```sh
+$ make test
+```
+
+To run the end-to-end tests:
+
+```sh
+$ tests/e2erun.sh
+```
+
 ## Configuration
 
 
 If Traffic Server is not running inside the cluster, you will need to provide a
-configuration file.  Copy `kubernetes.config.example` to the Traffic Server
-configuration directory, rename it to `kubernetes.config`, and edit it as
-appropriate.
-
-You will need to tell the plugin to load the configuration file in `plugin.config`:
-
-```
-kubernetes.so kubernetes.conf
-```
+`kubernetes.config` configuration file.  See [Configuration](config.md) for
+details.
 
 If TS is running inside the cluster, it will pick up its service account details
 automatically and the configuration file is not required, but you will need to
