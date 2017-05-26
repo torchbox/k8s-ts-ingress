@@ -4,7 +4,6 @@ docs_dir: docs
 site_dir: _docs
 repo_name: GitHub
 repo_url: https://github.com/torchbox/k8s-ts-ingress
-edit_uri: edit/master/docs/
 copyright: Copyright (c) 2016-2017 Torchbox Ltd.
 strict: true
 pages:
