@@ -6,7 +6,7 @@
             "ingress.kubernetes.io/auth-realm": "Test authentication",
             "ingress.kubernetes.io/auth-secret": "authtest",
             "ingress.kubernetes.io/auth-type": "basic",
-            "ingress.torchbox.com/auth-address-list": "127.0.0.0/8",
+            "ingress.kubernetes.io/whitelist-source-range": "127.0.0.0/8",
             "ingress.torchbox.com/auth-satisfy": "any"
         },
         "creationTimestamp": "2017-04-26T01:34:08Z",

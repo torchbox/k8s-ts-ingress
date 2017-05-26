@@ -111,6 +111,7 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_AUTH_TYPE_DIGEST		"digest"
 #define	IN_AUTH_REALM			A_INGRESS "auth-realm"
 #define	IN_AUTH_SECRET			A_INGRESS "auth-secret"
+#define	IN_WHITELIST_SOURCE_RANGE	A_INGRESS "whitelist-source-range"
 
 #define	IN_CLASS			A_KUBERNETES "ingress.class"
 #define	IN_CLASS_TRAFFICSERVER		"trafficserver"
@@ -127,7 +128,6 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_AUTH_SATISFY			A_TORCHBOX "auth-satisfy"
 #define	IN_AUTH_SATISFY_ANY		"any"
 #define	IN_AUTH_SATISFY_ALL		"all"
-#define	IN_AUTH_ADDRESS_LIST		A_TORCHBOX "auth-address-list"
 
 typedef struct {
 	char	*it_secret_name;

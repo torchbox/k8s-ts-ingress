@@ -382,24 +382,24 @@ authentication) instead.
 
 ### IP address authentication
 
-To enable IP authentication, set the `ingress.torchbox.com/auth-address-list`
-annotation to a space-delimited list of IP addresses or networks, for example
-`"127.0.0.0/8 ::1/128"`.
+To enable IP authentication, set the
+`ingress.kubernetes.io/whitelist-source-range` annotation to a comma-delimited
+list of IP addresses or networks, for example `"127.0.0.0/8,::1/128"`.
 
 When both IP authentication and password authentication are configured on the
 same ingress, you can set the `ingress.torchbox.com/auth-satisfy` annotation to
 either `any` or `all`:
 
 * `any` will permit the request if either the IP is present in
-  `auth-address-list` or if the client provides valid basic authentication;
+  `whitelist-source-range` or if the client provides valid basic authentication;
   otherwise the request will be denied with HTTP 401 Unauthorized.
 
 * `all` will permit the request if the client IP is present in
-  `auth-address-list` *and* the client also provides valid basic authentication.
-  If the client IP address is not in the address list, the request will be
-  denied with HTTP 403 Forbidden.  If the IP address is present but the request
-  did not contain valid basic authentication, the request will be denied with
-  HTTP 401 Unauthorized.
+  `whitelist-source-range` *and* the client also provides valid basic
+  authentication.  If the client IP address is not in the address list, the
+  request will be denied with HTTP 403 Forbidden.  If the IP address is present
+  but the request did not contain valid basic authentication, the request will
+  be denied with HTTP 401 Unauthorized.
 
 To prevent accidental misconfiguration, the default value is `all`.
 
@@ -530,6 +530,26 @@ services.
 For TLS to work, remember to set `servicePort` to `443` (or some other suitable
 value).
 
+Planned features
+----------------
+
+A feature being listed here indicates we are interested in implementing it, but
+provides no guarantee that it will be implemented within any particular time
+frame, or ever.
+
+* TLS client certificate authentication.
+* Client session affinity
+* Proxy protocol
+* Cross-Origin Resource Sharing
+* Rate limiting
+* SSL passthrough
+* Global / default configuration
+* Per-ingress gzip configuration
+* HSTS preload support (in any case, rewrite the HSTS support as it will be
+  removed from TS core in some later release)
+* Per-Ingress timeout configuration
+* HTTP/2 server push
+
 Support
 -------
 
@@ -540,11 +560,16 @@ Release history
 ---------------
 
 * 1.0.0-alpha5 (unreleased):
+    * Incompatible change: The `ingress.torchbox.com/auth-address-list`
+        annotation was renamed to `ingress.kubernetes.io/whitelist-source-range`,
+        and is now comma-delimited, for compatibility with other Ingress
+        controllers.
     * Feature: Support Ingress classes.
     * Feature: The X-Forwarded-Proto header is now (optionally) sent to the
         backend.
     * Feature: The `cache-whitelist-params` and `cache-ignore-params`
         annotations were implemented.
+    * Feature: The `tls_verify` configuration option was added.
     * Improvement: The API server connection code was reimplemented using cURL,
         making it more reliable and featureful.
     * Bug fix: TLS redirects with an empty URL path could crash.

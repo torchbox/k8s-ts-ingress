@@ -238,8 +238,8 @@ char			*mstr, *save, *saddr;
 	if ((mstr = strdup(str)) == NULL)
 		return NULL;
 
-	for (saddr = strtok_r(mstr, " \t\n\r", &save); saddr != NULL;
-	     saddr = strtok_r(NULL, " \t\n\r", &save)) {
+	for (saddr = strtok_r(mstr, ",", &save); saddr != NULL;
+	     saddr = strtok_r(NULL, ",", &save)) {
 	struct remap_auth_addr	*entry;
 	char			*p = NULL;
 	
@@ -400,7 +400,7 @@ const char	*key = NULL, *value = NULL;
 				rp->rp_auth_satisfy = REMAP_SATISFY_ALL;
 		}
 
-		else if (strcmp(key, IN_AUTH_ADDRESS_LIST) == 0)
+		else if (strcmp(key, IN_WHITELIST_SOURCE_RANGE) == 0)
 			rp->rp_auth_addr_list = remap_path_get_addresses(value);
 
 	}
