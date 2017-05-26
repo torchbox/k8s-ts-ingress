@@ -32,6 +32,7 @@ download_hyperkube() {
 	
 	echo '>>> Downloading hyperkube'
 	curl -Lo$HYPERKUBE https://storage.googleapis.com/kubernetes-release/release/v${E2E_KUBERNETES_VERSION}/bin/linux/amd64/hyperkube
+	chmod 755 $HYPERKUBE
 }
 
 download_etcd() {
@@ -42,6 +43,7 @@ download_etcd() {
 	echo '>>> Downloading etcd'
 	curl -L https://storage.googleapis.com/etcd/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | gzip -dc | tar xf - --strip-components=1 -C _test etcd-v${ETCD_VERSION}-linux-amd64/etcd
 	mv _test/etcd $ETCD
+	chmod 755 $ETCD
 }
 
 start_etcd() {
@@ -127,7 +129,7 @@ install_ts() {
 		return 0
 	fi
 
-	echo '>>> Installing Trafficserver'
+	echo '>>> Installing Traffic Server'
 
 	if [ ! -d "_test/${TS_DIR}" ]; then
 		if [ ! -e "_test/${TS_ARCHIVE}" ]; then
@@ -272,9 +274,8 @@ cleanup() {
 	stop_etcd || true
 
 	rm -rf $TESTDIR
-	exit 0
 }
-trap cleanup TERM INT EXIT 0
+trap cleanup TERM INT
 
 start_etcd
 start_apiserver
@@ -284,6 +285,8 @@ start_ts
 for test in $(cd tests/e2e; echo * | sort); do
 	_runtest $test
 done
+
+cleanup
 
 printf '>>> Ran %d tests, %d ok, %d failed\n' $TESTS_RUN $TESTS_OK $TESTS_FAILED
 if [ $TESTS_RUN -ne $TESTS_OK ]; then

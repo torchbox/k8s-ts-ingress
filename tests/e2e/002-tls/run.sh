@@ -4,7 +4,9 @@
 # Test basic functionality, i.e. that routing requests to an endpoint works.
 
 set -e
-output=$(curl -sS --resolve echoheaders.test:58080:127.0.0.1 http://echoheaders.test:58080/this-is-a-test)
+output=$(curl -sS --cacert tests/test-cert.pem			\
+		--resolve echoheaders.test:58443:127.0.0.1	\
+		https://echoheaders.test:58443/this-is-a-test)
 
 if echo "$output" | grep -q "Request path: /this-is-a-test"; then
 	exit 0
