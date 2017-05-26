@@ -1,7 +1,7 @@
 site_name: TS Ingress Controller
 theme: readthedocs
-docs_dir: mddocs
-site_dir: docs
+docs_dir: docs
+site_dir: _docs
 pages:
 - Home: index.md
 - Installation:
