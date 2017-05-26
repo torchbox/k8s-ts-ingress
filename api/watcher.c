@@ -117,6 +117,8 @@ struct curl_slist	*hdrs = NULL;
 
 	if (wt->wt_config->co_tls_verify)
 		curl_easy_setopt(wt->wt_curl, CURLOPT_SSL_VERIFYPEER, 1L);
+	else
+		curl_easy_setopt(wt->wt_curl, CURLOPT_SSL_VERIFYPEER, 0L);
 
 	curl_easy_setopt(wt->wt_curl, CURLOPT_WRITEFUNCTION,
 			 watcher_handle_read);

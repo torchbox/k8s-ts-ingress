@@ -8,6 +8,9 @@
  * warranty.
  */
 
+#include	<sys/types.h>
+#include	<sys/stat.h>
+
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
@@ -72,6 +75,7 @@ char		 line[1024], *s;
 FILE		*f = NULL;
 k8s_config_t	*ret = NULL;
 int		 lineno = 0;
+struct stat	 sb;
 
 	if ((ret = k8s_config_new()) == NULL)
 		return NULL;
@@ -101,6 +105,11 @@ int		 lineno = 0;
 
 		fclose(f);
 		f = NULL;
+	}
+
+	if (stat(SA_CACERT_FILE, &sb) == 0) {
+		free(ret->co_tls_cafile);
+		ret->co_tls_cafile = strdup(SA_CACERT_FILE);
 	}
 
 	if (file == NULL)
