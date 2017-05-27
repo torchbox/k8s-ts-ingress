@@ -140,11 +140,15 @@
                 
                     <li><a class="toctree-l4" href="#configuration">Configuration</a></li>
                 
+                    <li><a class="toctree-l4" href="#redirecting-http-to-https">Redirecting HTTP to HTTPS</a></li>
+                
                     <li><a class="toctree-l4" href="#connecting-to-pods-via-https">Connecting to pods via HTTPS</a></li>
                 
                     <li><a class="toctree-l4" href="#hsts">HSTS</a></li>
                 
-                    <li><a class="toctree-l4" href="#kube-lego">kube-lego</a></li>
+                    <li><a class="toctree-l4" href="#configuring-the-tls-cypher-list">Configuring the TLS cypher list</a></li>
+                
+                    <li><a class="toctree-l4" href="#using-kube-lego">Using kube-lego</a></li>
                 
             
             </ul>
@@ -184,6 +188,10 @@
     <li>TLS</li>
     <li class="wy-breadcrumbs-aside">
       
+        
+          <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github"> Edit on GitHub</a>
+        
+      
     </li>
   </ul>
   <hr/>
@@ -194,29 +202,33 @@
                 <h1 id="using-tls">Using TLS</h1>
 <h2 id="configuration">Configuration</h2>
 <p>TLS keys and certificates are taken from Kubernetes Secret resources according
-to <code>tls</code> attribute of each Ingress resource.  TLS Server Name Indication support
-is required for this to work; clients without SNI support will receive a TLS
-negotiation error.</p>
+to the <code>tls</code> attribute of each Ingress resource.  See the
+<a href="https://kubernetes.io/docs/concepts/services-networking/ingress/#tls">Ingress documentation</a>
+for details on how to configure TLS.</p>
+<p>TLS Server Name Indication support is required for TLS to work; clients without
+SNI support will receive a TLS negotiation error.  There is no default
+certificate for non-SNI-capable clients.</p>
 <p>If you don't want to use Kubernetes for TLS, set <code>tls: false</code> in
 <code>kubernetes.config</code> or set the <code>$TS_TLS</code> environment variable to <code>"false"</code>.
 You will need to provide TLS configuration some other way, like
 <code>ssl_multicert.config</code> or the <code>ssl-cert-loader</code> plugin, or else terminate TLS
 before traffic reaches Traffic Server.</p>
-<p>By default, non-TLS HTTP requests to an Ingress host with TLS configured will
-be 301 redirected to HTTPS.  To disable this behaviour, set the
-<code>ingress.kubernetes.io/ssl-redirect</code> annotation to <code>false</code>.</p>
+<h2 id="redirecting-http-to-https">Redirecting HTTP to HTTPS</h2>
+<p>By default, insecure HTTP requests to an Ingress which has TLS configured will
+be redirected to HTTPS with an HTTP 301 response.  To disable this behaviour,
+set the <code>ingress.kubernetes.io/ssl-redirect</code> annotation to <code>false</code>.</p>
 <p>To force a redirect to HTTPS even when TLS is not configured on the Ingress, set
 the <code>ingress.kubernetes.io/force-ssl-redirect</code> annotation to <code>"true"</code>.  This
 will not work unless you are offloading TLS termination in front of Traffic
 Server.</p>
 <h2 id="connecting-to-pods-via-https">Connecting to pods via HTTPS</h2>
 <p>Usually, communication between Traffic Server and backends (e.g. pods) is via
-non-TLS HTTP, even if the request was made over HTTPS.  To use HTTPS to
+insecure HTTP, even if the request was made over HTTPS.  To use HTTPS for
 communicate with the backend, set the <code>ingress.kubernetes.io/secure-backends</code>
 annotation to <code>"true"</code>.  This is not very useful when the backend is a pod,
 because TS connects to the pod by its IP address, and it's extremely unlikely
 the pod will have a TLS certificate for that IP address.  However, this can be
-useful when using external proxying (described below).</p>
+useful when using <a href="../external/">external proxying</a>.</p>
 <p>A better method to secure traffic between Traffic Server and pods is to use a
 network CNI plugin that supports encryption, such as Weave Net.</p>
 <h2 id="hsts">HSTS</h2>
@@ -227,24 +239,35 @@ months (15768000 seconds), but you should start with a lower value and gradually
 increase it.  Do not set it to a large value without testing it first, because,
 by design, it cannot be turned off for browsers that already saw the HSTS
 header until the max-age expires.</p>
-<p>HSTS headers are per-hostname, not per-host.  Therefore, <code>hsts-max-age</code> can only
+<p>HSTS headers are per-hostname, not per-path.  Therefore, <code>hsts-max-age</code> can only
 be set on the Ingress that includes the root path for a particular hostname
 (i.e., where the Ingress rule has no <code>path</code> attribute).</p>
 <p>To apply HSTS to subdomains as well, set the
 <code>ingress.kubernetes.io/hsts-include-subdomains</code> annotation.</p>
-<h2 id="kube-lego">kube-lego</h2>
-<p>kube-lego, a Kubernetes controller that automatically provisions TLS
-certificates using an ACME provider such as Let's Encrypt, currently
-<a href="https://github.com/jetstack/kube-lego/issues/189">doesn't support</a> any
-Ingress controllers other than nginx and GCE.  To use the TS Ingress controller
-with kube-lego, you should tell it to handle the <code>"nginx"</code> Ingress class,
-either in <code>kubernetes.config</code>:</p>
-<pre><code>ingress_classes: trafficserver nginx
+<h2 id="configuring-the-tls-cypher-list">Configuring the TLS cypher list</h2>
+<p>You cannot configure the cypher list on the Ingress level; this was judged to be
+too risky, as users are likely to set a cypher list and not keep it up to date
+with changes in best practice.  (If you require this feature, please open a
+<a href="https://github.com/torchbox/k8s-ts-ingress/issues">Github issue</a>.)</p>
+<p>To configure the global cypher list, set <code>proxy.config.ssl.server.cipher_suite</code>
+in the TS <code>records.config</code> file to an OpenSSL cypher string, or set the
+<code>$PROXY_CONFIG_SSL_SERVER_CIPHER_SUITE</code> environment variable:</p>
+<pre><code>PROXY_CONFIG_SSL_SERVER_CIPHER_SUITE=ECDH+AES:DH+AES:RSA+AES:!aNULL:!MD5:!DSS
 </code></pre>
 
-<p>Or by setting the <code>TS_INGRESS_CLASSES</code> environment variabe to
-<code>"trafficserver nginx"</code>.</p>
-<p>Then configure kube-lego as if you were using the nginx Ingress controller.</p>
+<h2 id="using-kube-lego">Using kube-lego</h2>
+<p><a href="https://github.com/jetstack/kube-lego">kube-lego</a> is a Kubernetes controller
+that automatically provisions TLS certificates using an ACME provider such as
+Let's Encrypt.  It is ideal for test or staging environments (or even production
+environments when domain-validated TLS certificates are sufficient), but it
+currently <a href="https://github.com/jetstack/kube-lego/issues/189">doesn't support</a>
+any Ingress controllers other than nginx and GCE.</p>
+<p>To use the TS Ingress controller with kube-lego, you should configure kube-lego
+as if you were using the nginx Ingress controller, then tell TS to handle the
+<code>"nginx"</code> Ingress class, either by setting the environment variable
+<code>$TS_INGRESS_CLASSES</code> to <code>trafficserver nginx</code>, or in <code>kubernetes.config</code>:</p>
+<pre><code>ingress_classes: trafficserver nginx
+</code></pre>
               
             </div>
           </div>
@@ -263,6 +286,8 @@ either in <code>kubernetes.config</code>:</p>
   <div role="contentinfo">
     <!-- Copyright etc -->
     
+      <p>Copyright (c) 2016-2017 Torchbox Ltd.</p>
+    
   </div>
 
   Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
@@ -277,6 +302,8 @@ either in <code>kubernetes.config</code>:</p>
 
 <div class="rst-versions" role="note" style="cursor: pointer">
     <span class="rst-current-version" data-toggle="rst-current-version">
+      
+          <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
       
       
         <span><a href="../external/" style="color: #fcfcfc;">&laquo; Previous</a></span>

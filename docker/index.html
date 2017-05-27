@@ -81,8 +81,6 @@
             
                 <li class="toctree-l3"><a href="#using-the-docker-image-on-kubernetes">Using the Docker image on Kubernetes</a></li>
                 
-                    <li><a class="toctree-l4" href="#deployment">Deployment</a></li>
-                
                     <li><a class="toctree-l4" href="#runtime-configuration">Runtime configuration</a></li>
                 
                     <li><a class="toctree-l4" href="#cache-storage">Cache storage</a></li>
@@ -182,6 +180,10 @@
     <li>Using the Docker Image</li>
     <li class="wy-breadcrumbs-aside">
       
+        
+          <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github"> Edit on GitHub</a>
+        
+      
     </li>
   </ul>
   <hr/>
@@ -190,7 +192,6 @@
             <div class="section">
               
                 <h1 id="using-the-docker-image-on-kubernetes">Using the Docker image on Kubernetes</h1>
-<h2 id="deployment">Deployment</h2>
 <p>We provide two examples Kubernetes deployments for the TS ingress controller:</p>
 <ul>
 <li><code>example-daemonset.yaml</code> uses a DaemonSet, with an example of using node
@@ -204,18 +205,19 @@
 Kubernetes, and we can't document every possible variation, so you will need to
 decide what method is best for your cluster.</p>
 <h2 id="runtime-configuration">Runtime configuration</h2>
-<p>Most Traffic Server configuration (i.e., <code>records.config</code> entries) can be
-changed using environment variables; see the
-<a href="https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides">Traffic Server Documentation</a>.</p>
+<p>Most Traffic Server configuration (<code>records.config</code> entries) can be changed
+using environment variables; see the
+<a href="https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides">Traffic Server Documentation</a>.  For example, to make Traffic Server listen on port 7080 for HTTP requests,
+set <code>PROXY_CONFIG_HTTP_SERVER_PORTS=7080</code>.</p>
 <p>The TS Docker image provides one additional environment variable:</p>
 <ul>
-<li><code>TS_CACHE_SIZE</code>: Size of the on-disk cache file to create, in megabytes.</li>
+<li><code>TS_CACHE_SIZE=nnn</code>: Size of the on-disk cache file to create, in megabytes.</li>
 </ul>
-<p>The cache file will be created automatically on startup if it doesn't exist.</p>
 <h2 id="cache-storage">Cache storage</h2>
 <p>The example deployment resources use an <code>emptyDir</code> for cache storage.  This
 means the cache will persist across node reboots, but will we cleared if the
 pod is move to a different node, or if it's upgraded (which deletes the old pod).</p>
+<p>The cache file will be created automatically on startup if it doesn't exist.</p>
 <p>For persistent cache storage, mount a volume on <code>/var/lib/trafficserver</code>. 
 However, be aware that only one instance of TS can access the cache at once.  If
 you are running multiple copies, you will need to create a separate PV for each
@@ -240,6 +242,8 @@ instance (perhaps by using a StatefulSet instead of a DaemonSet).</p>
   <div role="contentinfo">
     <!-- Copyright etc -->
     
+      <p>Copyright (c) 2016-2017 Torchbox Ltd.</p>
+    
   </div>
 
   Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
@@ -254,6 +258,8 @@ instance (perhaps by using a StatefulSet instead of a DaemonSet).</p>
 
 <div class="rst-versions" role="note" style="cursor: pointer">
     <span class="rst-current-version" data-toggle="rst-current-version">
+      
+          <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
       
       
         <span><a href="../source/" style="color: #fcfcfc;">&laquo; Previous</a></span>

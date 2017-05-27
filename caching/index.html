@@ -184,6 +184,10 @@
     <li>Caching</li>
     <li class="wy-breadcrumbs-aside">
       
+        
+          <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github"> Edit on GitHub</a>
+        
+      
     </li>
   </ul>
   <hr/>
@@ -218,18 +222,9 @@ header field containing a timestamp; the page will be cached until the expiry
 time is reached.  <code>Expires</code> is not recommended for new applications, since
 <code>Cache-Control</code> is more flexible and has better defined semantics.</p>
 <h2 id="disabling-caching">Disabling caching</h2>
-<p>To disable caching entirely on an Ingress, even if it sends <code>Cache-Control</code> or
-<code>Expires</code> header fields, use the <code>ingress.kubernetes.io/cache-enable</code> annotation:</p>
-<pre><code>metadata:
-  annotations:
-    ingress.kubernetes.io/cache-enable: &quot;false&quot;
-</code></pre>
-
-<p>If only some paths should have caching disabled, you can create another Ingress
-resource with <code>path</code> set to that path, and set the annotation on that Ingress.</p>
-<p>If you only want to prevent certain pages from being cached, you can indicate
-this using <code>Cache-Control</code>:</p>
-<pre><code>HTTP/1.1 200 OK
+<p>If you want to prevent certain pages from being cached, you can indicate this
+using <code>Cache-Control</code>:</p>
+<pre><code class="http">HTTP/1.1 200 OK
 Cache-Control: no-cache, no-store
 </code></pre>
 
@@ -237,15 +232,41 @@ Cache-Control: no-cache, no-store
 logged-in users, or pages containing a <code>Set-Cookie</code> header field.  By default,
 TS will not use the cache for requests containing a <code>Cookie</code> header field or
 cache responses containing a <code>Set-Cookie</code> field, but it's better to be explicit.</p>
+<p>To disable caching entirely on an Ingress, even if it sends <code>Cache-Control</code> or
+<code>Expires</code> header fields, use the <code>ingress.kubernetes.io/cache-enable</code> annotation:</p>
+<pre><code class="yaml">metadata:
+  annotations:
+    ingress.kubernetes.io/cache-enable: &quot;false&quot;
+</code></pre>
+
+<p>If only some paths should have caching disabled, you can create another Ingress
+resource for that particular path:</p>
+<pre><code class="yaml">apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    ingress.kubernetes.io/cache-enable: &quot;false&quot;
+  name: echoheaders
+spec:
+  rules:
+  - host: www.mysite.path
+    http:
+      paths:
+      - path: /admin
+        backend:
+          serviceName: myapp
+          servicePort: http
+</code></pre>
+
 <h2 id="caching-and-url-parameters">Caching and URL parameters</h2>
 <p>When a page is cached, its URL parameters are stored in the cache to ensure that
 a request with different URL parameters returns the correct content.  For
 example, the URL:</p>
-<pre><code>http://www.mysite.com/listings/?page=1
+<pre><code class="plain">http://www.mysite.com/listings/?page=1
 </code></pre>
 
 <p>will be cached differently from the URL:</p>
-<pre><code>http://www.mysite.com/listings/?page=2
+<pre><code class="plain">http://www.mysite.com/listings/?page=2
 </code></pre>
 
 <p>Usually this is what you want and no additional configuration is required.
@@ -276,9 +297,9 @@ any matching query parameters will be ignored for caching.</p>
 reversed: any URL parameter not matched will be ignored.</p>
 <p>When using either of these annotations, you probably also want to set
 <code>ingress.kubernetes.io/cache-sort-query-params: "true"</code>, which will cause the
-URL parameters to be lexically sorted.  These means that a request for <code>/?a=1&amp;b=2</code>
-will be cached the same as a request for <code>/?b=2&amp;a=1</code>, improving cache hit rate
-across clients.</p>
+URL parameters to be lexically sorted.  This means that a request for
+<code>/?a=1&amp;b=2</code> can be served a cached response for<code>/?b=2&amp;a=1</code>, improving cache hit
+rate across clients.</p>
 <p>These annotations also change the query string sent to the application.  This is
 to ensure the application doesn't accidentally vary the page content based on a
 query parameter that has been ignored for caching.</p>
@@ -321,6 +342,8 @@ current UNIX timestamp, although any non-zero integer will work.</p>
   <div role="contentinfo">
     <!-- Copyright etc -->
     
+      <p>Copyright (c) 2016-2017 Torchbox Ltd.</p>
+    
   </div>
 
   Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
@@ -335,6 +358,8 @@ current UNIX timestamp, although any non-zero integer will work.</p>
 
 <div class="rst-versions" role="note" style="cursor: pointer">
     <span class="rst-current-version" data-toggle="rst-current-version">
+      
+          <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
       
       
         <span><a href="../annotations/" style="color: #fcfcfc;">&laquo; Previous</a></span>
