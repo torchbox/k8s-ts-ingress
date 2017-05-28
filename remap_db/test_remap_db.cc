@@ -343,7 +343,7 @@ TEST(RemapDB, ForceTLSRedirectEmptyPath)
 	cluster_free(cluster);
 }
 
-TEST(RemapDB, AppRoot)
+TEST(RemapDB, AppRoot1)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-app-root.json");
 	k8s_config_t *cfg = k8s_config_new();
@@ -361,7 +361,34 @@ TEST(RemapDB, AppRoot)
 	memset(&res, 0, sizeof(res));
 
 	int ret = remap_run(db, &req, &res);
-	ASSERT_EQ(RR_REDIRECT, ret);
+	EXPECT_EQ(RR_OK, ret);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, AppRoot2)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-app-root.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = NULL;
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_REDIRECT, ret);
 	EXPECT_STREQ("/app/", res.rz_location);
 	EXPECT_EQ(301, res.rz_status);
 
@@ -372,6 +399,32 @@ TEST(RemapDB, AppRoot)
 	cluster_free(cluster);
 }
 
+TEST(RemapDB, AppRoot3)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-app-root.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+	req.rr_path = strdup("app/foo");
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_OK, ret);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
 TEST(RemapDB, RewriteTarget)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-rewrite-target.json");
@@ -895,7 +948,7 @@ TEST(RemapDB, CacheKey)
 	char *cachekey;
 	size_t keysize;
 	remap_make_cache_key(&req, &res, &cachekey, &keysize);
-	EXPECT_EQ(55u, keysize);
+	ASSERT_EQ(55u, keysize);
 	EXPECT_TRUE(memcmp(cachekey,
 		"\004http\026echoheaders.gce.t6x.uk\011\000what/ever\016\000quux=4&xyzzy=5", keysize) == 0);
 

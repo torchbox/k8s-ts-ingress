@@ -111,23 +111,24 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_AUTH_TYPE_DIGEST		"digest"
 #define	IN_AUTH_REALM			A_INGRESS "auth-realm"
 #define	IN_AUTH_SECRET			A_INGRESS "auth-secret"
+#define	IN_AUTH_SATISFY			A_INGRESS "auth-satisfy"
+#define	IN_AUTH_SATISFY_ANY		"any"
+#define	IN_AUTH_SATISFY_ALL		"all"
 #define	IN_WHITELIST_SOURCE_RANGE	A_INGRESS "whitelist-source-range"
+#define	IN_CACHE_ENABLE			A_INGRESS "cache-enable"
+#define	IN_CACHE_GENERATION		A_INGRESS "cache-generation"
+#define	IN_CACHE_IGNORE_PARAMS		A_INGRESS "cache-ignore-params"
+#define	IN_CACHE_WHITELIST_PARAMS	A_INGRESS "cache-whitelist-params"
+#define	IN_HSTS_INCLUDE_SUBDOMAINS	A_INGRESS "hsts-include-subdomains"
+#define	IN_HSTS_MAX_AGE			A_INGRESS "hsts-max-age"
+#define	IN_FOLLOW_REDIRECTS		A_INGRESS "follow-redirects"
+#define	IN_PRESERVE_HOST		A_INGRESS "preserve-host"
 
 #define	IN_CLASS			A_KUBERNETES "ingress.class"
 #define	IN_CLASS_TRAFFICSERVER		"trafficserver"
 
 /* Ingress annotations - Torchbox */
-#define	IN_HSTS_INCLUDE_SUBDOMAINS	A_TORCHBOX "hsts-include-subdomains"
-#define	IN_HSTS_MAX_AGE			A_TORCHBOX "hsts-max-age"
-#define	IN_CACHE_ENABLE			A_TORCHBOX "cache-enable"
-#define	IN_CACHE_GENERATION		A_TORCHBOX "cache-generation"
-#define	IN_CACHE_IGNORE_PARAMS		A_TORCHBOX "cache-ignore-params"
-#define	IN_CACHE_WHITELIST_PARAMS	A_TORCHBOX "cache-whitelist-params"
-#define	IN_PRESERVE_HOST		A_TORCHBOX "preserve-host"
-#define	IN_FOLLOW_REDIRECTS		A_TORCHBOX "follow-redirects"
-#define	IN_AUTH_SATISFY			A_TORCHBOX "auth-satisfy"
-#define	IN_AUTH_SATISFY_ANY		"any"
-#define	IN_AUTH_SATISFY_ALL		"all"
+/* currently none, as all our custom annotations have been standardised */
 
 typedef struct {
 	char	*it_secret_name;

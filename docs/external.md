@@ -77,7 +77,7 @@ kind: Ingress
 metadata:
   name: external-ingress
   annotations:
-    ingress.torchbox.com/preserve-host: "false"
+    ingress.kubernetes.io/preserve-host: "false"
 spec:
   rules:
   - host: external.example.com

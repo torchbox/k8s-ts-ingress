@@ -7,7 +7,7 @@
             "ingress.kubernetes.io/auth-secret": "authtest",
             "ingress.kubernetes.io/auth-type": "basic",
             "ingress.kubernetes.io/whitelist-source-range": "127.0.0.0/8",
-            "ingress.torchbox.com/auth-satisfy": "all"
+            "ingress.kubernetes.io/auth-satisfy": "all"
         },
         "creationTimestamp": "2017-04-26T01:34:08Z",
         "generation": 3,

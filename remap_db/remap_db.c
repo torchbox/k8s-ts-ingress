@@ -530,6 +530,9 @@ rr_check_proto(const remap_db_t *db, const remap_request_t *req,
 	return RR_ERR_INVALID_PROTOCOL;
 }
 
+/*
+ * app-root: redirect a request for "/" to the given path.
+ */
 int
 rr_check_app_root(const remap_db_t *db, const remap_request_t *req,
 		  remap_result_t *ret)
@@ -537,11 +540,9 @@ rr_check_app_root(const remap_db_t *db, const remap_request_t *req,
 	if (!ret->rz_path->rp_app_root)
 		return RR_OK;
 
-	if (!strncmp(ret->rz_path->rp_app_root, req->rr_path,
-		     strlen(ret->rz_path->rp_app_root)))
+	if (req->rr_path)
 		return RR_OK;
 
-	/* The request is not in the app-root, so redirect it. */
 	ret->rz_location = strdup(ret->rz_path->rp_app_root);
 	ret->rz_status = 301;
 	return RR_REDIRECT;

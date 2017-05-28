@@ -1,13 +1,14 @@
 # Traffic Server ingress controller
 
-**WARNING: This is alpha code, do not use it in production.**
+**WARNING: This is alpha code, do not use it in production.**  (If you do,
+please report bugs.)
 
-This is a Kubernetes ingress controller plugin for
-[Apache Traffic Server](https://trafficserver.apache.org/), a high-performance,
-extensible HTTP proxy server (unrelated to Apache httpd).  The Ingress
-controller allows Traffic Server to act as an ingress controller for Kubernetes
-clusters, routing incoming requests to pods while providing TLS termination,
-caching, ESI and other standard Traffic Server features.
+[Apache Traffic Server](https://trafficserver.apache.org/) is a high-performance,
+extensible HTTP proxy server with a rich feature set, including TLS termination,
+caching, and edge-side includes (ESI).  This plugin allows TS to act as an
+[Ingress](https://github.com/kubernetes/ingress) controller for
+[Kubernetes](https://kubernetes.io) clusters, providing the reverse proxy that
+allows HTTP requests from the Internet to reach Kubernetes pods.
 
 The controller is provided as C source code and as a pre-built Docker image.
 If you want to add Kubernetes support to an existing instance of TS, you should
@@ -55,12 +56,40 @@ The controller provides the following features:
 * ESI (Edge-Side Includes).
 
 More features are planned for future releases.  If you would like to see a
-particular feature supported, please [open a Github issue](https://github.com/torchbox/k8s-ts-ingress/issues).
+particular feature supported, please
+[open a Github issue](https://github.com/torchbox/k8s-ts-ingress/issues).
+
+## Planned features
+
+A feature being listed here indicates we are interested in implementing it, but
+provides no guarantee that it will be implemented within any particular time
+frame, or ever.
+
+* TLS client certificate authentication.
+* Client session affinity
+* Proxy protocol
+* Cross-Origin Resource Sharing
+* Rate limiting
+* SSL passthrough
+* Global / default configuration
+* Per-ingress gzip configuration
+* HSTS preload support (in any case, rewrite the HSTS support as it will be
+  removed from TS core in some later release)
+* Per-Ingress timeout configuration
+* HTTP/2 server push
+* Custom error bodies
+* Improve API watch support by first retrieving all objects, then watching with resourceVersion.
 
 ## Release history
 
+* 1.0.0-alpha6 (unreleased):
+    * The behaviour of the `app-root` annotation was changed to match the
+      behaviour of other Ingress controllers.
+    * Several annotations were moved from `ingress.kubernetes.io` to
+      `ingress.kubernetes.io` to improve compatibility among Ingress
+      controllers.
 * 1.0.0-alpha5:
-    * Incompatible change: The `ingress.torchbox.com/auth-address-list`
+    * Incompatible change: The `ingress.kubernetes.io/auth-address-list`
         annotation was renamed to `ingress.kubernetes.io/whitelist-source-range`,
         and is now comma-delimited, for compatibility with other Ingress
         controllers.
