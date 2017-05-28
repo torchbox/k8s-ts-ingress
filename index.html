@@ -257,7 +257,6 @@ frame, or ever.</p>
 <li>Per-ingress gzip configuration</li>
 <li>HSTS preload support (in any case, rewrite the HSTS support as it will be
   removed from TS core in some later release)</li>
-<li>Per-Ingress timeout configuration</li>
 <li>HTTP/2 server push</li>
 <li>Custom error bodies</li>
 <li>Improve API watch support by first retrieving all objects, then watching with resourceVersion.</li>
@@ -265,16 +264,18 @@ frame, or ever.</p>
 <h2 id="release-history">Release history</h2>
 <ul>
 <li>1.0.0-alpha6 (unreleased):<ul>
-<li>The behaviour of the <code>app-root</code> annotation was changed to match the
-  behaviour of other Ingress controllers.</li>
-<li>Several annotations were moved from <code>ingress.kubernetes.io</code> to
-  <code>ingress.kubernetes.io</code> to improve compatibility among Ingress
-  controllers.</li>
+<li>Incompatible change: The behaviour of the <code>app-root</code> annotation was
+    changed to match the behaviour of other Ingress controllers.</li>
+<li>Incompatible change: Several annotations were moved from
+    <code>ingress.torchbox.com</code> to <code>ingress.kubernetes.io</code> to improve
+     compatibility among Ingress controllers.</li>
+<li>Feature: The <code>ingress.kubernetes.io/read-response-timeout</code> annotation
+    was implemented.</li>
 </ul>
 </li>
 <li>1.0.0-alpha5:<ul>
-<li>Incompatible change: The <code>ingress.kubernetes.io/auth-address-list</code>
-    annotation was renamed to <code>ingress.kubernetes.io/whitelist-source-range</code>,
+<li>Incompatible change: The <code>ingress.torchbox.com/auth-address-list</code>
+    annotation was renamed to <code>ingress.torchbox.com/whitelist-source-range</code>,
     and is now comma-delimited, for compatibility with other Ingress
     controllers.</li>
 <li>Feature: Support Ingress classes.</li>
@@ -378,5 +379,5 @@ public domain.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-05-28 19:17:56
+Build Date UTC : 2017-05-28 20:04:33
 -->
