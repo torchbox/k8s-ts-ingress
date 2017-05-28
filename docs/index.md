@@ -75,7 +75,6 @@ frame, or ever.
 * Per-ingress gzip configuration
 * HSTS preload support (in any case, rewrite the HSTS support as it will be
   removed from TS core in some later release)
-* Per-Ingress timeout configuration
 * HTTP/2 server push
 * Custom error bodies
 * Improve API watch support by first retrieving all objects, then watching with resourceVersion.
@@ -83,14 +82,16 @@ frame, or ever.
 ## Release history
 
 * 1.0.0-alpha6 (unreleased):
-    * The behaviour of the `app-root` annotation was changed to match the
-      behaviour of other Ingress controllers.
-    * Several annotations were moved from `ingress.kubernetes.io` to
-      `ingress.kubernetes.io` to improve compatibility among Ingress
-      controllers.
+    * Incompatible change: The behaviour of the `app-root` annotation was
+        changed to match the behaviour of other Ingress controllers.
+    * Incompatible change: Several annotations were moved from
+        `ingress.torchbox.com` to `ingress.kubernetes.io` to improve
+         compatibility among Ingress controllers.
+    * Feature: The `ingress.kubernetes.io/read-response-timeout` annotation
+        was implemented.
 * 1.0.0-alpha5:
-    * Incompatible change: The `ingress.kubernetes.io/auth-address-list`
-        annotation was renamed to `ingress.kubernetes.io/whitelist-source-range`,
+    * Incompatible change: The `ingress.torchbox.com/auth-address-list`
+        annotation was renamed to `ingress.torchbox.com/whitelist-source-range`,
         and is now comma-delimited, for compatibility with other Ingress
         controllers.
     * Feature: Support Ingress classes.

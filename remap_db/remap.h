@@ -33,9 +33,6 @@ extern "C" {
 #define	REMAP_MIME_FIELD_X_FORWARDED_PROTO_LEN	\
 	(sizeof(REMAP_MIME_FIELD_X_FORWARDED_PROTO) - 1)
 
-/*
- * Stores one path entry in an Ingress.
- */
 #define REMAP_AUTH_NONE		0x0
 #define REMAP_AUTH_BASIC	0x1
 #define	REMAP_AUTH_DIGEST	0x2
@@ -64,6 +61,9 @@ typedef struct remap_target {
 	int	 rt_port;
 } remap_target_t;
 
+/*
+ * remap_path: stores one path entry in an Ingress.
+ */
 typedef struct {
 	regex_t		  rp_regex;
 	remap_target_t	 *rp_addrs;
@@ -79,6 +79,7 @@ typedef struct {
 	char	 *rp_rewrite_target;
 	int	  rp_no_ssl_redirect:1;
 	int	  rp_force_ssl_redirect:1;
+	int	  rp_read_timeout;
 	uint	  rp_auth_type:2;
 	uint	  rp_auth_satisfy:1;
 	char	 *rp_auth_realm;

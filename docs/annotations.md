@@ -17,10 +17,9 @@ supported by most Ingress controllers; those beginning with
   request path matched by the Ingress `path` attribute will be replaced with
   this string.  This has no effect on an Ingress without a `path` set.
 
-* `ingress.kubernetes.io/app-root`: if set to a path prefix, and the request URI
-  does not begin with that prefix, then a redirect will be returned to this
-  path.  This can be used for applications which sit in a subdirectory rather
-  than at the root.
+* `ingress.kubernetes.io/app-root`: if set to a path, requests for `/` will be
+  redirected to this path.  This can be used for applications which sit in a
+  subdirectory rather than at the root.
 
 * `ingress.kubernetes.io/follow-redirects`: if `"true"`, Traffic Server will
   follow 3xx redirect responses and serve the final response to the client.
@@ -33,4 +32,6 @@ supported by most Ingress controllers; those beginning with
   in the request to the backend name (e.g., the pod name), instead of the
   original request host.
 
-
+* `ingress.kubernetes.io/read-response-timeout": set the time in seconds that
+  TS will wait for for the response from the origin.  If this timeout is
+  exceeded, an HTTP 504 error will be returned to the client.

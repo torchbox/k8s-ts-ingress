@@ -123,7 +123,7 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_HSTS_MAX_AGE			A_INGRESS "hsts-max-age"
 #define	IN_FOLLOW_REDIRECTS		A_INGRESS "follow-redirects"
 #define	IN_PRESERVE_HOST		A_INGRESS "preserve-host"
-
+#define	IN_READ_RESPONSE_TIMEOUT	A_INGRESS "read-response-timeout"
 #define	IN_CLASS			A_KUBERNETES "ingress.class"
 #define	IN_CLASS_TRAFFICSERVER		"trafficserver"
 

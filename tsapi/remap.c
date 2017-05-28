@@ -469,6 +469,16 @@ int			 reenable = 1;
 	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_SSL_HSTS_INCLUDE_SUBDOMAINS,
 			      res.rz_host->rh_hsts_subdomains);
 
+	/* Set timeouts */
+	if (res.rz_path->rp_read_timeout) {
+		TSHttpTxnConfigIntSet(txnp,
+			TS_CONFIG_HTTP_CONNECT_ATTEMPTS_TIMEOUT,
+			res.rz_path->rp_read_timeout);
+		TSHttpTxnConfigIntSet(txnp,
+			TS_CONFIG_HTTP_POST_CONNECT_ATTEMPTS_TIMEOUT,
+			res.rz_path->rp_read_timeout);
+	}
+
 	/*
 	 * Usually, we want to preserve the request host header so the backend
 	 * can use it.  If preserve-host is set to false on the Ingress, then

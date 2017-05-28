@@ -367,6 +367,10 @@ const char	*key = NULL, *value = NULL;
 		else if (strcmp(key, IN_REWRITE_TARGET) == 0 && *value == '/')
 			rp->rp_rewrite_target = strdup(value + 1);
 
+		/* read-respone-timeout: first byte timeout */
+		else if (strcmp(key, IN_READ_RESPONSE_TIMEOUT) == 0)
+			rp->rp_read_timeout = atoi(value);
+
 		/*
 		 * Authentication.
 		 */
