@@ -66,6 +66,8 @@
                 
                     <li><a class="toctree-l4" href="#features">Features</a></li>
                 
+                    <li><a class="toctree-l4" href="#planned-features">Planned features</a></li>
+                
                     <li><a class="toctree-l4" href="#release-history">Release history</a></li>
                 
                     <li><a class="toctree-l4" href="#license-and-credits">License and credits</a></li>
@@ -192,13 +194,14 @@
             <div class="section">
               
                 <h1 id="traffic-server-ingress-controller">Traffic Server ingress controller</h1>
-<p><strong>WARNING: This is alpha code, do not use it in production.</strong></p>
-<p>This is a Kubernetes ingress controller plugin for
-<a href="https://trafficserver.apache.org/">Apache Traffic Server</a>, a high-performance,
-extensible HTTP proxy server (unrelated to Apache httpd).  The Ingress
-controller allows Traffic Server to act as an ingress controller for Kubernetes
-clusters, routing incoming requests to pods while providing TLS termination,
-caching, ESI and other standard Traffic Server features.</p>
+<p><strong>WARNING: This is alpha code, do not use it in production.</strong>  (If you do,
+please report bugs.)</p>
+<p><a href="https://trafficserver.apache.org/">Apache Traffic Server</a> is a high-performance,
+extensible HTTP proxy server with a rich feature set, including TLS termination,
+caching, and edge-side includes (ESI).  This plugin allows TS to act as an
+<a href="https://github.com/kubernetes/ingress">Ingress</a> controller for
+<a href="https://kubernetes.io">Kubernetes</a> clusters, providing the reverse proxy that
+allows HTTP requests from the Internet to reach Kubernetes pods.</p>
 <p>The controller is provided as C source code and as a pre-built Docker image.
 If you want to add Kubernetes support to an existing instance of TS, you should
 build the plugin from source.  If you want to deploy TS inside a Kubernetes
@@ -237,11 +240,40 @@ to manage a virtual IP address on your cluster.</p>
 <li>ESI (Edge-Side Includes).</li>
 </ul>
 <p>More features are planned for future releases.  If you would like to see a
-particular feature supported, please <a href="https://github.com/torchbox/k8s-ts-ingress/issues">open a Github issue</a>.</p>
+particular feature supported, please
+<a href="https://github.com/torchbox/k8s-ts-ingress/issues">open a Github issue</a>.</p>
+<h2 id="planned-features">Planned features</h2>
+<p>A feature being listed here indicates we are interested in implementing it, but
+provides no guarantee that it will be implemented within any particular time
+frame, or ever.</p>
+<ul>
+<li>TLS client certificate authentication.</li>
+<li>Client session affinity</li>
+<li>Proxy protocol</li>
+<li>Cross-Origin Resource Sharing</li>
+<li>Rate limiting</li>
+<li>SSL passthrough</li>
+<li>Global / default configuration</li>
+<li>Per-ingress gzip configuration</li>
+<li>HSTS preload support (in any case, rewrite the HSTS support as it will be
+  removed from TS core in some later release)</li>
+<li>Per-Ingress timeout configuration</li>
+<li>HTTP/2 server push</li>
+<li>Custom error bodies</li>
+<li>Improve API watch support by first retrieving all objects, then watching with resourceVersion.</li>
+</ul>
 <h2 id="release-history">Release history</h2>
 <ul>
+<li>1.0.0-alpha6 (unreleased):<ul>
+<li>The behaviour of the <code>app-root</code> annotation was changed to match the
+  behaviour of other Ingress controllers.</li>
+<li>Several annotations were moved from <code>ingress.kubernetes.io</code> to
+  <code>ingress.kubernetes.io</code> to improve compatibility among Ingress
+  controllers.</li>
+</ul>
+</li>
 <li>1.0.0-alpha5:<ul>
-<li>Incompatible change: The <code>ingress.torchbox.com/auth-address-list</code>
+<li>Incompatible change: The <code>ingress.kubernetes.io/auth-address-list</code>
     annotation was renamed to <code>ingress.kubernetes.io/whitelist-source-range</code>,
     and is now comma-delimited, for compatibility with other Ingress
     controllers.</li>
@@ -346,5 +378,5 @@ public domain.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-05-27 00:00:13
+Build Date UTC : 2017-05-28 19:17:56
 -->
