@@ -8,7 +8,7 @@
   
   
   
-  <title>Using multiple Ingress controllers - TS Ingress Controller</title>
+  <title>CORS - TS Ingress Controller</title>
   
 
   <link rel="shortcut icon" href="../img/favicon.ico">
@@ -23,9 +23,9 @@
   
   <script>
     // Current page data
-    var mkdocs_page_name = "Using multiple Ingress controllers";
-    var mkdocs_page_input_path = "classes.md";
-    var mkdocs_page_url = "/classes/";
+    var mkdocs_page_name = "CORS";
+    var mkdocs_page_input_path = "cors.md";
+    var mkdocs_page_url = "/cors/";
   </script>
   
   <script src="../js/jquery-2.1.1.min.js"></script>
@@ -81,15 +81,8 @@
 
         
             
-    <li class="toctree-l1 current">
-        <a class="current" href="./">Using multiple Ingress controllers</a>
-        
-            <ul>
-            
-                <li class="toctree-l3"><a href="#using-multiple-ingress-controllers">Using multiple Ingress controllers</a></li>
-                
-            
-            </ul>
+    <li class="toctree-l1 ">
+        <a class="" href="../classes/">Using multiple Ingress controllers</a>
         
     </li>
 
@@ -145,8 +138,19 @@
 
         
             
-    <li class="toctree-l1 ">
-        <a class="" href="../cors/">CORS</a>
+    <li class="toctree-l1 current">
+        <a class="current" href="./">CORS</a>
+        
+            <ul>
+            
+                <li class="toctree-l3"><a href="#configuring-cross-origing-resource-sharing">Configuring Cross-Origing Resource Sharing</a></li>
+                
+                    <li><a class="toctree-l4" href="#basic-cors-configuration">Basic CORS configuration</a></li>
+                
+                    <li><a class="toctree-l4" href="#advanced-configuration">Advanced configuration</a></li>
+                
+            
+            </ul>
         
     </li>
 
@@ -176,11 +180,11 @@
     
       
         
-          <li>Installation &raquo;</li>
+          <li>Usage &raquo;</li>
         
       
     
-    <li>Using multiple Ingress controllers</li>
+    <li>CORS</li>
     <li class="wy-breadcrumbs-aside">
       
         
@@ -194,28 +198,56 @@
           <div role="main">
             <div class="section">
               
-                <h1 id="using-multiple-ingress-controllers">Using multiple Ingress controllers</h1>
-<p>If you want to deploy more than one Ingress controller inside a cluster (for
-example, to test the TS Ingress controller before deploying it properly), you
-will need to use Ingress classes to control which resources should be handled
-by which controller.</p>
-<p>The Ingress class is set as an annotation on the resource:</p>
-<pre><code>metadata:
+                <h1 id="configuring-cross-origing-resource-sharing">Configuring Cross-Origing Resource Sharing</h1>
+<p>CORS is a method to permit cross-origin HTTP requests in JavaScript, i.e.
+requests made by JS running on one domain to a page on a different domain.
+This is usually disallowed for security reasons (it could allow one page to
+send requests using the user's credentials to another page); CORS provides a
+way to safely permit such requests.</p>
+<p>For more information on CORS, see the documentation on the
+<a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS">Mozilla Developer Network</a>.</p>
+<p>There are two ways to configure CORS: either your application can send CORS
+headers itself, or you can configure the Ingress resource to do so for you.
+If your application is handling CORS itself, you do not need any of the
+configuration described here.</p>
+<h2 id="basic-cors-configuration">Basic CORS configuration</h2>
+<p>To enable cross-origin requests from any domain, set the
+<code>ingress.kubernetes.io/enable-cors</code> annotation on the Ingress resource:</p>
+<pre><code class="yaml">metadata:
   annotations:
-    kubernetes.io/ingress.class: &quot;trafficserver&quot;
+    ingress.kubernetes.io/enable-cors: &quot;true&quot;
 </code></pre>
 
-<p>The TS Ingress controller will handle any Ingress resource which does not have
-an Ingress class set, or where the Ingress class is set to "trafficserver".</p>
-<p>To change the Ingress classes that TS will handle, set <code>ingress_classes</code> in
-<code>kubernetes.config</code> (or the <code>$TS_INGRESS_CLASSES</code> environment variable) to a
-whitespace-separate list of values, e.g. <code>"trafficserver ts-staging"</code>.  This
-can be used to run multiple copies of the TS Ingress controller in one cluster.
-If you do this, the <code>trafficserver</code> class will not be handled unless you
-explicitly include it in the list.</p>
-<p>For more information, see
-<a href="https://github.com/nginxinc/kubernetes-ingress/tree/master/examples/multiple-ingress-controllers">Using Multiple Ingress Controller</a>
-in the Kubernetes documentation.</p>
+<p>This will allow requests from any origin, with credentials, with the following
+request methods: <code>GET</code>, <code>PUT</code>, <code>POST</code>, and <code>DELETE</code>.</p>
+<p>This must <strong>only</strong> be used for Ingress resources that serve static assets, or
+dynamic pages that do not use any sort of authentication (including cookies);
+otherwise, any page on the Internet will be able to steal users' credentials.</p>
+<p>Setting <code>enable-cors: "true"</code> is equivalent to setting the following annotations:</p>
+<pre><code>ingress.kubernetes.io/access-control-allow-origin: &quot;*&quot;
+ingress.kubernetes.io/access-control-allow-credentials: &quot;true&quot;
+ingress.kubernetes.io/access-control-allow-methods: &quot;GET, PUT, POST, DELETE, OPTIONS&quot;
+ingress.kubernetes.io/access-control-allow-headers: &quot;DNT, Keep-Alive, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Authorization&quot;
+ingress.kubernetes.io/access-control-max-age: &quot;1728000&quot;
+</code></pre>
+
+<p>Note that the nginx Ingress controller adds "<code>X-CustomHeader</code>" to the CORS
+header list if <code>enable-cors</code> is set.  We believe this is a mistake, and the TS
+implementation will not add that header.</p>
+<h2 id="advanced-configuration">Advanced configuration</h2>
+<p>If you want to allow cross-origin requests from a specific set of domains, or
+you want to control the request methods permitted or whether credentials should
+be sent, do not use <code>enable-cors</code>; instead, set the
+<code>ingress.kubernetes.io/access-control-allow-origin</code> annotation:</p>
+<pre><code class="yaml">ingress.kubernetes.io/access-control-allow-origin: &quot;*&quot;
+</code></pre>
+
+<p>or:</p>
+<pre><code class="yaml">ingress.kubernetes.io/access-control-allow-origin: &quot;https://mydomain.com https://myothersite.com&quot;
+</code></pre>
+
+<p>The value should be either <code>"*"</code> (meaning all origins), or a whitespace-delimited
+list of origins.</p>
               
             </div>
           </div>
@@ -223,10 +255,8 @@ in the Kubernetes documentation.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../config/" class="btn btn-neutral float-right" title="Configuration">Next <span class="icon icon-circle-arrow-right"></span></a>
       
-      
-        <a href="../docker/" class="btn btn-neutral" title="Using the Docker Image"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../tls/" class="btn btn-neutral" title="TLS"><span class="icon icon-circle-arrow-left"></span> Previous</a>
       
     </div>
   
@@ -256,10 +286,8 @@ in the Kubernetes documentation.</p>
           <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
       
       
-        <span><a href="../docker/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+        <span><a href="../tls/" style="color: #fcfcfc;">&laquo; Previous</a></span>
       
-      
-        <span style="margin-left: 15px"><a href="../config/" style="color: #fcfcfc">Next &raquo;</a></span>
       
     </span>
 </div>
