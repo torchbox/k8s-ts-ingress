@@ -92,6 +92,7 @@ frame, or ever.
     * Feature: The `ingress.kubernetes.io/read-response-timeout` annotation
         was implemented.
     * Feature: CORS annotations were implemented.
+    * Feature: HTTP compression was implemented.
     * Bug fix: With certain combinations of OpenSSL and Traffic Server versions,
         a TLS request for an unknown host could hang indefinitely instead of
         returning an error.

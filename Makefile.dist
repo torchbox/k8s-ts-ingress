@@ -22,6 +22,7 @@ VERSION?=		unversioned
 
 DISTFILES=	api crypt util auth remap_db	\
 		tsapi remap_db			\
+		contrib				\
 		gtest tests			\
 		configure			\
 		configure.ac			\
