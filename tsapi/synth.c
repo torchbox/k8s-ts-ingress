@@ -106,8 +106,12 @@ synth_vadd_header(synth_t *sy, const char *hdr, const char *fmt, va_list args)
 void
 synth_set_body(synth_t *sy, const char *body)
 {
-	sy_printf(sy, "Content-Length: %d\r\n", strlen(body));
-	sy_printf(sy, "\r\n%s", body);
+	if (body) {
+		sy_printf(sy, "Content-Length: %d\r\n", strlen(body));
+		sy_printf(sy, "\r\n%s", body);
+	} else {
+		sy_printf(sy, "Content-Length: 0\r\n");
+	}
 }
 
 void

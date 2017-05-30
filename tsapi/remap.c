@@ -52,109 +52,9 @@ remap_db_t	*db;
 }
 
 /*
- * check_authn_basic: consider whether the request's authentication details
- * match the given route_path's configured user database.  if so, return 1;
- * otherwise return 0.
+ * Copy the string s, which is exactly n bytes long.  Any nul characters in
+ * s will be ignored.
  */
-int
-check_authn_basic(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs,
-		  const remap_path_t *rp)
-{
-TSMLoc		 auth_hdr = NULL;
-int		 len, ret;
-const char	*cs;
-
-	auth_hdr = TSMimeHdrFieldFind(reqp, hdrs,
-				      TS_MIME_FIELD_AUTHORIZATION,
-				      TS_MIME_LEN_AUTHORIZATION);
-	if (auth_hdr == NULL)
-		return 0;
-
-	cs = TSMimeHdrFieldValueStringGet(reqp, hdrs, auth_hdr, 0, &len);
-	ret = auth_check_basic(cs, len, rp);
-	TSHandleMLocRelease(reqp, hdrs, auth_hdr);
-
-	return ret == 1 ? 1 : 0;
-}
-
-/*
- * check_authz_address: test whether the client IP address for this txn matches
- * the address list in the remap_path.
- */
-int
-check_authz_address(TSHttpTxn txn, const remap_path_t *rp)
-{
-const struct sockaddr	*addr;
-
-	addr = TSHttpTxnClientAddrGet(txn);
-	if (addr == NULL)
-		return 0;
-
-	return auth_check_address(addr, rp);
-}
-
-/*
- * check_authz: validate the request against the given remap_path's
- * authentication configuration.  One of the following values will be
- * returned:
- *
- * AUTHZ_PERMIT:
- * 	The request was successfully authentication and can proceed.
- *
- * AUTHZ_DENY_ADDRESS:
- * 	The request was denied because of the client's IP address; it should not
- * 	proceed and providing authentication will not help.  (Return code 403.)
- *
- * AUTHZ_DENY_AUTHN:
- * 	The request was denied because it was missing authentication details,
- * 	or the provided authentication was incorrect.  The request should not
- * 	proceed, but it may succeed if the client retries with valid
- * 	authentication.  (Return code 401.)
- */
-
-#define	AUTHZ_PERMIT		1
-#define	AUTHZ_DENY_ADDRESS	2
-#define	AUTHZ_DENY_AUTHN	3
-
-int
-check_authz(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdrs, const remap_path_t *rp)
-{
-	if (rp->rp_auth_addr_list) {
-		if (check_authz_address(txn, rp)) {
-			if (rp->rp_auth_satisfy == REMAP_SATISFY_ANY) {
-				TSDebug("kubernetes", "check_authz: permitted"
-					" request because IP address matches"
-					" and satisfy is ANY");
-				return AUTHZ_PERMIT;
-			}
-		} else {
-			if (rp->rp_auth_satisfy == REMAP_SATISFY_ALL)
-				return AUTHZ_DENY_ADDRESS;
-		}
-	}
-
-	switch (rp->rp_auth_type) {
-	case REMAP_AUTH_NONE:
-		TSDebug("kubernetes", "check_authz: permitted request because"
-			" authentication is not configured");
-		return AUTHZ_PERMIT;
-
-	case REMAP_AUTH_BASIC:
-		if (check_authn_basic(txn, reqp, hdrs, rp)) {
-			TSDebug("kubernetes", "check_authz: permitted request"
-				" because basic authentication succeeded");
-			return AUTHZ_PERMIT;
-		}
-		break;
-
-	case REMAP_AUTH_DIGEST:
-		/* unimplemented */
-		break;
-	}
-
-	return AUTHZ_DENY_AUTHN;
-}
-
 static char *
 xstrndup(const char *s, size_t n)
 {
@@ -190,7 +90,7 @@ TSHttpTxn	txnp = TSContDataGet(contn);
 int
 request_from_txn(TSHttpTxn txnp, remap_request_t *req)
 {
-TSMLoc		 hdrs, url, auth_hdr;
+TSMLoc		 hdrs, url;
 TSMBuffer	 reqp;
 const char	*cs;
 char		*s;
@@ -199,6 +99,10 @@ int		 len;
 	/* Fetch the request and the URL. */
 	TSHttpTxnClientReqGet(txnp, &reqp, &hdrs);
 	TSHttpHdrUrlGet(reqp, hdrs, &url);
+
+	/* method */
+	cs = TSHttpHdrMethodGet(reqp, hdrs, &len);
+	req->rr_method = xstrndup(cs, len);
 
 	/* scheme */
 	if ((cs = TSUrlSchemeGet(reqp, url, &len)) != NULL)
@@ -224,16 +128,31 @@ int		 len;
 	/* client network address */
 	req->rr_addr = TSHttpTxnClientAddrGet(txnp);
 
-	/* Authorization header */
-	auth_hdr = TSMimeHdrFieldFind(reqp, hdrs,
-				      TS_MIME_FIELD_AUTHORIZATION,
-				      TS_MIME_LEN_AUTHORIZATION);
-	if (auth_hdr) {
-		cs = TSMimeHdrFieldValueStringGet(reqp, hdrs, auth_hdr, 0,
-						  &len);
-		if (cs)
-			req->rr_auth = xstrndup(cs, len);
-		TSHandleMLocRelease(reqp, hdrs, auth_hdr);
+	/* request header fields */
+	req->rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
+	for (int i = 0, end = TSMimeHdrFieldsCount(reqp, hdrs); i < end; ++i) {
+	TSMLoc			 ts_field;
+	remap_hdrfield_t	*remap_field;
+
+		remap_field = calloc(1, sizeof(*remap_field));
+		ts_field = TSMimeHdrFieldGet(reqp, hdrs, i);
+		remap_field->rh_nvalues = TSMimeHdrFieldValuesCount(reqp, hdrs,
+								    ts_field);
+		remap_field->rh_values = calloc(sizeof(char *),
+						remap_field->rh_nvalues);
+		/* store each value */
+		for (size_t j = 0; j < remap_field->rh_nvalues; ++j) {
+			cs = TSMimeHdrFieldValueStringGet(reqp, hdrs, ts_field,
+							  j, &len);
+			remap_field->rh_values[j] = xstrndup(cs, len);
+		}
+
+		cs = TSMimeHdrFieldNameGet(reqp, hdrs, ts_field, &len);
+		s = xstrndup(cs, len);
+		for (int j = 0; j < len; ++j)
+			s[j] = tolower(s[j]);
+		hash_set(req->rr_hdrfields, s, remap_field);
+		free(s);
 	}
 
 	TSHandleMLocRelease(reqp, hdrs, url);
@@ -257,6 +176,7 @@ TSMLoc		hdrs, newurl;
 
 	TSUrlCreate(reqp, &newurl);
 	TSUrlSchemeSet(reqp, newurl, res->rz_proto, -1);
+	//TSUrlPortSet(reqp, newurl, res->rz_target->rt_port);
 
 	TSUrlPathSet(reqp, newurl, res->rz_urlpath, -1);
 
@@ -330,6 +250,48 @@ TSMLoc		hdrs, xfp;
 }
 
 /*
+ * A continuation to set headers on the HTTP reponse.  It expects its
+ * continuation data to be a hash_t of string pairs.  This must be hooked to
+ * both TS_HTTP_READ_RESPONSE_HDR and TS_HTTP_TXN_CLOSE_HOOK to ensure the
+ * data is freed.
+ */
+int
+set_headers(TSCont contp, TSEvent event, void *edata)
+{
+hash_t		hdrset = TSContDataGet(contp);
+TSHttpTxn	txn = edata;
+TSMBuffer	resp;
+TSMLoc		hdrs;
+const char	*h, *v;
+
+	if (event == TS_EVENT_HTTP_TXN_CLOSE) {
+		TSDebug("kubernetes", "set_headers: closing");
+		hash_free(hdrset);
+		TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+		return TS_SUCCESS;
+	}
+
+	assert(event == TS_EVENT_HTTP_READ_RESPONSE_HDR);
+	TSDebug("kubernetes", "set_headers: running");
+
+	TSHttpTxnServerRespGet(txn, &resp, &hdrs);
+
+	hash_foreach(hdrset, &h, &v) {
+	TSMLoc	hdr;
+		TSDebug("kubernetes", "set_headers: [%s] = [%s]", h, v);
+		TSMimeHdrFieldCreateNamed(resp, hdrs, h, strlen(h), &hdr);
+		TSMimeHdrFieldValueStringInsert(resp, hdrs, hdr, 0,
+						v, strlen(v));
+		TSMimeHdrFieldAppend(resp, hdrs, hdr);
+		TSHandleMLocRelease(resp, hdrs, hdr);
+	}
+
+	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdrs);
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+	return TS_SUCCESS;
+}
+
+/*
  * handle_remap: called in READ_REQUEST_HDR_HOOK.  Match the incoming request
  * to an Ingress path (remap_path), apply any configurations from annotations,
  * and either set the host to proxy the request to the backend, or return
@@ -367,13 +329,17 @@ int			 reenable = 1;
 
 	/* Do the remap */
 	switch (remap_run(db, &req, &res)) {
-	case RR_REDIRECT:
-		sy = synth_new(301, "Moved");
-		synth_add_header(sy, "Location", "%s", res.rz_location);
+	case RR_SYNTHETIC: {
+	const char	*k, *v;
+
+		sy = synth_new(res.rz_status, res.rz_status_text);
+		hash_foreach(res.rz_headers, &k, &v)
+			synth_add_header(sy, k, v);
 		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
-		synth_set_body(sy, "The requested document has moved.\r\n");
+		synth_set_body(sy, res.rz_body);
 		synth_intercept(sy, txnp);
 		goto cleanup;
+	}
 
 		/* client errors */
 	case RR_ERR_INVALID_HOST:
@@ -512,6 +478,18 @@ int			 reenable = 1;
 	 * is set.
 	 */
 	TSSkipRemappingSet(txnp, 1);
+
+	/*
+	 * Set any extra response headers we need, e.g. for CORS.
+	 */
+	if (res.rz_headers) {
+		TSCont c = TSContCreate(set_headers, TSMutexCreate());
+		TSContDataSet(c, res.rz_headers);
+		TSHttpTxnHookAdd(txnp, TS_HTTP_READ_RESPONSE_HDR_HOOK, c);
+		TSHttpTxnHookAdd(txnp, TS_HTTP_TXN_CLOSE_HOOK, c);
+		/* prevent the hash being freed later */
+		res.rz_headers = NULL;
+	}
 
 	/*
 	 * If the target is an IP address (the usual case) we can pass it

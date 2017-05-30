@@ -9,8 +9,10 @@ instead.
 
 The following are required to build:
 
-* Traffic Server 7.0 or later (including development headers).  Older versions
-  might work, but are not tested or supported.
+* Traffic Server 7.1 or later (including development headers).  Older versions
+  might work, but are not tested or supported.  In particular, TS 7.0 (the
+  latest released version) is currently not supported; we intend to address this
+  in a future release of the plugin.
 * A working C99 compiler and `make` utility.
 * json-c library
 * cURL library

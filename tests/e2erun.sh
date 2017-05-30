@@ -170,12 +170,13 @@ install_plugin() {
 _actually_runtest() {
 	test=$1
 
-	printf 'Creating resources for test...\n'
+	printf '%-40s: ' "$test"
+	printf >>$TESTDIR/log  'Creating resources for test...\n'
 	for resource in tests/e2e/$test/resources/*.json; do
 		sed -e "s/\$TEST_IP_ADDRESS/$TEST_IP_ADDRESS/g" \
 			$resource >$TESTDIR/tmp.json
 
-		if ! $KUBECTL create -f $TESTDIR/tmp.json; then
+		if ! $KUBECTL create -f $TESTDIR/tmp.json >> $TESTDIR/log 2>&1; then
 			return 1
 		fi
 	done
@@ -184,8 +185,10 @@ _actually_runtest() {
 	sleep 5
 
 	if tests/e2e/$test/run.sh; then
+		printf 'ok\n'
 		return 0
 	else
+		printf 'failed\n'
 		return 1
 	fi
 }
@@ -196,10 +199,6 @@ _runtest() {
 
 	TESTS_RUN=$(expr $TESTS_RUN + 1)
 
-	printf '\n\n'
-	printf '#############################################################\n'
-	printf '>>> Running test: %s\n\n' $test
-
 	if _actually_runtest $1; then
 		TESTS_OK=$(expr $TESTS_OK + 1)
 	else
@@ -208,10 +207,7 @@ _runtest() {
 		status=1
 	fi
 
-	printf '\n>>> Cleaning up.\n'
-	$KUBECTL delete -f tests/e2e/$test/resources || true
-	printf '\n>>> Finished test: %s\n' $test
-	printf '#############################################################\n\n'
+	$KUBECTL delete -f tests/e2e/$test/resources >>$TESTDIR/log 2>&1
 }
 
 if [ -z "$E2E_KUBERNETES_VERSION" ]; then
@@ -282,12 +278,15 @@ start_apiserver
 start_httpd
 start_ts
 
+printf '\nRunning tests:\n\n'
+
 for test in $(cd tests/e2e; echo * | sort); do
 	_runtest $test
 done
 
+printf '\n'
 
-printf '>>> Ran %d tests, %d ok, %d failed\n' $TESTS_RUN $TESTS_OK $TESTS_FAILED
+printf '>>> Ran %d tests, %d ok, %d failed\n\n' $TESTS_RUN $TESTS_OK $TESTS_FAILED
 exit=0
 if [ $TESTS_RUN -ne $TESTS_OK ]; then
 	printf '*** FAILED.\n\n'

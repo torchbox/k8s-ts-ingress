@@ -52,6 +52,7 @@ The controller provides the following features:
   individual pages from the cache (`PURGE`), and fast clearing of the entire
   cache;
 * Authorization using HTTP Basic authentication or client IP address;
+* A complete, configurable CORS implementation;
 * Proxying to external (non-Kubernetes) services using Ingress resources;
 * ESI (Edge-Side Includes).
 
@@ -68,7 +69,6 @@ frame, or ever.
 * TLS client certificate authentication.
 * Client session affinity
 * Proxy protocol
-* Cross-Origin Resource Sharing
 * Rate limiting
 * SSL passthrough
 * Global / default configuration
@@ -77,7 +77,8 @@ frame, or ever.
   removed from TS core in some later release)
 * HTTP/2 server push
 * Custom error bodies
-* Improve API watch support by first retrieving all objects, then watching with resourceVersion.
+* Improve API watch support by first retrieving all objects, then watching with
+  resourceVersion.
 
 ## Release history
 
@@ -89,6 +90,10 @@ frame, or ever.
          compatibility among Ingress controllers.
     * Feature: The `ingress.kubernetes.io/read-response-timeout` annotation
         was implemented.
+    * Feature: CORS annotations were implemented.
+    * Bug fix: With certain combinations of OpenSSL and Traffic Server versions,
+        a TLS request for an unknown host could hang indefinitely instead of
+        returning an error.
 * 1.0.0-alpha5:
     * Incompatible change: The `ingress.torchbox.com/auth-address-list`
         annotation was renamed to `ingress.torchbox.com/whitelist-source-range`,

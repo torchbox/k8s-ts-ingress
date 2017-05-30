@@ -121,9 +121,7 @@ TEST(Auth, Basic)
 					 cryptpw.c_str())));
 
 		EXPECT_EQ(test.expect,
-			  auth_check_basic(test.field.data(),
-				  	   test.field.size(),
-				  	   &test_rp))
+			  auth_check_basic(test.field.data(), &test_rp))
 			<< "field [" << test.field << "], "
 			<< "username [" << test.user << "], "
 			<< "password [" << test.password << "]";

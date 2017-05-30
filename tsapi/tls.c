@@ -74,9 +74,9 @@ struct state		*state = TSContDataGet(contn);
 		host, rh->rh_ctx);
 
 	SSL_set_SSL_CTX(ssl, rh->rh_ctx);
-	TSVConnReenable(ssl_vc);
 
 cleanup:
+	TSVConnReenable(ssl_vc);
 	if (db_cfg)
 		TSConfigRelease(state->cfg_slot, db_cfg);
 	return TS_SUCCESS;

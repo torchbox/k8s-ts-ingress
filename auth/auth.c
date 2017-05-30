@@ -19,6 +19,7 @@
 #include	"ts_crypt.h"
 #include	"plugin.h"
 #include	"base64.h"
+#include	"auth.h"
 
 /*
  * Test whether the given plaintext password matches the encrypted password
@@ -41,13 +42,13 @@ char	*crypted;
  * the header could not be parsed (or is not a basic authentication header).
  */
 int
-auth_check_basic(const char *hdr, size_t len, const remap_path_t *rp)
+auth_check_basic(const char *hdr, const remap_path_t *rp)
 {
 char		 buf[256];
 char		*creds;
 char		*p;
 int		 n;
-size_t		 credslen;
+size_t		 credslen, len = strlen(hdr);
 
 	if (rp->rp_auth_type != REMAP_AUTH_BASIC)
 		return 0;

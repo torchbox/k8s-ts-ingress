@@ -70,21 +70,36 @@ typedef struct {
 	size_t		  rp_naddrs;
 	hash_t		  rp_users;
 
-	int	  rp_cache:1;
-	int	  rp_cache_gen;
-	int	  rp_follow_redirects:1;
-	int	  rp_secure_backends:1;
-	int	  rp_preserve_host:1;
-	char	 *rp_app_root;
-	char	 *rp_rewrite_target;
-	int	  rp_no_ssl_redirect:1;
-	int	  rp_force_ssl_redirect:1;
-	int	  rp_read_timeout;
-	uint	  rp_auth_type:2;
-	uint	  rp_auth_satisfy:1;
-	char	 *rp_auth_realm;
-	hash_t	  rp_ignore_params;
-	hash_t	  rp_whitelist_params;
+	/* Caching */
+	int	  rp_cache:1;			/* Enable caching	     */
+	int	  rp_cache_gen;			/* Set cache generation	     */
+	hash_t	  rp_ignore_params;		/* Params to ignore in cache */
+	hash_t	  rp_whitelist_params;		/* Cache param whitelist     */
+
+	/* TLS */
+	int	  rp_follow_redirects:1;	/* Follow 301/302 redirect   */
+	int	  rp_secure_backends:1;		/* Use TLS to origin	     */
+	int	  rp_no_ssl_redirect:1;		/* Never TLS redirect	     */
+	int	  rp_force_ssl_redirect:1;	/* Always TLS redirect	     */
+
+	/* Misc */
+	int	  rp_preserve_host:1;		/* Use origin name as Host   */
+	char	 *rp_app_root;			/* Redirect /		     */
+	char	 *rp_rewrite_target;		/* Rewrite path		     */
+	int	  rp_read_timeout;		/* Origin read timeout	     */
+
+	/* Authn/authz */
+	uint	  rp_auth_type:2;		/* Authentication type	     */
+	uint	  rp_auth_satisfy:1;		/* Auth satisfy (all/any)    */
+	char	 *rp_auth_realm;		/* Auth realm		     */
+
+	/* CORS */
+	int	  rp_enable_cors:1;		/* Do CORS processing	     */
+	int	  rp_cors_creds:1;		/* Allow credentials	     */
+	hash_t	  rp_cors_origins;		/* Permitted CORS origins    */
+	char	 *rp_cors_methods;		/* CORS methods		     */
+	char	 *rp_cors_headers;		/* CORS headersil	     */
+	int	  rp_cors_max_age;		/* CORS max age		     */
 
 	struct remap_auth_addr *rp_auth_addr_list;
 } remap_path_t;
@@ -136,17 +151,28 @@ remap_host_t	*remap_db_get_host(const remap_db_t *, const char *hostname);
 remap_host_t	*remap_db_get_or_create_host(remap_db_t *, const char *hostname);
 
 /*
+ * Represent a single header field.
+ */
+typedef struct remap_hdrfield {
+	size_t	  rh_nvalues;
+	char	**rh_values;
+} remap_hdrfield_t;
+
+void	remap_hdrfield_free(remap_hdrfield_t *);
+
+/*
  * Request data for remap_run();
  */
 typedef struct remap_request {
 	char		*rr_proto;	/* Request proto (http, https...) */
+	char		*rr_method;	/* Request method (GET, POST, ...) */
 	char		*rr_host;	/* Request Host: header */
 	char		*rr_path;	/* Request URL path, with leading '/' */
 	char		*rr_query;	/* Request URL query string, not
 					   including leading '/' */
+	hash_t		 rr_hdrfields;	/* Lowercased request header fields */
 	const struct sockaddr
 			*rr_addr;	/* Client network address */
-	char		*rr_auth;	/* Request Authorization: header */
 } remap_request_t;
 
 /*
@@ -170,25 +196,30 @@ typedef struct remap_result {
 	char			*rz_urlpath;
 	char			*rz_query;
 
-	/* redirect */
-	char		*rz_location;
+	/* headers to include in the response */
+	hash_t		 rz_headers;
+
+	/* synthetic response */
 	int		 rz_status;
+	const char	*rz_status_text;
+	const char	*rz_body;
 
 	/* the host and path that matched the request, if any */
 	remap_host_t	*rz_host;
 	remap_path_t	*rz_path;
 } remap_result_t;
 
-#define	RR_OK			0	/* Successful remap */
-#define	RR_REDIRECT		1	/* Redirect client */
-#define	RR_ERR_INVALID_HOST	(-1)	/* Host: header missing or invalid */
-#define	RR_ERR_INVALID_PROTOCOL	(-2)	/* Unrecognised protocol */
-#define	RR_ERR_NO_HOST		(-3)	/* Host not found */
-#define	RR_ERR_NO_PATH		(-4)	/* Path not found */
+#define	RR_OK			0	/* Successful remap		     */
+#define	RR_SYNTHETIC		1	/* Return a synthetic response, e.g.
+					   a redirect.			     */
+#define	RR_ERR_INVALID_HOST	(-1)	/* Host: header missing or invalid   */
+#define	RR_ERR_INVALID_PROTOCOL	(-2)	/* Unrecognised protocol	     */
+#define	RR_ERR_NO_HOST		(-3)	/* Host not found		     */
+#define	RR_ERR_NO_PATH		(-4)	/* Path not found		     */
 #define	RR_ERR_NO_BACKEND	(-5)	/* Path found, but has no functional
 					   backends */
-#define	RR_ERR_FORBIDDEN	(-6)	/* Request denied by IP address */
-#define	RR_ERR_UNAUTHORIZED	(-7)	/* Request denied by authentication */
+#define	RR_ERR_FORBIDDEN	(-6)	/* Request denied by IP address	     */
+#define	RR_ERR_UNAUTHORIZED	(-7)	/* Request denied by authenticatio   */
 
 
 int	remap_run(const remap_db_t *db, const remap_request_t *,

@@ -19,3 +19,4 @@ pages:
   - Authentication: auth.md
   - External proxying: external.md
   - TLS: tls.md
+  - CORS: cors.md

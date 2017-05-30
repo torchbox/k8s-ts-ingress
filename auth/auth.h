@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 int auth_check_password(hash_t users, const char *usenam, const char *pass);
-int auth_check_basic(const char *hdr, size_t hdrlen, const remap_path_t *);
+int auth_check_basic(const char *hdr, const remap_path_t *);
 int auth_check_address(const struct sockaddr *addr, const remap_path_t *);
 
 int ipv4_in_network(in_addr_t ip, in_addr_t netw, int pfxlen);

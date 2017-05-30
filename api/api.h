@@ -126,6 +126,13 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_READ_RESPONSE_TIMEOUT	A_INGRESS "read-response-timeout"
 #define	IN_CLASS			A_KUBERNETES "ingress.class"
 #define	IN_CLASS_TRAFFICSERVER		"trafficserver"
+#define	IN_ENABLE_CORS			A_INGRESS "enable-cors"
+#define	IN_ACCESS_CONTROL_ALLOW_ORIGIN	A_INGRESS "access-control-allow-origin"
+#define	IN_ACCESS_CONTROL_MAX_AGE	A_INGRESS "access-control-max-age"
+#define	IN_ACCESS_CONTROL_ALLOW_CREDENTIALS	\
+				A_INGRESS "access-control-allow-credentials"
+#define	IN_ACCESS_CONTROL_ALLOW_HEADERS	A_INGRESS "access-control-allow-headers"
+#define	IN_ACCESS_CONTROL_ALLOW_METHODS	A_INGRESS "access-control-allow-methods"
 
 /* Ingress annotations - Torchbox */
 /* currently none, as all our custom annotations have been standardised */

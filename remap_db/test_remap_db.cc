@@ -57,6 +57,18 @@ namespace {
 
 		return cluster;
 	}
+
+	remap_hdrfield_t *
+	make_hdr_field(const char *value)
+	{
+		remap_hdrfield_t *ret;
+		ret = (remap_hdrfield_t *)calloc(1, sizeof(*ret));
+		ret->rh_nvalues = 1;
+		ret->rh_values = (char **)calloc(sizeof(char *), 1);
+		ret->rh_values[0] = strdup(value);
+		return ret;
+	}
+
 } // anonymous namespace
 
 TEST(RemapDB, PathLookup)
@@ -139,6 +151,7 @@ TEST(RemapDB, Basic)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -171,6 +184,7 @@ TEST(RemapDB, EmptyPath)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = NULL;
@@ -203,6 +217,7 @@ TEST(RemapDB, IngressClass1)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -233,6 +248,7 @@ TEST(RemapDB, IngressClass2)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -263,6 +279,7 @@ TEST(RemapDB, IngressClass3)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -293,6 +310,7 @@ TEST(RemapDB, ForceTLSRedirect)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -301,9 +319,9 @@ TEST(RemapDB, ForceTLSRedirect)
 	memset(&res, 0, sizeof(res));
 
 	int ret = remap_run(db, &req, &res);
-	ASSERT_EQ(RR_REDIRECT, ret);
-	EXPECT_STREQ("https://echoheaders.gce.t6x.uk/what/ever",
-		     res.rz_location);
+	ASSERT_EQ(RR_SYNTHETIC, ret);
+	const char *s = (const char *)hash_get(res.rz_headers, "Location");
+	EXPECT_STREQ("https://echoheaders.gce.t6x.uk/what/ever", s);
 	EXPECT_EQ(301, res.rz_status);
 
 	remap_request_free(&req);
@@ -323,6 +341,7 @@ TEST(RemapDB, ForceTLSRedirectEmptyPath)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = NULL;
@@ -331,9 +350,9 @@ TEST(RemapDB, ForceTLSRedirectEmptyPath)
 	memset(&res, 0, sizeof(res));
 
 	int ret = remap_run(db, &req, &res);
-	ASSERT_EQ(RR_REDIRECT, ret);
-	EXPECT_STREQ("https://echoheaders.gce.t6x.uk/",
-		     res.rz_location);
+	ASSERT_EQ(RR_SYNTHETIC, ret);
+	const char *s = (const char *)hash_get(res.rz_headers, "Location");
+	EXPECT_STREQ("https://echoheaders.gce.t6x.uk/", s);
 	EXPECT_EQ(301, res.rz_status);
 
 	remap_request_free(&req);
@@ -353,6 +372,7 @@ TEST(RemapDB, AppRoot1)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -380,6 +400,7 @@ TEST(RemapDB, AppRoot2)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = NULL;
@@ -388,8 +409,9 @@ TEST(RemapDB, AppRoot2)
 	memset(&res, 0, sizeof(res));
 
 	int ret = remap_run(db, &req, &res);
-	EXPECT_EQ(RR_REDIRECT, ret);
-	EXPECT_STREQ("/app/", res.rz_location);
+	EXPECT_EQ(RR_SYNTHETIC, ret);
+	const char *s = (const char *)hash_get(res.rz_headers, "Location");
+	EXPECT_STREQ("/app/", s);
 	EXPECT_EQ(301, res.rz_status);
 
 	remap_request_free(&req);
@@ -409,6 +431,7 @@ TEST(RemapDB, AppRoot3)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("app/foo");
@@ -435,6 +458,7 @@ TEST(RemapDB, RewriteTarget)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
@@ -466,6 +490,7 @@ TEST(RemapDB, SecureBackends)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
@@ -501,6 +526,7 @@ TEST(RemapDB, AuthAddressPermit)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
@@ -537,6 +563,7 @@ TEST(RemapDB, AuthAddressDeny)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
@@ -570,11 +597,14 @@ TEST(RemapDB, AuthBasicPermit)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
-	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWludGVzdA==");
+	
+	hash_set(req.rr_hdrfields, "authorization",
+		 make_hdr_field("Basic cGxhaW50ZXN0OnBsYWludGVzdA=="));
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
@@ -607,6 +637,7 @@ TEST(RemapDB, AuthBasicDenyNoCredentials)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
@@ -640,11 +671,13 @@ TEST(RemapDB, AuthBasicDenyInvalidCredentials)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
-	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWlueHRlc3Q=");
+	hash_set(req.rr_hdrfields, "authorization",
+		 make_hdr_field("Basic cGxhaW50ZXN0OnBsYWlueHRlc3Q="));
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
@@ -674,11 +707,13 @@ TEST(RemapDB, AuthAllPermit)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
-	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWludGVzdA==");
+	hash_set(req.rr_hdrfields, "authorization",
+	         make_hdr_field("Basic cGxhaW50ZXN0OnBsYWludGVzdA=="));
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
@@ -711,6 +746,7 @@ TEST(RemapDB, AuthAllDenyNoCredentials)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
@@ -744,11 +780,13 @@ TEST(RemapDB, AuthAllDenyInvalidCredentials)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
-	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWlueHRlc3Q=");
+	hash_set(req.rr_hdrfields, "authorization",
+	         make_hdr_field("Basic cGxhaW50ZXN0OnBsYWlueHRlc3Q="));
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
@@ -778,11 +816,13 @@ TEST(RemapDB, AuthAllDenyInvalidAddress)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("foo/bar");
 	req.rr_addr = reinterpret_cast<struct sockaddr *>(&sin);
-	req.rr_auth = strdup("Basic cGxhaW50ZXN0OnBsYWludGVzdA==");
+	hash_set(req.rr_hdrfields, "authorization",
+	        make_hdr_field("Basic cGxhaW50ZXN0OnBsYWludGVzdA=="));
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
@@ -807,6 +847,7 @@ TEST(RemapDB, QueryString)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -838,6 +879,7 @@ TEST(RemapDB, QueryStringIgnore)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -869,6 +911,7 @@ TEST(RemapDB, QueryStringWhitelist)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -900,6 +943,7 @@ TEST(RemapDB, QueryStringIgnoreAndWhitelist)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -931,6 +975,7 @@ TEST(RemapDB, CacheKey)
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
 	req.rr_path = strdup("what/ever");
@@ -953,6 +998,114 @@ TEST(RemapDB, CacheKey)
 		"\004http\026echoheaders.gce.t6x.uk\011\000what/ever\016\000quux=4&xyzzy=5", keysize) == 0);
 
 	free(cachekey);
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, CORS1)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-cors1.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
+	hash_set(req.rr_hdrfields, "Origin", make_hdr_field("http://foo.com"));
+	req.rr_method = strdup("GET");
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+
+	const char *s = (const char *)hash_get(res.rz_headers,
+					       "Access-Control-Allow-Origin");
+	EXPECT_STREQ(s, "*");
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, CORS2)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-cors1.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
+	req.rr_method = strdup("GET");
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_OK, ret);
+
+	const char *s = (const char *)hash_get(res.rz_headers,
+					       "Access-Control-Allow-Origin");
+	EXPECT_TRUE(s == NULL);
+
+	remap_request_free(&req);
+	remap_result_free(&res);
+	remap_db_free(db);
+	k8s_config_free(cfg);
+	cluster_free(cluster);
+}
+
+TEST(RemapDB, CORSPreflight)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-cors1.json");
+	k8s_config_t *cfg = k8s_config_new();
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
+	hash_set(req.rr_hdrfields, "Origin", make_hdr_field("http://foo.com"));
+	req.rr_method = strdup("OPTIONS");
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.gce.t6x.uk");
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+
+	int ret = remap_run(db, &req, &res);
+	EXPECT_EQ(RR_SYNTHETIC, ret);
+	EXPECT_EQ(204, res.rz_status);
+
+	EXPECT_STREQ("*", (const char *)hash_get(res.rz_headers,
+				"Access-Control-Allow-Origin"));
+	EXPECT_STREQ("true", (const char *)hash_get(res.rz_headers,
+				"Access-Control-Allow-Credentials"));
+	EXPECT_STREQ("1728000", (const char *)hash_get(res.rz_headers,
+				"Access-Control-Max-Age"));
+	EXPECT_STREQ("GET, PUT, POST, DELETE, OPTIONS" ,
+			(const char *)hash_get(res.rz_headers,
+				"Access-Control-Allow-Methods"));
+	EXPECT_STREQ("DNT, Keep-Alive, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Authorization",
+			(const char *)hash_get(res.rz_headers,
+				"Access-Control-Allow-Headers"));
+
 	remap_request_free(&req);
 	remap_result_free(&res);
 	remap_db_free(db);

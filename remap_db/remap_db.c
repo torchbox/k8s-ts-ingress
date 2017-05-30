@@ -154,6 +154,7 @@ int		 rerr;
 		return NULL;
 
 	ret->rp_preserve_host = 1;
+	ret->rp_cors_origins = hash_new(127, NULL);
 
 	if (!path)
 		return ret;
@@ -201,9 +202,12 @@ struct remap_auth_addr	*rip, *nrip;
 	free(rp->rp_app_root);
 	free(rp->rp_rewrite_target);
 	free(rp->rp_auth_realm);
+	free(rp->rp_cors_headers);
+	free(rp->rp_cors_methods);
 	hash_free(rp->rp_users);
 	hash_free(rp->rp_whitelist_params);
 	hash_free(rp->rp_ignore_params);
+	hash_free(rp->rp_cors_origins);
 	regfree(&rp->rp_regex);
 
 	for (rip = rp->rp_auth_addr_list; rip; rip = nrip) {
@@ -298,6 +302,8 @@ const char	*key = NULL, *value = NULL;
 	 */
 
 	hash_foreach(annotations, &key, &value) {
+		TSDebug("kubernetes", "[%s] = [%s]", key, value);
+
 		/* cache-enable: turn caching on or off */
 		if (strcmp(key, IN_CACHE_ENABLE) == 0)
 			rp->rp_cache = truefalse(value);
@@ -345,8 +351,11 @@ const char	*key = NULL, *value = NULL;
 			rp->rp_secure_backends = truefalse(value);
 
 		/* ssl-redirect: if false, disable http->https redirect */
-		else if (strcmp(key, IN_SSL_REDIRECT) == 0)
-			rp->rp_no_ssl_redirect = !truefalse(value);
+		else if (strcmp(key, IN_SSL_REDIRECT) == 0) {
+			rp->rp_no_ssl_redirect = truefalse(value) ? 0 : 1;
+			TSDebug("kubernetes", "rp_no_ssl_redirect=%d",
+				rp->rp_no_ssl_redirect);
+		}
 
 		/*
 		 * force-ssl-redirect: redirect http->https even if the
@@ -372,6 +381,45 @@ const char	*key = NULL, *value = NULL;
 			rp->rp_read_timeout = atoi(value);
 
 		/*
+		 * CORS; either enable-cors can be specified, or a more
+		 * specific configuration. 
+		*/
+		else if (strcmp(key, IN_ENABLE_CORS) == 0) {
+			/*
+			 * Set a standard, wide-open CORS configuration.
+			 */
+			rp->rp_enable_cors = 1;
+			hash_set(rp->rp_cors_origins, "*", HASH_PRESENT);
+			rp->rp_cors_creds = 1;
+			rp->rp_cors_methods = strdup("GET, PUT, POST, "
+						     "DELETE, OPTIONS");
+			rp->rp_cors_headers = strdup(
+				"DNT, Keep-Alive, User-Agent, "
+				"X-Requested-With, If-Modified-Since, "
+				"Cache-Control, Content-Type, Authorization");
+			rp->rp_cors_max_age = 1728000;
+		}
+
+		else if (strcmp(key, IN_ACCESS_CONTROL_ALLOW_ORIGIN) == 0) {
+		char	*p, *q, *r;
+			q = strdup(value);
+			for (p = strtok_r(q, " \t\r\n", &r);
+			     p; p = strtok_r(NULL, " \t\r\n", &r))
+				hash_set(rp->rp_cors_origins, p, HASH_PRESENT);
+			free(q);
+			rp->rp_enable_cors = 1;
+		}
+
+		else if (strcmp(key, IN_ACCESS_CONTROL_MAX_AGE) == 0)
+			rp->rp_cors_max_age = atoi(value);
+		else if (strcmp(key, IN_ACCESS_CONTROL_ALLOW_HEADERS) == 0)
+			rp->rp_cors_headers = strdup(value);
+		else if (strcmp(key, IN_ACCESS_CONTROL_ALLOW_METHODS) == 0)
+			rp->rp_cors_methods = strdup(value);
+		else if (strcmp(key, IN_ACCESS_CONTROL_ALLOW_CREDENTIALS) == 0)
+			rp->rp_cors_creds = strcmp(value, "true") ? 1 : 0;
+
+		/* 
 		 * Authentication.
 		 */
 
@@ -547,9 +595,11 @@ rr_check_app_root(const remap_db_t *db, const remap_request_t *req,
 	if (req->rr_path)
 		return RR_OK;
 
-	ret->rz_location = strdup(ret->rz_path->rp_app_root);
+	hash_set(ret->rz_headers, "Location", strdup(ret->rz_path->rp_app_root));
 	ret->rz_status = 301;
-	return RR_REDIRECT;
+	ret->rz_status_text = "Moved";
+	ret->rz_body = "This document has moved.\n";
+	return RR_SYNTHETIC;
 }
 
 int
@@ -558,6 +608,7 @@ rr_check_tls(const remap_db_t *db, const remap_request_t *req,
 {
 const char	*newp;
 size_t		 blen;
+char		*hdr;
 
 	/* If already TLS, do nothing */
 	if (!strcmp(req->rr_proto, "https") || !strcmp(req->rr_proto, "wss"))
@@ -567,6 +618,8 @@ size_t		 blen;
 	 * Skip redirect if no_ssl_redirect is set, or if the rh_ctx is null
 	 * and force_ssl_redirect is not set.
 	 */
+	TSDebug("kubernetes", "rp_no_ssl_redirect=%d",
+		ret->rz_path->rp_no_ssl_redirect);
 	if (ret->rz_path->rp_no_ssl_redirect)
 		return RR_OK;
 	if (!ret->rz_host->rh_ctx && !ret->rz_path->rp_force_ssl_redirect)
@@ -587,21 +640,86 @@ size_t		 blen;
 	if (req->rr_query)
 		blen += strlen(req->rr_query) + 1;
 
-	ret->rz_location = malloc(blen);
-	snprintf(ret->rz_location, blen, "%s://%s/%s%s%s",
+	hdr = malloc(blen);
+	snprintf(hdr, blen, "%s://%s/%s%s%s",
 		 newp, req->rr_host,
 		 req->rr_path ? req->rr_path : "",
 		 req->rr_query ? "?" : "",
 		 req->rr_query ? req->rr_query : "");
 
+	hash_set(ret->rz_headers, "Location", hdr);
 	ret->rz_status = 301;
-	return RR_REDIRECT;
+	ret->rz_status_text = "Moved";
+	ret->rz_body = "This document has moved.\n";
+	return RR_SYNTHETIC;
+}
+
+int
+rr_check_cors(const remap_db_t *db, const remap_request_t *req,
+	      remap_result_t *res)
+{
+const char		*origin;
+remap_hdrfield_t	*hdr;
+char			 s[32];
+
+	if (!res->rz_path->rp_enable_cors)
+		return RR_OK;
+
+	if ((hdr = hash_get(req->rr_hdrfields, "origin")) == NULL)
+		return RR_OK;
+	if (hdr->rh_nvalues < 1)
+		return RR_OK;
+	origin = hdr->rh_values[0];
+
+	/*
+	 * Is this a recognised CORS origin?
+	 */
+	if (hash_get(res->rz_path->rp_cors_origins, "*")) {
+		hash_set(res->rz_headers, "Access-Control-Allow-Origin",
+			 strdup("*"));
+	} else if (hash_get(res->rz_path->rp_cors_origins,  origin)) {
+		hash_set(res->rz_headers, "Access-Control-Allow-Origin",
+			 strdup(origin));
+		hash_set(res->rz_headers, "Vary", strdup("Origin"));
+	} else
+		return RR_OK;
+
+
+	/*
+	 * If this is a preflight request, set some extra headers and return
+	 * an empty body.
+	 */
+	if (strcmp(req->rr_method, "OPTIONS"))
+		return RR_OK;
+
+	if (res->rz_path->rp_cors_methods)
+		hash_set(res->rz_headers, "Access-Control-Allow-Methods",
+			 strdup(res->rz_path->rp_cors_methods));
+
+	if (res->rz_path->rp_cors_headers)
+		hash_set(res->rz_headers, "Access-Control-Allow-Headers",
+			 strdup(res->rz_path->rp_cors_headers));
+
+	if (res->rz_path->rp_cors_max_age) {
+		snprintf(s, sizeof(s), "%d", res->rz_path->rp_cors_max_age);
+		hash_set(res->rz_headers, "Access-Control-Max-Age", strdup(s));
+	}
+
+	hash_set(res->rz_headers, "Access-Control-Allow-Credentials",
+		 strdup(res->rz_path->rp_cors_creds ? "true" : "false"));
+
+	res->rz_status = 204;
+	res->rz_status_text = "No content";
+	return RR_SYNTHETIC;
 }
 
 int
 rr_check_auth(const remap_db_t *db, const remap_request_t *req,
 	      remap_result_t *res)
 {
+remap_hdrfield_t	*rr_auth_field;
+const char		*rr_auth = NULL;
+
 	/* No authentication? */
 	if (res->rz_path->rp_auth_type == REMAP_AUTH_NONE &&
 	    !res->rz_path->rp_auth_addr_list)
@@ -614,12 +732,22 @@ rr_check_auth(const remap_db_t *db, const remap_request_t *req,
 		return RR_ERR_FORBIDDEN;
 	}
 
+	/* fetch Authorization header; it should only ever have one value */
+	/* XXX is this right?  e.g., should we handle
+	 * 	Authorization: Bearer 1234, Basic abcd==
+	 * ?
+	 * in practice, it's extremely unlikely we would ever see such a
+	 * header.
+	 */
+	rr_auth_field = hash_get(req->rr_hdrfields, "authorization");
+	if (rr_auth_field && rr_auth_field->rh_nvalues == 1)
+		rr_auth = rr_auth_field->rh_values[0];
+
 	/* Only basic auth? */
 	if (!res->rz_path->rp_auth_addr_list) {
-		if (!req->rr_auth)
+		if (!rr_auth)
 			return RR_ERR_UNAUTHORIZED;
-		if (auth_check_basic(req->rr_auth, strlen(req->rr_auth),
-				     res->rz_path) == 1)
+		if (auth_check_basic(rr_auth, res->rz_path) == 1)
 			return RR_OK;
 		return RR_ERR_UNAUTHORIZED;
 	}
@@ -628,19 +756,17 @@ rr_check_auth(const remap_db_t *db, const remap_request_t *req,
 	if (res->rz_path->rp_auth_satisfy == REMAP_SATISFY_ANY) {
 		if (auth_check_address(req->rr_addr, res->rz_path))
 			return RR_OK;
-		if (!req->rr_auth)
+		if (!rr_auth)
 			return RR_ERR_UNAUTHORIZED;
-		if (auth_check_basic(req->rr_auth, strlen(req->rr_auth),
-				     res->rz_path) == 1)
+		if (auth_check_basic(rr_auth, res->rz_path) == 1)
 			return RR_OK;
 		return RR_ERR_UNAUTHORIZED;
 	} else {
 		if (!auth_check_address(req->rr_addr, res->rz_path))
 			return RR_ERR_FORBIDDEN;
-		if (!req->rr_auth)
+		if (!rr_auth)
 			return RR_ERR_UNAUTHORIZED;
-		if (auth_check_basic(req->rr_auth, strlen(req->rr_auth),
-				     res->rz_path) != 1)
+		if (auth_check_basic(rr_auth, res->rz_path) != 1)
 			return RR_ERR_UNAUTHORIZED;
 		return RR_OK;
 	}
@@ -745,7 +871,9 @@ int	 r;
 size_t	 pfxsz;
 
 	memset(ret, 0, sizeof(*ret));
+	ret->rz_headers = hash_new(127, free);
 
+	/* CORS? */
 	/* Check host header is present */
 	if (!req->rr_host || !*req->rr_host) {
 		TSDebug("kubernetes", "missing or empty host header");
@@ -776,6 +904,10 @@ size_t	 pfxsz;
 	 * to enter a password over insecure http.
 	 */
 	if ((r = rr_check_auth(db, req, ret)) != RR_OK)
+		return r;
+
+	/* CORS */
+	if ((r = rr_check_cors(db, req, ret)) != RR_OK)
 		return r;
 
 	/* Check for app-root */
@@ -820,17 +952,19 @@ size_t	 pfxsz;
 void
 remap_request_free(remap_request_t *req)
 {
+	free(req->rr_method);
 	free(req->rr_proto);
 	free(req->rr_host);
 	free(req->rr_path);
 	free(req->rr_query);
-	free(req->rr_auth);
+
+	hash_free(req->rr_hdrfields);
 }
 
 void
 remap_result_free(remap_result_t *rz)
 {
-	free(rz->rz_location);
+	hash_free(rz->rz_headers);
 	free(rz->rz_urlpath);
 	free(rz->rz_query);
 }
@@ -878,4 +1012,13 @@ char		*p;
 	if (res->rz_query)
 		memcpy(p, res->rz_query, querylen);
 	p += querylen;
+}
+
+void
+remap_hdrfield_free(remap_hdrfield_t *field)
+{
+	for (size_t i = 0; i < field->rh_nvalues; ++i)
+		free(field->rh_values[i]);
+	free(field->rh_values);
+	free(field);
 }
