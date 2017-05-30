@@ -4,15 +4,8 @@
 #
 # Permission is granted to anyone to use this software for any purpose,
 # including commercial applications, and to alter it and redistribute it
-# freely.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# freely. This software is provided 'as-is', without any express or implied
+# warranty.
 
 TS_INCDIR=	@TS_INCDIR@
 TS_PLUGINDIR=	@TS_PLUGINDIR@
@@ -32,7 +25,8 @@ CPPFLAGS=	@LIBCURL_CPPFLAGS@	\
 		-I${ROOT}/crypt		\
 		-I${ROOT}/remap_db	\
 		-I${ROOT}/tsapi		\
-		-I${ROOT}/util
+		-I${ROOT}/util		\
+		-I${ROOT}/contrib/brotli/include
 
 JSON_CFLAGS=	@JSON_CFLAGS@
 PTHREAD_LIBS=	@PTHREAD_LIBS@
@@ -75,6 +69,7 @@ SRCS=		hash.c		\
 		remap_db.c	\
 		remap_build.c	\
 		tls.c		\
+		compress.c	\
 		plugin.c	\
 		base64.c	\
 		auth.c		\
@@ -108,7 +103,8 @@ TEST_OBJS=	gtest-all.o		\
 all: kubernetes.so
 
 kubernetes.so: ${OBJS}
-	${CC} ${CFLAGS} ${LDFLAGS} -shared -o $@ ${OBJS} ${LIBS}
+	${MAKE} -C contrib/brotli libbrotli.a
+	${CC} ${CFLAGS} ${LDFLAGS} -shared -o $@ ${OBJS} ${LIBS} -Lcontrib/brotli -lbrotli
 
 test: ${TEST_OBJS} ${GTEST_OBJS}
 	${CXX} ${CXXFLAGS} ${LDFLAGS} ${TEST_OBJS} ${GTEST_OBJS} -o test ${LIBS} ${PTHREAD_LIBS}

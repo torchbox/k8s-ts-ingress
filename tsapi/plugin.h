@@ -60,10 +60,10 @@ struct state {
 	int		 cfg_slot;
 };
 
-int handle_remap(TSCont, TSEvent, void *);
-int handle_tls(TSCont, TSEvent, void *);
-
-void rebuild_maps(struct state *);
+int	handle_remap(TSCont, TSEvent, void *);
+int	handle_tls(TSCont, TSEvent, void *);
+void	tsi_compress(remap_path_t *rp, TSHttpTxn txn);
+void	rebuild_maps(struct state *);
 
 #ifdef __cplusplus
 }

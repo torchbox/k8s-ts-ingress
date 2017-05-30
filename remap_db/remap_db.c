@@ -156,6 +156,35 @@ int		 rerr;
 	ret->rp_preserve_host = 1;
 	ret->rp_cors_origins = hash_new(127, NULL);
 
+	/* Enable compresstion by default */
+	ret->rp_compress = 1;
+	ret->rp_compress_types = hash_new(127, NULL);
+
+	/*
+	 * This list of types is from the nginx Ingress controller.  Note that
+	 * text/html is deliberately excluded to avoid the TLS BREACH attack.
+	 */
+	hash_set(ret->rp_compress_types, "application/atom+xml", HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "application/javascript",
+		 HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "aplication/x-javascript",
+		 HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "application/json", HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "application/rss+xml", HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "application/vnd.ms-fontobject",
+		 HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "application/x-font-ttf",
+		 HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "application/x-web-app-manifest+json",
+		 HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "application/xml", HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "font/opentype", HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "image/svg+xml", HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "image/x-icon", HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "text/css", HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "text/plain", HASH_PRESENT);
+	hash_set(ret->rp_compress_types, "text/x-component", HASH_PRESENT);
+
 	if (!path)
 		return ret;
 
@@ -208,6 +237,7 @@ struct remap_auth_addr	*rip, *nrip;
 	hash_free(rp->rp_whitelist_params);
 	hash_free(rp->rp_ignore_params);
 	hash_free(rp->rp_cors_origins);
+	hash_free(rp->rp_compress_types);
 	regfree(&rp->rp_regex);
 
 	for (rip = rp->rp_auth_addr_list; rip; rip = nrip) {
@@ -341,6 +371,24 @@ const char	*key = NULL, *value = NULL;
 
 			free(v);
 		}
+
+		/* compress-types: set types to compress */
+		else if (strcmp(key, IN_COMPRESS_TYPES) == 0) {
+		char	*v = strdup(value);
+		char	*r, *sr = NULL;
+
+			hash_free(rp->rp_compress_types);
+			rp->rp_compress_types = hash_new(127, NULL);
+
+			for (r = strtok_r(v, " \t", &sr); r;
+			     r = strtok_r(NULL, " \t", &sr))
+				hash_set(rp->rp_compress_types, r, HASH_PRESENT);
+
+			free(v);
+		}
+
+		else if (strcmp(key, IN_COMPRESS_ENABLE) == 0)
+			rp->rp_compress = truefalse(value);
 
 		/* follow-redirects: if set, TS will resolve 3xx responses itself */
 		else if (strcmp(key, IN_FOLLOW_REDIRECTS) == 0)

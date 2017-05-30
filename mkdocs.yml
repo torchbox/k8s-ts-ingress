@@ -20,3 +20,4 @@ pages:
   - External proxying: external.md
   - TLS: tls.md
   - CORS: cors.md
+  - Compression: compression.md

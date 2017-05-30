@@ -492,6 +492,14 @@ int			 reenable = 1;
 	}
 
 	/*
+	 * Compress the response if enabled.  Do this here so we don't waste
+	 * time compressing any of the tiny error responses that might have
+	 * been generated above.
+	 */
+	if (res.rz_path->rp_compress)
+		tsi_compress(res.rz_path, txnp);
+
+	/*
 	 * If the target is an IP address (the usual case) we can pass it
 	 * to TS directly.
 	 */

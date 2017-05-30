@@ -51,6 +51,7 @@ The controller provides the following features:
   including support for alternatives (the HTTP `Vary` header field), removal of
   individual pages from the cache (`PURGE`), and fast clearing of the entire
   cache;
+* Configurable HTTP compression (gzip and Brotli);
 * Authorization using HTTP Basic authentication or client IP address;
 * A complete, configurable CORS implementation;
 * Proxying to external (non-Kubernetes) services using Ingress resources;
@@ -72,11 +73,11 @@ frame, or ever.
 * Rate limiting
 * SSL passthrough
 * Global / default configuration
-* Per-ingress gzip configuration
 * HSTS preload support (in any case, rewrite the HSTS support as it will be
   removed from TS core in some later release)
 * HTTP/2 server push
 * Custom error bodies
+* Brotli
 * Improve API watch support by first retrieving all objects, then watching with
   resourceVersion.
 

@@ -87,6 +87,8 @@ typedef struct {
 	char	 *rp_app_root;			/* Redirect /		     */
 	char	 *rp_rewrite_target;		/* Rewrite path		     */
 	int	  rp_read_timeout;		/* Origin read timeout	     */
+	int	  rp_compress:1;		/* Compress response	     */
+	hash_t	  rp_compress_types;		/* Content types to compress */
 
 	/* Authn/authz */
 	uint	  rp_auth_type:2;		/* Authentication type	     */

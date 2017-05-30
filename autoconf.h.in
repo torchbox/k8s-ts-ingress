@@ -9,6 +9,9 @@
 /* Define to 1 if you have the `ssl' library (-lssl). */
 #undef HAVE_LIBSSL
 
+/* Define to 1 if you have the `z' library (-lz). */
+#undef HAVE_LIBZ
+
 /* Define if you have POSIX threads libraries and header files. */
 #undef HAVE_PTHREAD
 

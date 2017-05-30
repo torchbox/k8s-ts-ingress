@@ -133,6 +133,8 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 				A_INGRESS "access-control-allow-credentials"
 #define	IN_ACCESS_CONTROL_ALLOW_HEADERS	A_INGRESS "access-control-allow-headers"
 #define	IN_ACCESS_CONTROL_ALLOW_METHODS	A_INGRESS "access-control-allow-methods"
+#define	IN_COMPRESS_ENABLE		A_INGRESS "compress-enable"
+#define	IN_COMPRESS_TYPES		A_INGRESS "compress-types"
 
 /* Ingress annotations - Torchbox */
 /* currently none, as all our custom annotations have been standardised */
