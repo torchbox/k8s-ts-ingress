@@ -1016,7 +1016,7 @@ TEST(RemapDB, CORS1)
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
-	hash_set(req.rr_hdrfields, "Origin", make_hdr_field("http://foo.com"));
+	hash_set(req.rr_hdrfields, "origin", make_hdr_field("http://foo.com"));
 	req.rr_method = strdup("GET");
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -1081,7 +1081,7 @@ TEST(RemapDB, CORSPreflight)
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
-	hash_set(req.rr_hdrfields, "Origin", make_hdr_field("http://foo.com"));
+	hash_set(req.rr_hdrfields, "origin", make_hdr_field("http://foo.com"));
 	req.rr_method = strdup("OPTIONS");
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
