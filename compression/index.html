@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  
+  <title>Compression - TS Ingress Controller</title>
+  
+
+  <link rel="shortcut icon" href="../img/favicon.ico">
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="../css/highlight.css">
+
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Compression";
+    var mkdocs_page_input_path = "compression.md";
+    var mkdocs_page_url = "/compression/";
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js"></script>
+  <script src="../js/modernizr-2.8.3.min.js"></script>
+  <script type="text/javascript" src="../js/highlight.pack.js"></script>
+  <script src="../js/theme.js"></script> 
+
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> TS Ingress Controller</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        <ul class="current">
+          
+            <li>
+    <li class="toctree-l1 ">
+        <a class="" href="..">Home</a>
+        
+    </li>
+<li>
+          
+            <li>
+    <ul class="subnav">
+    <li><span>Installation</span></li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../source/">Installing from source</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../docker/">Using the Docker Image</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../classes/">Using multiple Ingress controllers</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../config/">Configuration</a>
+        
+    </li>
+
+        
+    </ul>
+<li>
+          
+            <li>
+    <ul class="subnav">
+    <li><span>Usage</span></li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../annotations/">Annotations</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../caching/">Caching</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../auth/">Authentication</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../external/">External proxying</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../tls/">TLS</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../cors/">CORS</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 current">
+        <a class="current" href="./">Compression</a>
+        
+            <ul>
+            
+                <li class="toctree-l3"><a href="#http-compression">HTTP compression</a></li>
+                
+                    <li><a class="toctree-l4" href="#http-compression-and-caching">HTTP compression and caching</a></li>
+                
+                    <li><a class="toctree-l4" href="#http-compression-and-tls-breach">HTTP compression and TLS BREACH</a></li>
+                
+            
+            </ul>
+        
+    </li>
+
+        
+    </ul>
+<li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">TS Ingress Controller</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Usage &raquo;</li>
+        
+      
+    
+    <li>Compression</li>
+    <li class="wy-breadcrumbs-aside">
+      
+        
+          <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github"> Edit on GitHub</a>
+        
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="http-compression">HTTP compression</h1>
+<p>HTTP compression allows the response body of an HTTP transation to be compressed
+to reduce its size, saving bandwidth and decreasing page load times.  Both the
+gzip and Brotli algorithms are supported; gzip is the most common and
+widely-supported algorithm, while Brotli is a newer algorithm specifically
+designed to perform well for typical HTTP content (like HTML).</p>
+<p>SDCH (an experimental delta-compression algorithm) and deflate (an uncommon
+gzip-like format) are not supported.</p>
+<p>HTTP compression is enabled by default.  To disable compression on an Ingress,
+set the <code>ingress.kubernetes.io/compress-enable</code> annotation to <code>"false"</code>:</p>
+<pre><code class="yaml">metadata:
+  annotations:
+    ingress.kubernetes.io/compress-enable: &quot;false&quot;
+</code></pre>
+
+<p>HTTP compression is only used for certain file types.  It doesn't make sense to
+compress images, for example, since common image file formats already include
+compression, and a second layer of compression would only waste CPU cycles
+without any reduction in file size.</p>
+<p>By default, the following content types are compressed:</p>
+<ul>
+<li><code>text/css</code></li>
+<li><code>text/x-component</code></li>
+<li><code>text/plain</code></li>
+<li><code>font/opentype</code></li>
+<li><code>image/svg+xml</code></li>
+<li><code>image/x-icon</code></li>
+<li><code>application/atom+xml</code></li>
+<li><code>application/rss+xml</code></li>
+<li><code>application/javascript</code></li>
+<li><code>aplication/x-javascript</code></li>
+<li><code>application/json</code></li>
+<li><code>application/vnd.ms-fontobject</code></li>
+<li><code>application/x-font-ttf</code></li>
+<li><code>application/x-web-app-manifest+json</code></li>
+</ul>
+<p>This is a reasonable default list for most sites, but if you want to provide
+your own list, set the <code>ingress.kubernetes.io/compress-types</code> annotation:</p>
+<pre><code class="yaml">metadata:
+  annotations:
+    ingress.kubernetes.io/compress-types: &quot;test/css application/javascript application/vnd.my-special-type&quot;
+</code></pre>
+
+<h2 id="http-compression-and-caching">HTTP compression and caching</h2>
+<p>TS always fetches uncompressed documents from the origin server (the application),
+and stores uncompressed pages in its cache.  If the client requests a
+compressed response, the document is compressed on the fly while sending it to
+the client.</p>
+<p>This avoids a common problem with caching based on the value of the
+<code>Accept-Encoding</code> header (e.g. using <code>Vary</code>): if a compressed version of the
+document is cached, and the client requests an uncompressed version, TS will go
+to the origin to fetch the new version.  If the page has changed and not been
+purged in the mean time, this can lead to different version of the document
+being returned depending on whether the client supports compression, leading
+to strange and difficult to debug problems.</p>
+<p>The disadvantage of this method is that it increases TS CPU usage; this may
+become an issue if you are serving a lot of traffic (several hundred Mbits/sec
+or more).  If this is an issue for you, you can disable compression on the
+Ingress, and return compressed responses from your application instead, using
+<code>Vary: Accept-Encoding</code>.</p>
+<p>We may implement a more efficient compression mechanism (likely a hybrid of
+these two options) in a future release.</p>
+<h2 id="http-compression-and-tls-breach">HTTP compression and TLS BREACH</h2>
+<p>Document types that commonly contain sensitive content (such as <code>text/html</code>)
+are not included on the default compression list.  This is because compressing
+those content types can leave applications open to the TLS
+<a href="https://en.wikipedia.org/wiki/BREACH">BREACH</a> attack, allowing plaintext page
+content (such as CSRF tokens) to be recovered from encrypted data.</p>
+<p>If you add these content types to the <code>compress-types</code> list, especially
+<code>text/html</code>, you must ensure your application is not affected; for example if
+your application:</p>
+<ul>
+<li>does not include sensitive data in the page body;</li>
+<li>does not use TLS and is therefore insecure anyway;</li>
+<li>includes sensitive data in the page body, but does so in a way specifically
+  designed to resist attack via BREACH (for example, Django version 1.10 or
+  newer).</li>
+</ul>
+<p>If you are not certain that your application meets at least one of these
+requirements, you should not enable compression of HTML.</p>
+<p>There are methods to mitigate BREACH in the proxy layer, for example "length
+hiding", which obfuscates the length of the returned document by appending
+random comment data to the HTML.  We may implement this in a future version if
+there is any user demand for it.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="../cors/" class="btn btn-neutral" title="CORS"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+      <p>Copyright (c) 2016-2017 Torchbox Ltd.</p>
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+	  
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+<div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+          <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
+      
+      
+        <span><a href="../cors/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+    </span>
+</div>
+
+</body>
+</html>
