@@ -253,8 +253,20 @@ be sent, do not use <code>enable-cors</code>; instead, set the
 <pre><code class="yaml">ingress.kubernetes.io/access-control-allow-origin: &quot;https://mydomain.com https://myothersite.com&quot;
 </code></pre>
 
-<p>The value should be either <code>"*"</code> (meaning all origins), or a whitespace-delimited
+<p>The value should be either <code>"*"</code> (meaning all origins) or a whitespace-delimited
 list of origins.</p>
+<p>You can use the following set of annotations to configure other CORS headers
+in the response:</p>
+<ul>
+<li><code>ingress.kubernetes.io/access-control-allow-credentials</code></li>
+<li><code>ingress.kubernetes.io/access-control-allow-methods</code></li>
+<li>`ingress.kubernetes.io/access-control-allow-headers</li>
+<li><code>ingress.kubernetes.io/access-control-max-age</code></li>
+</ul>
+<p>There is no default for these values, so you will likely want to set all of
+them.</p>
+<p>Do not set <code>ingress.kubernetes.io/enable-cors</code> at the same time as any of the
+other CORS-related annotations; behaviour in that case is undefined.</p>
               
             </div>
           </div>
