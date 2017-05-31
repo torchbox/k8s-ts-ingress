@@ -3,10 +3,10 @@
 **WARNING: This is alpha code, do not use it in production.**  (If you do,
 please report bugs.)
 
-[Apache Traffic Server](https://trafficserver.apache.org/) is a high-performance,
+[Traffic Server](https://trafficserver.apache.org/) is a high-performance,
 extensible HTTP proxy server with a rich feature set, including TLS termination,
-caching, and edge-side includes (ESI).  This plugin allows TS to act as an
-[Ingress](https://github.com/kubernetes/ingress) controller for
+caching, and edge-side includes (ESI).  This plugin allows Traffic Server to
+act as an [Ingress](https://github.com/kubernetes/ingress) controller for
 [Kubernetes](https://kubernetes.io) clusters, providing the reverse proxy that
 allows HTTP requests from the Internet to reach Kubernetes pods.
 

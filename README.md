@@ -1,14 +1,14 @@
-Apache Traffic Server ingress controller for Kubernetes
-=======================================================
+Traffic Server ingress controller for Kubernetes
+================================================
 
 **WARNING: This is alpha code, do not use it in production.**
 
 This is a Kubernetes ingress controller plugin for
-[Apache Traffic Server](https://trafficserver.apache.org/), a high-performance,
-extensible HTTP proxy server (unrelated to Apache httpd).  The Ingress
-controller allows Traffic Server to act as an ingress controller for Kubernetes
-clusters, routing incoming requests to pods while providing TLS termination,
-caching, ESI and other standard Traffic Server features.
+[Traffic Server](https://trafficserver.apache.org/), a high-performance,
+extensible HTTP proxy server.  The Ingress controller allows Traffic Server to
+act as an ingress controller for Kubernetes clusters, routing incoming requests
+to pods while providing TLS termination, caching, ESI and other standard
+Traffic Server features.
 
 The controller is provided as C source code and as a pre-built Docker image.
 If you want to add Kubernetes support to an existing instance of TS, you should
