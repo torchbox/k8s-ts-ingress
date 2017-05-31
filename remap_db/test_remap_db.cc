@@ -992,10 +992,12 @@ TEST(RemapDB, CacheKey)
 
 	char *cachekey;
 	size_t keysize;
+	string expected = "/BGh0dHAWZWNob2hlYWRlcnMuZ2NlLnQ2eC51awkAd2hhdC9ldm"
+		"VyDgBxdXV4PTQmeHl6enk9NQ==";
 	remap_make_cache_key(&req, &res, &cachekey, &keysize);
-	ASSERT_EQ(55u, keysize);
-	EXPECT_TRUE(memcmp(cachekey,
-		"\004http\026echoheaders.gce.t6x.uk\011\000what/ever\016\000quux=4&xyzzy=5", keysize) == 0);
+	string actual = string(cachekey, keysize);
+	EXPECT_EQ(expected.size(), keysize);
+	EXPECT_EQ(expected, actual);
 
 	free(cachekey);
 	remap_request_free(&req);

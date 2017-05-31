@@ -1065,10 +1065,11 @@ size_t		 buflen;
 		memcpy(p, res->rz_query, querylen);
 	p += querylen;
 
-	*keylen = base64_encode_len(buflen);
-	*key = malloc(*keylen + 1);
+	*keylen = base64_encode_len(buflen) + 1;
+	*key = malloc(*keylen);
 	**key = '/';
 	base64_encode((unsigned char*)buf, buflen, *key + 1);
+	free(buf);
 }
 
 void
