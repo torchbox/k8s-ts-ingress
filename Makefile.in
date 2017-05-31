@@ -125,6 +125,7 @@ lint: ${SRCS}
 
 clean:
 	rm -f kubernetes.so ${OBJS} ${TEST_OBJS} *.plist test
+	${MAKE} -C contrib/brotli clean
 
 depend: ${SRCS} ${TEST_SRCS}
 	sed -e '/^# ADDED BY MAKE DEPEND -- DO NOT DELETE/,$$ d' < Makefile > Makefile.tmp

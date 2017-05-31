@@ -7,7 +7,8 @@
 # freely. This software is provided 'as-is', without any express or implied
 # warranty.
 
-VPATH=	common enc
+VPATH=	@top_srcdir@/contrib/brotli/common	\
+	@top_srcdir@/contrib/brotli/enc
 SRCS=	backward_references.c backward_references_hq.c bit_cost.c	\
         block_splitter.c brotli_bit_stream.c cluster.c			\
 	compress_fragment.c compress_fragment_two_pass.c dictionary.c	\
@@ -25,3 +26,6 @@ libbrotli.a: ${OBJS}
 
 %.o: %.c
 	${CC} ${CPPFLAGS} ${CFLAGS} -c $<
+
+clean:
+	rm -f ${OBJS} libbrotli.a
