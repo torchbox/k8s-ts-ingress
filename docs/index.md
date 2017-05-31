@@ -67,6 +67,7 @@ A feature being listed here indicates we are interested in implementing it, but
 provides no guarantee that it will be implemented within any particular time
 frame, or ever.
 
+* Configurable cookie removal
 * TLS client certificate authentication.
 * Client session affinity
 * Proxy protocol
@@ -77,7 +78,6 @@ frame, or ever.
   removed from TS core in some later release)
 * HTTP/2 server push
 * Custom error bodies
-* Brotli
 * Improve API watch support by first retrieving all objects, then watching with
   resourceVersion.
 
