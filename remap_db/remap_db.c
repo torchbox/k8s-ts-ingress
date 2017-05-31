@@ -156,12 +156,13 @@ int		 rerr;
 	ret->rp_preserve_host = 1;
 	ret->rp_cors_origins = hash_new(127, NULL);
 
+	/* Cache by default */
+	ret->rp_cache = 1;
+	ret->rp_ignore_cookies = hash_new(127, NULL);
+
 	/* Enable compresstion by default */
 	ret->rp_compress = 1;
 	ret->rp_compress_types = hash_new(127, NULL);
-
-	/* Cache by default */
-	ret->rp_cache = 1;
 
 	/*
 	 * This list of types is from the nginx Ingress controller.  Note that
@@ -241,6 +242,7 @@ struct remap_auth_addr	*rip, *nrip;
 	hash_free(rp->rp_ignore_params);
 	hash_free(rp->rp_cors_origins);
 	hash_free(rp->rp_compress_types);
+	hash_free(rp->rp_ignore_cookies);
 	regfree(&rp->rp_regex);
 
 	for (rip = rp->rp_auth_addr_list; rip; rip = nrip) {
@@ -371,6 +373,21 @@ const char	*key = NULL, *value = NULL;
 			for (r = strtok_r(v, " \t", &sr); r;
 			     r = strtok_r(NULL, " \t", &sr))
 				hash_set(rp->rp_whitelist_params, r, HASH_PRESENT);
+
+			free(v);
+		}
+
+		/* cache-ignore-cookies: cookie names to remove from the request */
+		else if (strcmp(key, IN_CACHE_IGNORE_COOKIES) == 0) {
+		char	*v = strdup(value);
+		char	*r, *sr = NULL;
+
+			hash_free(rp->rp_ignore_cookies);
+			rp->rp_ignore_cookies = hash_new(127, NULL);
+
+			for (r = strtok_r(v, " \t", &sr); r;
+			     r = strtok_r(NULL, " \t", &sr))
+				hash_set(rp->rp_ignore_cookies, r, HASH_PRESENT);
 
 			free(v);
 		}

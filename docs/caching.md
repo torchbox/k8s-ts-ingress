@@ -136,6 +136,40 @@ These annotations also change the query string sent to the application.  This is
 to ensure the application doesn't accidentally vary the page content based on a
 query parameter that has been ignored for caching.
 
+## Caching and cookies
+
+Usually, TS will not cache a response or serve a request from the cache if
+either of the following are true:
+
+* The request has a `Cookie` header field
+* The response has a `Set-Cookie` header field
+
+This is true even if the response includes an explicit `Cache-Control`, and is
+intended to avoid accidental leakage of private data due to misconfiguration.
+
+However, in some cases your users may have cookies set that do not affect page
+content.  This is common with tracking cookies for page analytics tools; Google
+Analytics, for example, sets several cookies with names like `__utma`, which are
+only ever referenced from JavaScript and do not affect page content.
+
+To allow caching to work even with these cookies set, use the
+`ingress.kubernetes.io/cache-remove-cookies` annotation:
+
+```yaml
+metadata:
+  annotations:
+    ingress.kubernetes.io/cache-remove-cookies: "utm_* has_js"
+```
+
+The annotation value should be a space-delimited list of UNIX globs; any cookie
+in the request `Cookie:` header field which matches one of the globs will be
+removed.  If there are no cookies left, then the entire `Cookie` header field
+will be removed from the request; the request can then be served from the cache,
+or its response can be stored in the cache.
+
+
+If any cookies remain after processing, caching will be bypassed as normal.
+
 ## Removing pages from the cache
 
 ### Removing individual URLs
@@ -168,7 +202,7 @@ When an Ingress has caching enable, TS will include an `X-Cache-Status` header
 in the HTTP response, which looks like this:
 
 ```
-X-Cache-Status: hit (1496232521)
+X-Cache-Status: hit-fresh (1496232521)
 ```
 
 The number in brackets is the current cache generation configured on the Ingress.

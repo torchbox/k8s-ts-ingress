@@ -119,6 +119,7 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_CACHE_GENERATION		A_INGRESS "cache-generation"
 #define	IN_CACHE_IGNORE_PARAMS		A_INGRESS "cache-ignore-params"
 #define	IN_CACHE_WHITELIST_PARAMS	A_INGRESS "cache-whitelist-params"
+#define	IN_CACHE_IGNORE_COOKIES		A_INGRESS "cache-ignore-cookies"
 #define	IN_HSTS_INCLUDE_SUBDOMAINS	A_INGRESS "hsts-include-subdomains"
 #define	IN_HSTS_MAX_AGE			A_INGRESS "hsts-max-age"
 #define	IN_FOLLOW_REDIRECTS		A_INGRESS "follow-redirects"

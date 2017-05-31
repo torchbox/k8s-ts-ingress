@@ -30,6 +30,7 @@
 #include	"base64.h"
 #include	"ts_crypt.h"
 #include	"auth.h"
+#include	"strmatch.h"
 
 void
 rebuild_maps(struct state *state)
@@ -329,6 +330,108 @@ const char	*h, *v;
 	return TS_SUCCESS;
 }
 
+int
+should_ignore_cookie(hash_t globs, const char *cookie)
+{
+const char	*k, *p = strchr(cookie, '=');
+
+	if (!p)
+		return 0;
+
+	hash_foreach(globs, &k, NULL)
+		if (strmatch(cookie, p, k, k + strlen(k)))
+			return 1;
+
+	return 0;
+}
+
+static void
+check_cookies(TSHttpTxn txn, remap_request_t *req, remap_result_t *res,
+	      int *can_cache)
+{
+TSMBuffer	 reqp;
+TSMLoc		 hdr;
+TSMLoc		 field;
+char		*s, *r, *t;
+const char	*cs;
+int		 len;
+char		*newhdr;
+
+	TSHttpTxnClientReqGet(txn, &reqp, &hdr);
+	field = TSMimeHdrFieldFind(reqp, hdr, "Cookie", 6);
+	if (field == TS_NULL_MLOC) {
+		/* No cookies, we can cache this */
+		*can_cache = 1;
+		goto cleanup;
+	}
+
+	/* For now, we cannot cache; this may change later */
+	*can_cache = 0;
+
+	cs = TSMimeHdrFieldValueStringGet(reqp, hdr, field, 0, &len);
+	s = malloc(len + 1);
+	bcopy(cs, s, len);
+	s[len] = 0;
+
+	newhdr = malloc(1);
+	newhdr[0] = '\0';
+
+	for (r = strtok_r(s, " ,", &t); r; r = strtok_r(NULL, ", ", &t)) {
+		if (should_ignore_cookie(res->rz_path->rp_ignore_cookies, r))
+			continue;
+		TSDebug("kubernetes", "check_cookies: preserving this cookie [%s]",
+			r);
+		newhdr = realloc(newhdr, strlen(newhdr) + strlen(r) + 3);
+		if (*newhdr)
+			strcat(newhdr, ", ");
+		strcat(newhdr, r);
+	}
+
+	free(s);
+
+	if (*newhdr) {
+		/* Set the new cookie header */
+		TSMimeHdrFieldValuesClear(reqp, hdr, field);
+		TSMimeHdrFieldValueStringSet(reqp, hdr, field, -1, newhdr, -1);
+	} else {
+		/* No cookies left; remove the header */
+		TSMimeHdrFieldRemove(reqp, hdr, field);
+		*can_cache = 1;
+	}
+
+	free(newhdr);
+
+cleanup:
+	if (field != TS_NULL_MLOC)
+		TSHandleMLocRelease(reqp, hdr, field);
+	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdr);
+}
+
+/*
+ * Check if the response can be cached, and disable caching if not.
+ */
+int
+check_response_cache(TSCont contn, TSEvent event, void *edata)
+{
+TSHttpTxn	txn = edata;
+TSMBuffer	resp;
+TSMLoc		hdr, field;
+
+	if (TSHttpTxnServerRespGet(txn, &resp, &hdr) != TS_SUCCESS)
+		return TS_SUCCESS;
+
+	field = TSMimeHdrFieldFind(resp, hdr, "Set-Cookie", -1);
+	if (field) {
+		/* Response has cookies - do not cache it */
+		TSHttpTxnConfigIntSet(txn, TS_CONFIG_HTTP_CACHE_HTTP, 0);
+		TSHandleMLocRelease(resp, hdr, field);
+	}
+
+	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+	return TS_SUCCESS;
+}
+
 /*
  * handle_remap: called in READ_REQUEST_HDR_HOOK.  Match the incoming request
  * to an Ingress path (remap_path), apply any configurations from annotations,
@@ -451,18 +554,6 @@ int			 reenable = 1;
 				TS_CONFIG_HTTP_REDIRECT_USE_ORIG_CACHE_KEY, 1);
 	}
 
-	/*
-	 * Set cache generation if it's set on the Ingress.  If it's not set,
-	 * just set it to zero.
-	 */
-	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_GENERATION,
-			      res.rz_path->rp_cache_gen);
-
-	/*
-	 * Enable caching, unless it's been cached on the Ingress.
-	 */
-	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_HTTP,
-			      res.rz_path->rp_cache);
 	if (res.rz_path->rp_cache) {
 		TSCont c = TSContCreate(add_cache_status, TSMutexCreate());
 		TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_RESPONSE_HDR_HOOK, c);
@@ -502,18 +593,47 @@ int			 reenable = 1;
 	if (state->config->co_xfp)
 		add_xfp(txnp);
 
+	/* By default, do not cache */
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_HTTP, 0);
+
 	/*
-	 * If caching is enabled on this path, set the effective cache URL.
+	 * If caching is enabled on this path, see if we can actually cache
+	 * this request.
 	 */
 	if (res.rz_path->rp_cache) {
 	char	*cacheurl;
 	size_t	 urllen;
+	int	 can_cache;
 
-		remap_make_cache_key(&req, &res, &cacheurl, &urllen);
-		if (TSCacheUrlSet(txnp, cacheurl, urllen) != TS_SUCCESS)
-			TSDebug("kubernetes", "handle_remap: TSCacheUrlSet"
-					      " failed!");
-		free(cacheurl);
+		/*
+		 * Removes any cookies from the request that we don't want,
+		 * and removes the entire Cookie header if that leaves it
+		 * empty; if so, it sets can_cache to 1.  If can_cache is
+		 * 0, we should not cache this request.
+		 */
+		check_cookies(txnp, &req, &res, &can_cache);
+
+		if (can_cache) {
+		TSCont	c;
+
+			/*
+			 * Set cache generation if it's set on the Ingress.  If it's
+			 * not set, just set it to zero.
+			 */
+			TSHttpTxnConfigIntSet(txnp,
+					TS_CONFIG_HTTP_CACHE_GENERATION,
+					res.rz_path->rp_cache_gen);
+			TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_HTTP, 1);
+
+			/* Set the cache URL */
+			remap_make_cache_key(&req, &res, &cacheurl, &urllen);
+			TSCacheUrlSet(txnp, cacheurl, urllen);
+			free(cacheurl);
+
+			/* Check if the response should be cached */
+			c = TSContCreate(check_response_cache, TSMutexCreate());
+			TSHttpTxnHookAdd(txnp, TS_HTTP_READ_RESPONSE_HDR_HOOK, c);
+		}
 	}
 
 	/*

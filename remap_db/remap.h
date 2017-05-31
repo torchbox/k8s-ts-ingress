@@ -75,6 +75,7 @@ typedef struct {
 	int	  rp_cache_gen;			/* Set cache generation	     */
 	hash_t	  rp_ignore_params;		/* Params to ignore in cache */
 	hash_t	  rp_whitelist_params;		/* Cache param whitelist     */
+	hash_t	  rp_ignore_cookies;		/* Cookie names to remove    */
 
 	/* TLS */
 	int	  rp_follow_redirects:1;	/* Follow 301/302 redirect   */
