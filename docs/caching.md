@@ -153,12 +153,12 @@ Analytics, for example, sets several cookies with names like `__utma`, which are
 only ever referenced from JavaScript and do not affect page content.
 
 To allow caching to work even with these cookies set, use the
-`ingress.kubernetes.io/cache-remove-cookies` annotation:
+`ingress.kubernetes.io/cache-ignore-cookies` annotation:
 
 ```yaml
 metadata:
   annotations:
-    ingress.kubernetes.io/cache-remove-cookies: "utm_* has_js"
+    ingress.kubernetes.io/cache-ignore-cookies: "utm_* has_js"
 ```
 
 The annotation value should be a space-delimited list of UNIX globs; any cookie
