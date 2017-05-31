@@ -182,7 +182,7 @@ _actually_runtest() {
 	done
 
 	# wait a few seconds for TS to notice the resource changes
-	sleep 5
+	sleep 10
 
 	if tests/e2e/$test/run.sh; then
 		printf 'ok\n'

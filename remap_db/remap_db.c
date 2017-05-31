@@ -160,6 +160,9 @@ int		 rerr;
 	ret->rp_compress = 1;
 	ret->rp_compress_types = hash_new(127, NULL);
 
+	/* Cache by default */
+	ret->rp_cache = 1;
+
 	/*
 	 * This list of types is from the nginx Ingress controller.  Note that
 	 * text/html is deliberately excluded to avoid the TLS BREACH attack.
@@ -252,7 +255,7 @@ void
 remap_path_add_address(remap_path_t *rp, const char *host, int port)
 {
 	rp->rp_addrs = realloc(rp->rp_addrs,
-			       sizeof(struct sockaddr_in) *
+			       sizeof(remap_target_t) *
 				(rp->rp_naddrs + 1));
 	rp->rp_addrs[rp->rp_naddrs].rt_host = strdup(host);
 	rp->rp_addrs[rp->rp_naddrs].rt_port = port;
@@ -1023,23 +1026,24 @@ remap_make_cache_key(remap_request_t *req, remap_result_t *res,
 {	
 uint8_t		 protolen, hostlen;
 uint16_t	 pathlen = 0, querylen = 0;
-char		*p;
+char		*buf, *p;
+size_t		 buflen;
 
-	*keylen = 0;
+	buflen = 0;
 
 	protolen = (uint8_t) strlen(req->rr_proto);
 	hostlen = (uint8_t) strlen(req->rr_host);
 
-	*keylen += 1 + protolen + 1 + hostlen;
+	buflen += 1 + protolen + 1 + hostlen;
 
 	if (req->rr_path)
 		pathlen = (uint16_t) strlen(req->rr_path);
 	if (res->rz_query)
 		querylen = (uint16_t) strlen(res->rz_query);
 
-	*keylen += 2 + pathlen + 2 + querylen;
+	buflen += 2 + pathlen + 2 + querylen;
 
-	p = *key = malloc(*keylen);
+	p = buf = malloc(buflen);
 
 	*p++ = protolen;
 	memcpy(p, req->rr_proto, protolen);
@@ -1060,6 +1064,11 @@ char		*p;
 	if (res->rz_query)
 		memcpy(p, res->rz_query, querylen);
 	p += querylen;
+
+	*keylen = base64_encode_len(buflen);
+	*key = malloc(*keylen + 1);
+	**key = '/';
+	base64_encode((unsigned char*)buf, buflen, *key + 1);
 }
 
 void

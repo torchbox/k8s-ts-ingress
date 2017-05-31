@@ -63,7 +63,19 @@ or:
 ingress.kubernetes.io/access-control-allow-origin: "https://mydomain.com https://myothersite.com"
 ```
 
-The value should be either `"*"` (meaning all origins), or a whitespace-delimited
+The value should be either `"*"` (meaning all origins) or a whitespace-delimited
 list of origins.
 
+You can use the following set of annotations to configure other CORS headers
+in the response:
 
+* `ingress.kubernetes.io/access-control-allow-credentials`
+* `ingress.kubernetes.io/access-control-allow-methods`
+* `ingress.kubernetes.io/access-control-allow-headers
+* `ingress.kubernetes.io/access-control-max-age`
+
+There is no default for these values, so you will likely want to set all of
+them.
+
+Do not set `ingress.kubernetes.io/enable-cors` at the same time as any of the
+other CORS-related annotations; behaviour in that case is undefined.

@@ -31,8 +31,9 @@ typedef int64_t (*comp_finish_callback) (struct comp_state *);
 typedef void (*comp_free_callback) (struct comp_state *);
 
 typedef struct comp_state {
-	int	cs_type;
-	hash_t	cs_types;
+	TSHttpTxn	cs_txn;
+	int		cs_type;
+	hash_t		cs_types;
 
 	/* The VIO that's writing to us */
 	TSVIO			cs_input_vio;
@@ -86,7 +87,6 @@ br_init(comp_state_t *state)
 {
 	state->cs_brotli = BrotliEncoderCreateInstance(NULL, NULL, NULL);
 	BrotliEncoderSetParameter(state->cs_brotli, BROTLI_PARAM_QUALITY, 2);
-	state->cs_done_init = 1;
 }
 
 void
@@ -183,7 +183,6 @@ gzip_init(comp_state_t *state)
 	bzero(&state->cs_zstream, sizeof(state->cs_zstream));
 	deflateInit2(&state->cs_zstream, 3, Z_DEFLATED, 15 + 16, 8,
 		    Z_DEFAULT_STRATEGY);
-	state->cs_done_init = 1;
 }
 
 void
@@ -310,16 +309,57 @@ int		 has_gzip = 0, has_br = 0;
  * has a content-encoding.
  */
 static int
-response_can_compress(TSMBuffer resp, TSMLoc hdr)
+response_can_compress(comp_state_t *state, TSMBuffer resp, TSMLoc hdr)
 {
-TSMLoc	cenc;
-int	ok;
+TSMLoc		 field;
+int		 len;
+char		*s, *p;
+const char	*cs;
 
-	cenc = TSMimeHdrFieldFind(resp, hdr, "Content-Encoding", -1);
-	ok = (cenc == TS_NULL_MLOC) ? 1 : 0;
-	if (cenc)
-		TSHandleMLocRelease(resp, hdr, cenc);
-	return ok;
+	/* 
+	 * If the response already has a Content-Encoding header, it's not
+	 * cacheable.
+	 */
+	field = TSMimeHdrFieldFind(resp, hdr, "Content-Encoding", -1);
+	if (field) {
+		TSHandleMLocRelease(resp, hdr, field);
+		return 0;
+	}
+
+	/*
+	 * See if the content type is on our list of allowed types.
+	 */
+	field = TSMimeHdrFieldFind(resp, hdr, "Content-Type", -1);
+	if (field == TS_NULL_MLOC) {
+		TSDebug("kubernetes", "response_can_compress: no content-type");
+		return 0;
+	}
+
+	cs = TSMimeHdrFieldValueStringGet(resp, hdr, field, 0, &len);
+	if (cs == NULL) {
+		TSDebug("kubernetes", "compress_hook: content-type header, but no values");
+		TSHandleMLocRelease(resp, hdr, field);
+		return 0;
+	}
+
+	s = malloc(len + 1);
+	bcopy(cs, s, len);
+	if ((p = memchr(s, ';', len)) != NULL)
+		*p = '\0';
+	else
+		s[len] = '\0';
+
+	TSHandleMLocRelease(resp, hdr, field);
+
+	if (hash_get(state->cs_types, s) == NULL) {
+		TSDebug("kubernetes", "response_can_compress: content-type [%s]"
+				      " not compressible", s);
+		free(s);
+		return 0;
+	}
+
+	free(s);
+	return 1;
 }
 
 /*
@@ -327,8 +367,10 @@ int	ok;
  * if no compression is done, because we still need to set Vary.
  */
 static int
-set_compress_headers(TSHttpTxn txn, comp_state_t *state)
+set_compress_headers(TSCont contn, TSEvent event, void *edata)
 {
+TSHttpTxn	txn = edata;
+comp_state_t	*state = TSContDataGet(contn);
 TSMBuffer	resp;
 TSMLoc		reshdr, hdr;
 
@@ -382,25 +424,61 @@ TSMLoc		reshdr, hdr;
 	TSHandleMLocRelease(resp, reshdr, hdr);
 
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, reshdr);
+
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 	return TS_SUCCESS;
 }
 
 static void
-compress_do(TSCont contn, comp_state_t *state)
+compress_init(TSHttpTxn txn, TSCont contn, comp_state_t *state)
+{
+	/*
+	 * Install the compression hooks for whatever type we're using.
+	 */
+	switch (state->cs_type) {
+	case COMP_NONE:
+		break;
+
+	case COMP_GZIP:
+		state->cs_init = gzip_init;
+		state->cs_produce = gzip_produce;
+		state->cs_finish = gzip_finish;
+		state->cs_free = gzip_free;
+		break;
+
+	case COMP_BROTLI:
+		state->cs_init = br_init;
+		state->cs_produce = br_produce;
+		state->cs_finish = br_finish;
+		state->cs_free = br_free;
+		break;
+
+	default:
+		assert(!"unknown cs_type");
+	}
+
+	state->cs_input_vio = TSVConnWriteVIOGet(contn);
+	state->cs_input_reader = TSVIOReaderGet(state->cs_input_vio);
+	state->cs_output_conn = TSTransformOutputVConnGet(contn);
+	state->cs_output_buffer = TSIOBufferCreate();
+	state->cs_output_reader = TSIOBufferReaderAlloc(
+					state->cs_output_buffer);
+	state->cs_output_vio = TSVConnWrite(state->cs_output_conn,
+			contn, state->cs_output_reader, INT64_MAX);
+
+	if (state->cs_init)
+		state->cs_init(state);
+	state->cs_done_init = 1;
+}
+
+static void
+compress_do(TSHttpTxn txn, TSCont contn, comp_state_t *state)
 {
 TSIOBufferBlock	blk;
 int64_t		 avail, toread;
 
-	if (!state->cs_input_vio) {
-		state->cs_input_vio = TSVConnWriteVIOGet(contn);
-		state->cs_input_reader = TSVIOReaderGet(state->cs_input_vio);
-		state->cs_output_conn = TSTransformOutputVConnGet(contn);
-		state->cs_output_buffer = TSIOBufferCreate();
-		state->cs_output_reader = TSIOBufferReaderAlloc(
-						state->cs_output_buffer);
-		state->cs_output_vio = TSVConnWrite(state->cs_output_conn,
-				contn, state->cs_output_reader, INT64_MAX);
-		state->cs_init(state);
+	if (!state->cs_done_init) {
+		compress_init(txn, contn, state);
 	}
 
 	TSDebug("kubernetes", "compress_do: called");
@@ -462,13 +540,17 @@ int64_t		 avail, toread;
 static int
 transform_event(TSCont contn, TSEvent event, void *edata)
 {
-comp_state_t	*state = TSContDataGet(contn);
+comp_state_t	*state;
+TSHttpTxn	 txn;
 
-	TSDebug("kubernetes", "transform_event: event=%d", event);
+	TSDebug("kubernetes", "transform_event: event=%d", (int)event);
 
 	/* Connection closed? */
 	if (TSVConnClosedGet(contn))
 		return TS_SUCCESS;
+
+	/* state may not be valid if the connection has been closed */
+	state = TSContDataGet(contn);
 
 	switch (event) {
 	case TS_EVENT_ERROR:
@@ -489,7 +571,8 @@ comp_state_t	*state = TSContDataGet(contn);
 		 */
 	case TS_EVENT_VCONN_WRITE_READY:
 	case TS_EVENT_IMMEDIATE:
-		compress_do(contn, state);
+		txn = state->cs_txn;
+		compress_do(txn, contn, state);
 		break;
 
 	default:
@@ -499,186 +582,164 @@ comp_state_t	*state = TSContDataGet(contn);
 	return TS_SUCCESS;
 }
 
-void
-transform_init(TSHttpTxn txn, comp_state_t *state)
-{
-TSCont	c;
-
-	c = TSTransformCreate(transform_event, txn);
-
-	switch (state->cs_type) {
-	case COMP_GZIP:
-		state->cs_init = gzip_init;
-		state->cs_produce = gzip_produce;
-		state->cs_finish = gzip_finish;
-		state->cs_free = gzip_free;
-		break;
-
-	case COMP_BROTLI:
-		state->cs_init = br_init;
-		state->cs_produce = br_produce;
-		state->cs_finish = br_finish;
-		state->cs_free = br_free;
-		break;
-
-	default:
-		assert(!"unknown cs_type");
-	}
-
-	TSContDataSet(c, state);
-	TSHttpTxnHookAdd(txn, TS_HTTP_RESPONSE_TRANSFORM_HOOK, c);
-}
-
 /*
- * The continuation to enable compression on a transaction.  This checks whether
- * compression should be enabled (based on the request accept-encoding), and if
- * so inserts one of our compression transformations (gzip or brotli).
- *
- * If the response already has a Content-Encoding, we don't do anything.  This
- * is to avoid compressing content twice, even if it's compressed with an
- * algorithm we don't know about.  It's extremely uncommon for C-E to be used
- * for anything except compression, so this should be safe.
- *
- * This must be called on TS_HTTP_READ_RESPONSE_HDR_HOOK to set up compression
- * and on TS_HTTP_TXN_CLOSE_HOOK to free resources.
+ * Remove an Accept-Encoding header from the request sent to the server.  We do
+ * this so the server doesn't compress the response.
  */
 static int
-compress_hook(TSCont contn, TSEvent event, void *edata)
+remove_aenc(TSCont contn, TSEvent event, void *edata)
 {
 TSHttpTxn	txn = edata;
-comp_state_t	*state = TSContDataGet(contn);
-TSMBuffer	resp;
-TSMLoc		reshdr;
-TSMLoc		hdr;
-const char	*cs;
-int		 len;
-char		*s, *p;
+TSMBuffer	reqp;
+TSMLoc		reqhdr, aenc;
 
-	TSDebug("kubernetes", "compress_hook: running, event=%d", event);
+	assert(event == TS_EVENT_HTTP_SEND_REQUEST_HDR);
 
-	if (event == TS_EVENT_HTTP_TXN_CLOSE) {
-		/*
-		 * The request is finished; clean up.
-		 */
-		comp_state_free(state);
-		TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
-		return TS_SUCCESS;
+	TSHttpTxnServerReqGet(txn, &reqp, &reqhdr);
+	aenc = TSMimeHdrFieldFind(reqp, reqhdr, "Accept-Encoding", -1);
+	if (aenc) {
+		TSDebug("kubernetes",
+			"compress_hook: removing Accept-Encoding");
+		TSMimeHdrFieldDestroy(reqp, reqhdr, aenc);
+		TSHandleMLocRelease(reqp, reqhdr, aenc);
 	}
+	TSHandleMLocRelease(reqp, TS_NULL_MLOC, reqhdr);
 
-	if (event == TS_EVENT_HTTP_READ_REQUEST_HDR) {
-	TSMBuffer	reqp;
-	TSMLoc		reqhdr;
-
-		/* 
-		 * Determine if the client can handle a compressed response. If
-		 * so, install our compression hooks.
-		 */
-		TSHttpTxnClientReqGet(txn, &reqp, &reqhdr);
-		state->cs_type = request_can_compress(reqp, reqhdr);
-		TSHandleMLocRelease(reqp, TS_NULL_MLOC, reqhdr);
-
-		if (state->cs_type != COMP_NONE) {
-			TSDebug("kubernetes", "compress_hook: request is compressible");
-
-			TSHttpTxnHookAdd(txn, TS_HTTP_SEND_REQUEST_HDR_HOOK, contn);
-			TSHttpTxnHookAdd(txn, TS_HTTP_READ_RESPONSE_HDR_HOOK, contn);
-		}
-
-		TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
-		return TS_SUCCESS;
-	}
-
-	if (event == TS_EVENT_HTTP_SEND_REQUEST_HDR) {
-	TSMBuffer	reqp;
-	TSMLoc		reqhdr, aenc;
-
-		/*
-		 * If the request has an Accept-Encoding header, remove it
-		 * before sending the request to the backend.  This ensures
-		 * that we never cache a compressed response.
-		 */
-		TSHttpTxnServerReqGet(txn, &reqp, &reqhdr);
-		aenc = TSMimeHdrFieldFind(reqp, reqhdr, "Accept-Encoding", -1);
-		if (aenc) {
-			TSDebug("kubernetes",
-				"compress_hook: removing Accept-Encoding");
-			TSMimeHdrFieldDestroy(reqp, reqhdr, aenc);
-			TSHandleMLocRelease(reqp, reqhdr, aenc);
-		}
-		TSHandleMLocRelease(reqp, TS_NULL_MLOC, reqhdr);
-
-		TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
-		return TS_SUCCESS;
-	}
-
-	if (event == TS_EVENT_HTTP_SEND_RESPONSE_HDR) {
-		set_compress_headers(txn, state);
-		TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
-		return TS_SUCCESS;
-	}
-
-	assert(event == TS_EVENT_HTTP_READ_RESPONSE_HDR);
-
-	TSHttpTxnServerRespGet(txn, &resp, &reshdr);
-
-	/* Can the response be compressed? */
-	if (!response_can_compress(resp, reshdr)) {
-		TSDebug("kubernetes", "compress_hook: response is not compressible");
-		goto cleanup;
-	}
-
-	/*
-	 * See if the content type is on our list of allowed types.
-	 */
-	hdr = TSMimeHdrFieldFind(resp, reshdr, "Content-Type", -1);
-	if (hdr == TS_NULL_MLOC) {
-		TSDebug("kubernetes", "compress_hook: no content-type");
-		return TS_SUCCESS;
-	}
-
-	cs = TSMimeHdrFieldValueStringGet(resp, reshdr, hdr, 0, &len);
-	if (cs == NULL) {
-		TSDebug("kubernetes", "compress_hook: content-type header, but no values");
-		TSHandleMLocRelease(resp, reshdr, hdr);
-		goto cleanup;
-	}
-
-	s = malloc(len + 1);
-	bcopy(cs, s, len);
-	if ((p = memchr(s, ';', len)) != NULL)
-		*p = '\0';
-	else
-		s[len] = '\0';
-
-	if (hash_get(state->cs_types, s) == NULL) {
-		TSDebug("kubernetes", "compress_hook: content-type [%s] not compressible", s);
-		TSHandleMLocRelease(resp, reshdr, hdr);
-		free(s);
-		goto cleanup;
-	}
-
-	TSHandleMLocRelease(resp, reshdr, hdr);
-	free(s);
-
-	TSDebug("kubernetes", "compress_hook: will compress this response");
-
-	/*
-	 * Do not cache the compressed response, we compress on the fly.
-	 */
-	TSHttpTxnTransformedRespCache(txn, 0);
-	TSHttpTxnUntransformedRespCache(txn, 1);
-
-	/*
-	 * Set up our transform.
-	 */
-	transform_init(txn, state);
-
-cleanup:
-	TSHandleMLocRelease(resp, TS_NULL_MLOC, reshdr);
 	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 	return TS_SUCCESS;
 }
 
+static int
+check_server_response(TSCont contn, TSEvent event, void *edata)
+{
+TSHttpTxn	 txn = edata;
+TSMBuffer	 resp;
+TSMLoc		 hdr;
+comp_state_t	*state = TSContDataGet(contn);
+
+	/* Check if the response is compressible */
+	if (TSHttpTxnServerRespGet(txn, &resp, &hdr) != TS_SUCCESS) {
+		TSDebug("kubernetes", "check_server_response: cannot get resp?!");
+		return TS_ERROR;
+	}
+
+	if (response_can_compress(state, resp, hdr)) {
+	TSCont	transform;
+
+		/* Tell TS not to cache the transformed data */
+		TSHttpTxnTransformedRespCache(txn, 0);
+		TSHttpTxnUntransformedRespCache(txn, 1);
+
+		transform = TSTransformCreate(transform_event, txn);
+		TSContDataSet(transform, state);
+		TSHttpTxnHookAdd(txn, TS_HTTP_RESPONSE_TRANSFORM_HOOK,
+				 transform);
+	}
+
+	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+	return TS_SUCCESS;
+}
+
+int
+check_cached_response(TSCont contn, TSEvent event, void *edata)
+{
+TSHttpTxn	 txn = edata;
+TSMBuffer	 resp;
+TSMLoc		 hdr;
+comp_state_t	*state = TSContDataGet(contn);
+int		 cache_status;
+
+	/*
+	 * If we didn't get a cache hit, do nothing and wait for the server
+	 * response hook to run.
+	 */
+	TSHttpTxnCacheLookupStatusGet(txn, &cache_status);
+	if (cache_status != TS_CACHE_LOOKUP_HIT_FRESH) {
+		TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+		return TS_SUCCESS;
+	}
+
+	/* Check if the response is compressible */
+	if (TSHttpTxnCachedRespGet(txn, &resp, &hdr) != TS_SUCCESS) {
+		TSDebug("kubernetes", "check_cached_response: cannot get resp?!");
+		return TS_ERROR;
+	}
+
+	if (response_can_compress(state, resp, hdr)) {
+	TSCont	transform;
+
+		/* Tell TS not to cache the transformed data */
+		TSHttpTxnTransformedRespCache(txn, 0);
+		TSHttpTxnUntransformedRespCache(txn, 1);
+
+		transform = TSTransformCreate(transform_event, txn);
+		TSContDataSet(transform, state);
+		TSHttpTxnHookAdd(txn, TS_HTTP_RESPONSE_TRANSFORM_HOOK,
+				 transform);
+	}
+
+	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+	return TS_SUCCESS;
+}
+
+/*
+ * Called on READ_REQUEST_HDR_HOOK.  Check whether the client can support
+ * compression; if so, install our transform hook.  We may still end up not
+ * compressing the response, e.g. if it's not in the list of supported types.
+ */
+static int
+check_compress(TSCont contn, TSEvent event, void *edata)
+{
+TSHttpTxn	txn = edata;
+TSMBuffer	reqp;
+TSMLoc		hdr;
+comp_state_t	*state = TSContDataGet(contn);
+
+	assert(event == TS_EVENT_HTTP_READ_REQUEST_HDR);
+
+	TSHttpTxnClientReqGet(txn, &reqp, &hdr);
+	state->cs_type = request_can_compress(reqp, hdr);
+	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdr);
+
+	if (state->cs_type != COMP_NONE) {
+	TSCont	c;
+
+		TSDebug("kubernetes", "check_compress: request is compressible");
+
+		c = TSContCreate(remove_aenc, TSMutexCreate());
+		TSContDataSet(c, state);
+		TSHttpTxnHookAdd(txn, TS_HTTP_SEND_REQUEST_HDR_HOOK, c);
+
+		c = TSContCreate(check_server_response, TSMutexCreate());
+		TSContDataSet(c, state);
+		TSHttpTxnHookAdd(txn, TS_HTTP_READ_RESPONSE_HDR_HOOK, c);
+
+		c = TSContCreate(check_cached_response, TSMutexCreate());
+		TSContDataSet(c, state);
+		TSHttpTxnHookAdd(txn, TS_HTTP_CACHE_LOOKUP_COMPLETE_HOOK, c);
+	}
+
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+	return TS_SUCCESS;
+}
+
+/*
+ * Clean up the request and free our state.
+ */
+static int
+free_state(TSCont contn, TSEvent event, void *edata)
+{
+comp_state_t	*state = TSContDataGet(contn);
+TSHttpTxn	 txn = edata;
+
+	TSDebug("kubernetes", "free_state: running");
+	assert(event == TS_EVENT_HTTP_TXN_CLOSE);
+	comp_state_free(state);
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+	return TS_SUCCESS;
+}
 
 /*
  * Set up compression for a request for the given remap_path.
@@ -696,12 +757,21 @@ TSCont		 contn;
 
 	state = calloc(1, sizeof(*state));
 	state->cs_types = hash_new(127, NULL);
+	state->cs_txn = txn;
+
 	hash_foreach(rp->rp_compress_types, &k, NULL)
 		hash_set(state->cs_types, k, HASH_PRESENT);
 
-	contn = TSContCreate(compress_hook, TSMutexCreate());
+	/* Set headers (Content-Encoding, Vary, ...) */
+	contn = TSContCreate(set_compress_headers, TSMutexCreate());
+	TSContDataSet(contn, state);
+	TSHttpTxnHookAdd(txn, TS_HTTP_SEND_RESPONSE_HDR_HOOK, contn);
+
+	contn = TSContCreate(check_compress, TSMutexCreate());
 	TSContDataSet(contn, state);
 	TSHttpTxnHookAdd(txn, TS_HTTP_READ_REQUEST_HDR_HOOK, contn);
-	TSHttpTxnHookAdd(txn, TS_HTTP_SEND_RESPONSE_HDR_HOOK, contn);
+
+	contn = TSContCreate(free_state, TSMutexCreate());
+	TSContDataSet(contn, state);
 	TSHttpTxnHookAdd(txn, TS_HTTP_TXN_CLOSE_HOOK, contn);
 }

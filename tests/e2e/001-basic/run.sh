@@ -10,5 +10,6 @@ if echo "$output" | grep -q "Request path: /this-is-a-test"; then
 	exit 0
 else
 	echo "Failed: output did not include test string."
+	echo "Test output: [$output]"
 	exit 1
 fi

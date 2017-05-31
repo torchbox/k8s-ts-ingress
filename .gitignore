@@ -3,9 +3,10 @@
 *~
 \#*#
 
-# Build swap files
+# Build files
 *.o
 *.so
+*.a
 
 # autoconf generated files
 /Makefile
@@ -27,3 +28,4 @@
 /_test
 /configure
 /_docs
+/contrib/brotli/Makefile

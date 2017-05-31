@@ -250,6 +250,44 @@ TSMLoc		hdrs, xfp;
 }
 
 /*
+ * Add an X-Cache-Status header to this response.
+ */
+int
+add_cache_status(TSCont contn, TSEvent event, void *edata)
+{
+TSHttpTxn		txn = edata;
+char			buf[64];
+TSMgmtInt		cache_gen = 0;
+int			status;
+TSMBuffer		resp;
+TSMLoc			hdr, field;
+static const char *const status_names[] = {
+	"miss", "hit-stale", "hit-fresh", "skipped", "unknown"
+};
+
+	TSHttpTxnConfigIntGet(txn, TS_CONFIG_HTTP_CACHE_GENERATION, &cache_gen);
+	TSHttpTxnCacheLookupStatusGet(txn, &status);
+	if (status < 0 || status > 4)
+		status = 4;
+
+	snprintf(buf, sizeof(buf), "%s (%ld)", status_names[status],
+		(long) cache_gen);
+
+	TSHttpTxnClientRespGet(txn, &resp, &hdr);
+	field = TSMimeHdrFieldFind(resp, hdr, "X-Cache-Status", -1);
+	if (field == TS_NULL_MLOC)
+		TSMimeHdrFieldCreateNamed(resp, hdr,
+				"X-Cache-Status", -1, &field);
+	TSMimeHdrFieldValueStringInsert(resp, hdr, field, 0, buf, -1);
+	TSMimeHdrFieldAppend(resp, hdr, field);
+	TSHandleMLocRelease(resp, hdr, field);
+	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
+
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+	return TS_SUCCESS;
+}
+
+/*
  * A continuation to set headers on the HTTP reponse.  It expects its
  * continuation data to be a hash_t of string pairs.  This must be hooked to
  * both TS_HTTP_READ_RESPONSE_HDR and TS_HTTP_TXN_CLOSE_HOOK to ensure the
@@ -425,6 +463,10 @@ int			 reenable = 1;
 	 */
 	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_HTTP,
 			      res.rz_path->rp_cache);
+	if (res.rz_path->rp_cache) {
+		TSCont c = TSContCreate(add_cache_status, TSMutexCreate());
+		TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_RESPONSE_HDR_HOOK, c);
+	}
 
 	/*
 	 * Send HSTS headers.
@@ -468,7 +510,9 @@ int			 reenable = 1;
 	size_t	 urllen;
 
 		remap_make_cache_key(&req, &res, &cacheurl, &urllen);
-		TSCacheUrlSet(txnp, cacheurl, urllen);
+		if (TSCacheUrlSet(txnp, cacheurl, urllen) != TS_SUCCESS)
+			TSDebug("kubernetes", "handle_remap: TSCacheUrlSet"
+					      " failed!");
 		free(cacheurl);
 	}
 
