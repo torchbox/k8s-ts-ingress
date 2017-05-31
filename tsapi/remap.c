@@ -291,8 +291,10 @@ static const char *const status_names[] = {
 /*
  * A continuation to set headers on the HTTP reponse.  It expects its
  * continuation data to be a hash_t of string pairs.  This must be hooked to
- * both TS_HTTP_READ_RESPONSE_HDR and TS_HTTP_TXN_CLOSE_HOOK to ensure the
+ * both TS_HTTP_SEND_RESPONSE_HDR and TS_HTTP_TXN_CLOSE_HOOK to ensure the
  * data is freed.
+ *
+ * This also sets the Server and Via headers.
  */
 int
 set_headers(TSCont contp, TSEvent event, void *edata)
@@ -301,6 +303,7 @@ hash_t		hdrset = TSContDataGet(contp);
 TSHttpTxn	txn = edata;
 TSMBuffer	resp;
 TSMLoc		hdrs;
+TSMLoc		hdr;
 const char	*h, *v;
 
 	if (event == TS_EVENT_HTTP_TXN_CLOSE) {
@@ -310,13 +313,12 @@ const char	*h, *v;
 		return TS_SUCCESS;
 	}
 
-	assert(event == TS_EVENT_HTTP_READ_RESPONSE_HDR);
+	assert(event == TS_EVENT_HTTP_SEND_RESPONSE_HDR);
 	TSDebug("kubernetes", "set_headers: running");
 
-	TSHttpTxnServerRespGet(txn, &resp, &hdrs);
+	TSHttpTxnClientRespGet(txn, &resp, &hdrs);
 
-	hash_foreach(hdrset, &h, &v) {
-	TSMLoc	hdr;
+	if (hdrset) hash_foreach(hdrset, &h, &v) {
 		TSDebug("kubernetes", "set_headers: [%s] = [%s]", h, v);
 		TSMimeHdrFieldCreateNamed(resp, hdrs, h, strlen(h), &hdr);
 		TSMimeHdrFieldValueStringInsert(resp, hdrs, hdr, 0,
@@ -324,6 +326,39 @@ const char	*h, *v;
 		TSMimeHdrFieldAppend(resp, hdrs, hdr);
 		TSHandleMLocRelease(resp, hdrs, hdr);
 	}
+
+	{
+	char		 via[256];
+	const char	*stack[10];
+	int		 stacksz;
+
+		TSHttpTxnClientProtocolStackGet(txn, 10, &stack[0], &stacksz);
+		if (stacksz > 10)
+			stacksz = 10;
+		snprintf(via, sizeof(via), "%s %s (%s)",
+			 stacksz ? stack[0] : "http/1.0", myhostname, via_name);
+
+		if ((hdr = TSMimeHdrFieldFind(resp, hdrs, "Via", 3)) == TS_NULL_MLOC) {
+			TSMimeHdrFieldCreateNamed(resp, hdrs, "Via", 3, &hdr);
+			TSMimeHdrFieldAppend(resp, hdrs, hdr);
+		}
+		TSMimeHdrFieldValueStringInsert(resp, hdrs, hdr, 0, via, -1);
+		TSHandleMLocRelease(resp, hdrs, hdr);
+	}
+#if 1
+	if ((hdr = TSMimeHdrFieldFind(resp, hdrs, "Server", 6)) == TS_NULL_MLOC) {
+		TSMimeHdrFieldCreateNamed(resp, hdrs, "Server", 6, &hdr);
+		TSMimeHdrFieldAppend(resp, hdrs, hdr);
+	} else
+		TSMimeHdrFieldValuesClear(resp, hdrs, hdr);
+	TSMimeHdrFieldValueStringSet(resp, hdrs, hdr, -1, via_name, via_name_len);
+	TSHandleMLocRelease(resp, hdrs, hdr);
+
+#else	/* doesn't seem to work */
+	TSHttpTxnConfigIntSet(txn, TS_CONFIG_HTTP_RESPONSE_SERVER_ENABLED, 1);
+	TSHttpTxnConfigStringSet(txn, TS_CONFIG_HTTP_RESPONSE_SERVER_STR,
+			      via_name, via_name_len);
+#endif
 
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdrs);
 	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
@@ -451,9 +486,20 @@ remap_result_t		 res;
 synth_t			*sy;
 struct sockaddr_in	 addr;
 int			 reenable = 1;
+TSCont			 c, set_headers_cont;
 
 	bzero(&req, sizeof(req));
 	bzero(&res, sizeof(res));
+
+	set_headers_cont = TSContCreate(set_headers, TSMutexCreate());
+	TSContDataSet(set_headers_cont, NULL);
+	TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_RESPONSE_HDR_HOOK, set_headers_cont);
+	TSHttpTxnHookAdd(txnp, TS_HTTP_TXN_CLOSE_HOOK, set_headers_cont);
+
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_NORMALIZE_AE_GZIP, 0);
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_INSERT_RESPONSE_VIA_STR, 0);
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_INSERT_REQUEST_VIA_STR, 1);
+	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_RESPONSE_SERVER_ENABLED, 0);
 
 	map_cfg = TSConfigGet(state->cfg_slot);
 	db = TSConfigDataGet(map_cfg);
@@ -555,7 +601,7 @@ int			 reenable = 1;
 	}
 
 	if (res.rz_path->rp_cache) {
-		TSCont c = TSContCreate(add_cache_status, TSMutexCreate());
+		c = TSContCreate(add_cache_status, TSMutexCreate());
 		TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_RESPONSE_HDR_HOOK, c);
 	}
 
@@ -614,8 +660,6 @@ int			 reenable = 1;
 		check_cookies(txnp, &req, &res, &can_cache);
 
 		if (can_cache) {
-		TSCont	c;
-
 			/*
 			 * Set cache generation if it's set on the Ingress.  If it's
 			 * not set, just set it to zero.
@@ -647,10 +691,7 @@ int			 reenable = 1;
 	 * Set any extra response headers we need, e.g. for CORS.
 	 */
 	if (res.rz_headers) {
-		TSCont c = TSContCreate(set_headers, TSMutexCreate());
-		TSContDataSet(c, res.rz_headers);
-		TSHttpTxnHookAdd(txnp, TS_HTTP_READ_RESPONSE_HDR_HOOK, c);
-		TSHttpTxnHookAdd(txnp, TS_HTTP_TXN_CLOSE_HOOK, c);
+		TSContDataSet(set_headers_cont, res.rz_headers);
 		/* prevent the hash being freed later */
 		res.rz_headers = NULL;
 	}
@@ -673,22 +714,19 @@ int			 reenable = 1;
 		addr.sin_port = htons(res.rz_target->rt_port);
 		TSHttpTxnServerAddrSet(txnp, (struct sockaddr *) &addr);
 	} else {
-	TSCont	ext_cont;
-
 		/*
 		 * We have a DNS name, so we need to do a host lookup to get the
 		 * IP address.
 		 */
-		if ((ext_cont = TSContCreate(external_lookup,
-					     TSMutexCreate())) == NULL) {
+		if ((c = TSContCreate(external_lookup, TSMutexCreate())) == NULL) {
 			/* Well, that's unfortunate. */
 			TSDebug("kubernetes", "[%s] cannot create continuation",
 				res.rz_target->rt_host);
 			goto cleanup;
 		}
 
-		TSContDataSet(ext_cont, txnp);
-		TSHostLookup(ext_cont, res.rz_target->rt_host,
+		TSContDataSet(c, txnp);
+		TSHostLookup(c, res.rz_target->rt_host,
 			     strlen(res.rz_target->rt_host));
 		TSDebug("kubernetes", "[%s]: starting external name lookup",
 			res.rz_target->rt_host);

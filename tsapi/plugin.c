@@ -15,6 +15,7 @@
 
 #include	<errno.h>
 #include	<string.h>
+#include	<unistd.h>
 
 #include	<json.h>
 #include	<curl/curl.h>
@@ -24,6 +25,11 @@
 #include	"watcher.h"
 #include	"config.h"
 #include	"plugin.h"
+#include	"autoconf.h"
+
+char *via_name;
+int via_name_len;
+char myhostname[HOST_NAME_MAX + 1];
 
 /*
  * Watcher callbacks; called when the Kubernetes cluster state changes.
@@ -56,6 +62,15 @@ struct {
 	{ "/api/v1/services",			service_cb },
 	{ "/api/v1/endpoints",			endpoints_cb },
 };
+
+	via_name_len = snprintf(NULL, 0, "ATS/%s Ingress/%s",
+				TSTrafficServerVersionGet(), PACKAGE_VERSION);
+	via_name = malloc(via_name_len + 1);
+	via_name_len = snprintf(via_name, via_name_len + 1, "ATS/%s Ingress/%s",
+				TSTrafficServerVersionGet(), PACKAGE_VERSION);
+
+	if (gethostname(myhostname, sizeof(myhostname)) == -1)
+		strcpy(myhostname, "unknown");
 
 	SSL_library_init();
 	SSL_load_error_strings();

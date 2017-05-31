@@ -47,11 +47,14 @@ The controller provides the following features:
 * HTTP/2;
 * WebSockets;
 * TLS termination, configured in the Ingress resource using Kubernetes Secrets;
-* Caching of responses, controlled by `Cache-Control` or `Expires` headers,
-  including support for alternatives (the HTTP `Vary` header field), removal of
-  individual pages from the cache (`PURGE`), and fast clearing of the entire
-  cache;
-* Configurable HTTP compression (gzip and Brotli);
+* Emulation of the nginx Ingress controller (for services that require it,
+  e.g. kube-lego);
+* Flexible HTTP caching, including:
+    * Cache lifetime controlled by `Cache-Control` or `Expires` headers;
+    * Removal from the cache of individual pages or all pages at once;
+    * Alternatives (HTTP Vary);
+    * Ignoring URL parameters and cookies which do not affect page content.
+* HTTP compression (gzip and Brotli);
 * Authorization using HTTP Basic authentication or client IP address;
 * A complete, configurable CORS implementation;
 * Proxying to external (non-Kubernetes) services using Ingress resources;
@@ -67,7 +70,6 @@ A feature being listed here indicates we are interested in implementing it, but
 provides no guarantee that it will be implemented within any particular time
 frame, or ever.
 
-* Configurable cookie removal
 * TLS client certificate authentication.
 * Client session affinity
 * Proxy protocol
@@ -96,6 +98,7 @@ frame, or ever.
     * Feature: For Ingress resources with caching enabled, an `X-Cache-Status`
         header is returned in the response, indicating whether the request was
         cached and the current cache generation.
+    * Feature: The `cache-ignore-cookies` annotation was implemented.
     * Bug fix: With certain combinations of OpenSSL and Traffic Server versions,
         a TLS request for an unknown host could hang indefinitely instead of
         returning an error.

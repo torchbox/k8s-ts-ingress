@@ -15,6 +15,7 @@
 #include	<netinet/in.h>
 #include	<arpa/inet.h>
 
+#include	<unistd.h>
 #include	<regex.h>
 
 #include	<ts/ts.h>
@@ -28,6 +29,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+extern char *via_name;
+extern int via_name_len;
+extern char myhostname[HOST_NAME_MAX + 1];
 
 /*
  * Hold the current Kubernetes cluster state (populated by our watchers), as
