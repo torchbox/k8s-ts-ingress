@@ -125,6 +125,8 @@
                 
                     <li><a class="toctree-l4" href="#removing-pages-from-the-cache">Removing pages from the cache</a></li>
                 
+                    <li><a class="toctree-l4" href="#x-cache-status-header">X-Cache-Status header</a></li>
+                
             
             </ul>
         
@@ -336,6 +338,26 @@ integer.  This changes the cache generation for the Ingress; any objects cached
 with a different generation are no longer visible, and have been effectively
 removed from the cache.  Typically the cache generation would be set to the
 current UNIX timestamp, although any non-zero integer will work.</p>
+<h2 id="x-cache-status-header"><code>X-Cache-Status</code> header</h2>
+<p>When an Ingress has caching enable, TS will include an <code>X-Cache-Status</code> header
+in the HTTP response, which looks like this:</p>
+<pre><code>X-Cache-Status: hit (1496232521)
+</code></pre>
+
+<p>The number in brackets is the current cache generation configured on the Ingress.
+The first word is the cache lookup status, which can be:</p>
+<ul>
+<li><code>miss</code>: the document was not found in the cache, and TS went to the origin to
+  fetch it.</li>
+<li><code>hit-fresh</code>: a valid copy of the document was found in the cache, and TS
+  served this copy without going to the origin.</li>
+<li><code>hit-stale</code>: a stale copy of the document was found in the cache (e.g., it
+  had exceeded its <code>max-age</code>), and TS went to the origin to revalidate the
+  document.  The document may still have been served from the cache if the
+  origin returned HTTP 304 (Not modified).</li>
+<li><code>skipped</code>: TS did not do a cache lookup for the document.  This status is most
+  common with internally-generated responses, such as errors and redirects.</li>
+</ul>
               
             </div>
           </div>

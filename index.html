@@ -289,6 +289,9 @@ frame, or ever.</p>
     was implemented.</li>
 <li>Feature: CORS annotations were implemented.</li>
 <li>Feature: HTTP compression was implemented.</li>
+<li>Feature: For Ingress resources with caching enabled, an <code>X-Cache-Status</code>
+    header is returned in the response, indicating whether the request was
+    cached and the current cache generation.</li>
 <li>Bug fix: With certain combinations of OpenSSL and Traffic Server versions,
     a TLS request for an unknown host could hang indefinitely instead of
     returning an error.</li>
@@ -400,5 +403,5 @@ public domain.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-05-31 12:04:30
+Build Date UTC : 2017-05-31 12:12:52
 -->
