@@ -161,3 +161,26 @@ integer.  This changes the cache generation for the Ingress; any objects cached
 with a different generation are no longer visible, and have been effectively
 removed from the cache.  Typically the cache generation would be set to the
 current UNIX timestamp, although any non-zero integer will work.
+
+## `X-Cache-Status` header
+
+When an Ingress has caching enable, TS will include an `X-Cache-Status` header
+in the HTTP response, which looks like this:
+
+```
+X-Cache-Status: hit (1496232521)
+```
+
+The number in brackets is the current cache generation configured on the Ingress.
+The first word is the cache lookup status, which can be:
+
+* `miss`: the document was not found in the cache, and TS went to the origin to
+  fetch it.
+* `hit-fresh`: a valid copy of the document was found in the cache, and TS
+  served this copy without going to the origin.
+* `hit-stale`: a stale copy of the document was found in the cache (e.g., it
+  had exceeded its `max-age`), and TS went to the origin to revalidate the
+  document.  The document may still have been served from the cache if the
+  origin returned HTTP 304 (Not modified).
+* `skipped`: TS did not do a cache lookup for the document.  This status is most
+  common with internally-generated responses, such as errors and redirects.

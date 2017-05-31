@@ -93,6 +93,9 @@ frame, or ever.
         was implemented.
     * Feature: CORS annotations were implemented.
     * Feature: HTTP compression was implemented.
+    * Feature: For Ingress resources with caching enabled, an `X-Cache-Status`
+        header is returned in the response, indicating whether the request was
+        cached and the current cache generation.
     * Bug fix: With certain combinations of OpenSSL and Traffic Server versions,
         a TLS request for an unknown host could hang indefinitely instead of
         returning an error.
