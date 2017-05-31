@@ -98,6 +98,15 @@ struct {
 	state->cfg_slot = TSConfigSet(0, NULL, (TSConfigDestroyFunc) hash_free);
 
 	/*
+	 * Create continuation to rebuild the maps when something changes.
+	 */
+	if ((state->rebuild_cont = TSContCreate(handle_rebuild, TSMutexCreate())) == NULL) {
+		TSError("[kubernetes] Failed to create continuation.");
+		return;
+	}
+
+	TSContDataSet(state->rebuild_cont, state);
+	/*
 	 * Create watchers.
 	 */
 	for (i = 0; i < sizeof(watchers) / sizeof(*watchers); i++) {
@@ -115,16 +124,6 @@ struct {
 		watcher_set_callback(wt, watchers[i].callback, state);
 		watcher_run(wt, 0);
 	}
-
-	/*
-	 * Create continuation to rebuild the maps when something changes.
-	 */
-	if ((state->rebuild_cont = TSContCreate(handle_rebuild, TSMutexCreate())) == NULL) {
-		TSError("[kubernetes] Failed to create continuation.");
-		return;
-	}
-
-	TSContDataSet(state->rebuild_cont, state);
 
 	/*
 	 * Create SNI hook to associate Kubernetes SSL_CTXs with incoming
