@@ -17,6 +17,9 @@ if [ -z "$1" ]; then
 	exit 1
 fi
 
+port=48080
+[ ! -z "$2" ] && port=$2
+
 ncpid=0
 
 if [ "$1" = "handle" ]; then
@@ -44,7 +47,7 @@ fi
 trap '[ $ncpid != 0 ] && kill $ncpid; exit 0' INT TERM EXIT 0
 
 while :; do
-	$NETCAT -l -p 48080 -c "$0 handle" "$1" & ncpid=$!
+	$NETCAT -l -p $port -c "$0 handle" "$1" & ncpid=$!
 	wait $ncpid
 	ncpid=0
 done

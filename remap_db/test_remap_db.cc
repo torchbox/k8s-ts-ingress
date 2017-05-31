@@ -967,7 +967,8 @@ TEST(RemapDB, QueryStringIgnoreAndWhitelist)
 
 TEST(RemapDB, CacheKey)
 {
-	cluster_t *cluster = load_test_ingress("tests/ingress-ignore-whitelist-params.json");
+	cluster_t *cluster = load_test_ingress(
+			"tests/ingress-ignore-whitelist-params.json");
 	k8s_config_t *cfg = k8s_config_new();
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
