@@ -54,7 +54,7 @@ spec:
 
       containers:
       - name: trafficserver
-        image: docker.io/torchbox/k8s-ts-ingress:1.0.0-alpha6
+        image: docker.io/torchbox/k8s-ts-ingress:1.0.0-alpha7
         imagePullPolicy: IfNotPresent
 
         # The memory limit must be large enough for both TS itself, and its RAM

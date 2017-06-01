@@ -8,7 +8,7 @@ We provide two examples Kubernetes deployments for the TS ingress controller:
 * `example-deployment.yaml` uses a Deployment, with a nodePort Service used to
   expose TS.
  
-These both use the Docker image `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha6`.
+These both use the Docker image `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha7`.
 
 You will probably want to read and edit one of these files before using it.
 
