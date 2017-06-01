@@ -19,6 +19,7 @@
 
 #include	<ts/ts.h>
 #include	<ts/remap.h>
+#include	<ts/experimental.h>
 
 #include	<openssl/ssl.h>
 
@@ -106,8 +107,11 @@ int		 len;
 	req->rr_method = xstrndup(cs, len);
 
 	/* scheme */
-	if ((cs = TSUrlSchemeGet(reqp, url, &len)) != NULL)
+	if ((cs = TSUrlSchemeGet(reqp, url, &len)) != NULL) {
 		req->rr_proto = xstrndup(cs, len);
+		TSDebug("kubernetes", "request_from_txn: scheme is [%.*s]",
+			len, cs);
+	}
 
 	/* host - if missing, ignore this request */
 	if ((cs = TSHttpHdrHostGet(reqp, hdrs, &len)) != NULL) {
@@ -319,6 +323,10 @@ size_t		 hlen;
 
 	TSHttpTxnClientRespGet(txn, &resp, &hdrs);
 
+	/*
+	 * Set any header fields in the txn's hdrset; typically these come from
+	 * the remap response.
+	 */
 	if (hdrset) hash_foreach(hdrset, &h, &hlen, &v) {
 		TSDebug("kubernetes", "set_headers: [%.*s] = [%s]",
 			(int) hlen, h, v);
@@ -329,6 +337,9 @@ size_t		 hlen;
 		TSHandleMLocRelease(resp, hdrs, hdr);
 	}
 
+	/*
+	 * Set Via and Server fields.
+	 */
 	{
 	char		 via[256];
 	const char	*stack[10];
@@ -361,6 +372,91 @@ size_t		 hlen;
 	TSHttpTxnConfigStringSet(txn, TS_CONFIG_HTTP_RESPONSE_SERVER_STR,
 			      via_name, via_name_len);
 #endif
+
+	/*
+	 * Do HTTP/2 server push.
+	 */
+	for (int i = 0, end = TSMimeHdrFieldsCount(resp, hdrs); i < end; ++i) {
+	const char	*cs;
+	int		 len, n;
+	TSMBuffer	 req;
+	TSMLoc		 reqhdr;
+	TSMLoc		 requrl;
+
+
+		hdr = TSMimeHdrFieldGet(resp, hdrs, i);
+		cs = TSMimeHdrFieldNameGet(resp, hdrs, hdr, &len);
+		if (len != 4 || memcmp(cs, "Link", 4)) {
+			TSHandleMLocRelease(resp, hdrs, hdr);
+			continue;
+		}
+
+		n = TSMimeHdrFieldValuesCount(resp, hdrs, hdr);
+		TSDebug("kubernetes", "set_headers: will push %d URLs", n);
+
+		TSHttpTxnClientReqGet(txn, &req, &reqhdr);
+		TSHttpHdrUrlGet(req, reqhdr, &requrl);
+
+		for (int i = 0; i < n; ++i) {
+		char		*s, *t, *r, *url = NULL;
+		TSMLoc		 pushurl;
+		int		 nopush = 0, relpreload = 0;
+
+			
+			/* Fetch the Link field */
+			cs = TSMimeHdrFieldValueStringGet(resp, hdrs, hdr, i, &len);
+			s = strndup(cs, len);
+
+			for (t = strtok_r(s, "; ", &r); t != NULL;
+			     t = strtok_r(NULL, "; ", &r)) {
+			size_t	len;
+
+				if (strcmp(t, "nopush") == 0)
+					nopush = 1;
+				else if (strcmp(t, "rel=preload") == 0)
+					relpreload = 1;
+				else {
+					len = strlen(t);
+
+					if (len >= 3 && t[0] == '<' &&
+					    t[1] == '/' && t[len-1] == '>')
+						url = strndup(t + 2, len - 3);
+				}
+			}
+			free(s);
+
+			if (nopush || !relpreload || !url) {
+				free(url);
+				continue;
+			}
+
+			/*
+			 * The Link URL is relative; construct a new URL with
+			 * the absolute URL based on the request URL.
+			 */
+			TSUrlClone(resp, req, requrl, &pushurl);
+			TSUrlPathSet(resp, pushurl, url, strlen(url));
+			TSDebug("kubernetes", "push header is [%.*s]", len, cs);
+
+			/*
+			 * We might have changed the request URL scheme from
+			 * https to http.  Put it back to https if the client
+			 * request was https.
+			 */
+			if (TSHttpTxnClientProtocolStackContains(txn, "tls"))
+				TSUrlSchemeSet(resp, pushurl, "https", 5);
+
+			cs = TSUrlStringGet(resp, pushurl, &len);
+			TSDebug("kubernetes", "push URL is [%.*s]", len, cs);
+			TSHttpTxnServerPush(txn, cs, len);
+
+			TSHandleMLocRelease(resp, hdrs, pushurl);
+		}
+
+		TSHandleMLocRelease(resp, hdrs, hdr);
+		TSHandleMLocRelease(req, reqhdr, requrl);
+		TSHandleMLocRelease(req, TS_NULL_MLOC, reqhdr);
+	}
 
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdrs);
 	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);

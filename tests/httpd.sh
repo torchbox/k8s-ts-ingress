@@ -35,8 +35,12 @@ if [ "$1" = "handle" ]; then
 	printf 'HTTP/1.0 200 OK\r\n'
 	printf 'Connection: close\r\n'
 	printf 'Content-Type: text/plain;charset=UTF-8\r\n'
-	if echo "$path" | grep -q "^/cached/"; then
+	if echo "$path" | grep -q "/cached/"; then
 		printf 'Cache-Control: public, max-age=3600\r\n'
+	fi
+	if echo "$path" | grep -q "/server-push/"; then
+		printf 'Link: </cached/foo>; rel=preload; as=script\r\n'
+		printf 'Link: </cached/bar>; rel=preload; as=script\r\n'
 	fi
 	printf '\r\n'
 	printf 'Request method: %s\n' "$method"

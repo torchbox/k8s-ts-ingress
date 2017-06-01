@@ -86,7 +86,7 @@ frame, or ever.
 ## Release history
 
 * 1.0.0-alpha8 (unreleased):
-    * No changes yet.
+    * Feature: HTTP/2 Server Push was implemented.
 
 * 1.0.0-alpha7:
     * Improvement: The Traffic Server version in the Docker image has been
