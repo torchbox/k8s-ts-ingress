@@ -1,0 +1,35 @@
+{
+	"kind": "Endpoints",
+	"apiVersion": "v1",
+	"metadata": {
+		"name":"kube-lego-nginx",
+		"namespace": "kube-lego",
+		"selfLink": "/api/v1/namespaces/kube-lego/endpoints/kube-lego-nginx",
+		"uid": "ccc81a2c-1d7f-11e7-be11-4201ac1fd807",
+		"resourceVersion": "9052867",
+		"creationTimestamp": "2017-04-09T23:53:59Z"
+	},
+	"subsets": [
+		{
+			"notReadyAddresses": [
+				{
+					"ip": "172.28.114.153",
+					"nodeName":"worker-g8dj",
+					"targetRef": {
+						"kind": "Pod",
+						"namespace": "kube-lego",
+						"name": "kube-lego-2225583713-6z6th",
+						"uid": "f94d4d7c-4687-11e7-a408-4201ac1fd809",
+						"resourceVersion":"9052866"
+					}
+				}
+			],
+			"ports": [ 
+				{
+					"port":8080,
+					"protocol":"TCP"
+				}
+			]
+		}
+	]
+}

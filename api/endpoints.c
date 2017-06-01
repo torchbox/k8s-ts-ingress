@@ -105,7 +105,7 @@ size_t			 i, j;
 					eport->et_name = strdup(
 						json_object_get_string(tmp));
 				} else {
-					eport->et_name = strdup("");
+					eport->et_name = strdup("<default>");
 				}
 
 				/* Endpoints.metadata.subsets.port.protocol */
@@ -114,7 +114,7 @@ size_t			 i, j;
 					eport->et_protocol = strdup(
 						json_object_get_string(tmp));
 				} else {
-					eport->et_protocol = strdup("");
+					eport->et_protocol = strdup("TCP");
 				}
 
 				/* Endpoints.metadata.subsets.port.port */
