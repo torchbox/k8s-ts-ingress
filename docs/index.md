@@ -44,7 +44,7 @@ The controller provides the following features:
 
 * Full support for Ingress resources, including many annotations used by other
   controller implementations;
-* HTTP/2;
+* HTTP/2, including server push;
 * WebSockets;
 * TLS termination, configured in the Ingress resource using Kubernetes Secrets;
 * Emulation of the nginx Ingress controller (for services that require it,
@@ -78,7 +78,6 @@ frame, or ever.
 * Global / default configuration
 * HSTS preload support (in any case, rewrite the HSTS support as it will be
   removed from TS core in some later release)
-* HTTP/2 server push
 * Custom error bodies
 * Improve API watch support by first retrieving all objects, then watching with
   resourceVersion.
