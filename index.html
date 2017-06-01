@@ -249,7 +249,7 @@ to manage a virtual IP address on your cluster.</p>
 <ul>
 <li>Full support for Ingress resources, including many annotations used by other
   controller implementations;</li>
-<li>HTTP/2;</li>
+<li>HTTP/2, including server push;</li>
 <li>WebSockets;</li>
 <li>TLS termination, configured in the Ingress resource using Kubernetes Secrets;</li>
 <li>Emulation of the nginx Ingress controller (for services that require it,
@@ -283,7 +283,6 @@ frame, or ever.</p>
 <li>Global / default configuration</li>
 <li>HSTS preload support (in any case, rewrite the HSTS support as it will be
   removed from TS core in some later release)</li>
-<li>HTTP/2 server push</li>
 <li>Custom error bodies</li>
 <li>Improve API watch support by first retrieving all objects, then watching with
   resourceVersion.</li>
@@ -446,5 +445,5 @@ of California, based on code written by Guido van Rossum.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-06-01 16:32:04
+Build Date UTC : 2017-06-01 16:33:35
 -->
