@@ -92,8 +92,9 @@ TEST(Hash, Foreach)
 		populate_hash(hs);
 
 		const char *key, *value;
-		hash_foreach(hs, &key, &value)
-			actual[key] = value;
+		size_t keylen;
+		hash_foreach(hs, &key, &keylen, &value)
+			actual[string(key, keylen)] = value;
 
 		EXPECT_EQ(size_t(3), actual.size());
 		EXPECT_EQ(expected, actual);
@@ -108,6 +109,7 @@ TEST(Hash, Iterate)
 	struct hash_iter_state	 iterstate;
 	hash_t			 hs = NULL;
 	const char		*k = NULL;
+	size_t			 klen;
 	void			*v = NULL;
 	int			 i = 0;
 	map<string, string>	 actual, expected{
@@ -122,12 +124,12 @@ TEST(Hash, Iterate)
 		memset(&iterstate, 0, sizeof(iterstate));
 
 		for (int c = 0; c < 3; c++) {
-			i = hash_iterate(hs, &iterstate, &k, &v);
+			i = hash_iterate(hs, &iterstate, &k, &klen, &v);
 			ASSERT_EQ(i, 1);
-			actual.emplace(k, static_cast<char const *>(v));
+			actual.emplace(string(k, klen), static_cast<char const *>(v));
 		}
 
-		i = hash_iterate(hs, &iterstate, &k, &v);
+		i = hash_iterate(hs, &iterstate, &k, &klen, &v);
 		EXPECT_EQ(i, 0);
 
 		EXPECT_EQ(expected, actual);

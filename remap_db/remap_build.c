@@ -32,7 +32,7 @@ namespace_t		*namespace;
 remap_db_t		*db;
 
 	db = remap_db_new(cfg);
-	hash_foreach(cluster->cs_namespaces, NULL, &namespace)
+	hash_foreach(cluster->cs_namespaces, NULL, NULL, &namespace)
 		build_namespace(db, namespace);
 
 	return db;
@@ -48,7 +48,7 @@ ingress_t		*ingress;
 
 	TSDebug("kubernetes", "namespace %s:", ns->ns_name);
 
-	hash_foreach(ns->ns_ingresses, NULL, &ingress)
+	hash_foreach(ns->ns_ingresses, NULL, NULL, &ingress)
 		build_ingress(db, ns, ingress);
 }
 

@@ -146,7 +146,7 @@ service_find_port(const service_t *service, const char *name,
 service_port_t	*port;
 int		 n = atoi(name);
 
-	hash_foreach(service->sv_ports, NULL, &port) {
+	hash_foreach(service->sv_ports, NULL, NULL, &port) {
 		if (port->sp_protocol != proto)
 			continue;
 

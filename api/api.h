@@ -201,19 +201,19 @@ void		 namespace_free(namespace_t *);
 
 void		 namespace_put_ingress(namespace_t *, ingress_t *);
 ingress_t	*namespace_get_ingress(namespace_t *, const char *);
-ingress_t	*namespace_del_ingress(namespace_t *, const char *);
+void		 namespace_del_ingress(namespace_t *, const char *);
 
 void		 namespace_put_secret(namespace_t *, secret_t *);
 secret_t	*namespace_get_secret(namespace_t *, const char *);
-secret_t	*namespace_del_secret(namespace_t *, const char *);
+void		 namespace_del_secret(namespace_t *, const char *);
 
 void		 namespace_put_service(namespace_t *, service_t *);
 service_t	*namespace_get_service(namespace_t *, const char *);
-service_t	*namespace_del_service(namespace_t *, const char *);
+void		 namespace_del_service(namespace_t *, const char *);
 
 void		 namespace_put_endpoints(namespace_t *, endpoints_t *);
 endpoints_t	*namespace_get_endpoints(namespace_t *, const char *);
-endpoints_t	*namespace_del_endpoints(namespace_t *, const char *);
+void		 namespace_del_endpoints(namespace_t *, const char *);
 
 /*
  * Clusters

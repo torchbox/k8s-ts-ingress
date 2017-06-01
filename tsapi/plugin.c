@@ -171,7 +171,7 @@ struct {
 static void
 ingress_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
-ingress_t	*ing, *old;
+ingress_t	*ing;
 namespace_t	*ns;
 struct state	*state = data;
 
@@ -188,8 +188,7 @@ struct state	*state = data;
 
 	ns = cluster_get_namespace(state->cluster, ing->in_namespace);
 	if (ev == WT_DELETED) {
-		if ((old = namespace_del_ingress(ns, ing->in_name)) != NULL)
-			ingress_free(old);
+		namespace_del_ingress(ns, ing->in_name);
 		ingress_free(ing);
 	} else
 		namespace_put_ingress(ns, ing);
@@ -205,7 +204,7 @@ struct state	*state = data;
 static void
 secret_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
-secret_t		*secret, *old;
+secret_t		*secret;
 namespace_t		*ns;
 struct state	*state = data;
 
@@ -222,8 +221,7 @@ struct state	*state = data;
 
 	ns = cluster_get_namespace(state->cluster, secret->se_namespace);
 	if (ev == WT_DELETED) {
-		if ((old = namespace_del_secret(ns, secret->se_name)) != NULL)
-			secret_free(old);
+		namespace_del_secret(ns, secret->se_name);
 		secret_free(secret);
 	} else
 		namespace_put_secret(ns, secret);
@@ -292,17 +290,20 @@ struct hash_iter_state	 isa, isb;
 		for (;;) {
 		int			 ra, rb;
 		const char		*ka, *kb;
+		size_t			 kalen, kblen;
 		endpoints_port_t	*pa, *pb;
 
-			ra = hash_iterate(as->es_ports, &isa, &ka, (void **)&pa);
-			rb = hash_iterate(bs->es_ports, &isb, &kb, (void **)&pb);
+			ra = hash_iterate(as->es_ports, &isa, &ka, &kalen, (void **)&pa);
+			rb = hash_iterate(bs->es_ports, &isb, &kb, &kblen, (void **)&pb);
 			if (ra != rb)
 				return 0;
 
 			if (!ra)
 				break;
 
-			if (strcmp(ka, kb))
+			if (kalen != kblen)
+				return 0;
+			if (memcmp(ka, kb, kalen))
 				return 0;
 			if (strcmp(pa->et_name, pb->et_name))
 				return 0;
@@ -319,7 +320,7 @@ struct hash_iter_state	 isa, isb;
 static void
 endpoints_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
-endpoints_t		*endpoints, *eps2, *old;
+endpoints_t		*endpoints, *eps2;
 namespace_t		*ns;
 struct state		*state = data;
 
@@ -347,8 +348,7 @@ struct state		*state = data;
 		endpoints->ep_namespace, endpoints->ep_name);
 
 	if (ev == WT_DELETED) {
-		if ((old = namespace_del_endpoints(ns, endpoints->ep_name)) != NULL)
-			endpoints_free(old);
+		namespace_del_endpoints(ns, endpoints->ep_name);
 		endpoints_free(endpoints);
 	} else
 		namespace_put_endpoints(ns, endpoints);
@@ -364,7 +364,7 @@ struct state		*state = data;
 static void
 service_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
 {
-service_t		*service, *old;
+service_t		*service;
 namespace_t		*ns;
 struct state		*state = data;
 
@@ -381,8 +381,7 @@ struct state		*state = data;
 
 	ns = cluster_get_namespace(state->cluster, service->sv_namespace);
 	if (ev == WT_DELETED) {
-		if ((old = namespace_del_service(ns, service->sv_name)) != NULL)
-			service_free(old);
+		namespace_del_service(ns, service->sv_name);
 		service_free(service);
 	} else
 		namespace_put_service(ns, service);

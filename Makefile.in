@@ -27,6 +27,7 @@ CPPFLAGS=	@LIBCURL_CPPFLAGS@	\
 		-I${ROOT}/remap_db	\
 		-I${ROOT}/tsapi		\
 		-I${ROOT}/util		\
+		-I${ROOT}/contrib/rax	\
 		-I${ROOT}/contrib/brotli/include
 
 JSON_CFLAGS=	@JSON_CFLAGS@
@@ -43,6 +44,7 @@ VPATH=		${ROOT}/crypt		\
 		${ROOT}/remap_db	\
 		${ROOT}/tsapi		\
 		${ROOT}/tests		\
+		${ROOT}/contrib/rax	\
 		${ROOT}/gtest/src
 
 CRYPT_SRCS=	crypt.c		\
@@ -62,6 +64,7 @@ API_SRCS=	cluster.c	\
 API_OBJS=	${API_SRCS:.c=.o}
 
 SRCS=		hash.c		\
+		rax.c		\
 		strmatch.c	\
 		config.c	\
 		watcher.c	\
@@ -91,6 +94,7 @@ TEST_SRCS=	ts_mockapi.cc		\
 TEST_OBJS=	gtest-all.o		\
 		gtest_main.o		\
 		base64.o		\
+		rax.o			\
 		hash.o			\
 		strmatch.o		\
 		auth.o			\

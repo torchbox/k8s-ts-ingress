@@ -150,16 +150,17 @@ domain.
 `crypt_des.c` is copyright (c) 1989, 1993 The Regents of the University of
 California, based on code written by Tom Truscott.
 
-`strmatch.c` is copyright (c) 1989, 1993, 1994 The Regents of the University
-of California, based on code written by Guido van Rossum.
-
 `crypt_md5.c` was written by Poul-Henning Kamp, and is released under the
 "beer-ware" license.
 
 `crypt_sha256.c` and `crypt_sha512.c` were written by Ulrich Drepper, and are
 released into the public domain.
 
-`hash.c` contains code written by Landon Curt Noll, which is released into the
-public domain.
+`strmatch.c` is copyright (c) 1989, 1993, 1994 The Regents of the University
+of California, based on code written by Guido van Rossum.
+
+`contrib/rax` is Copyright (c) 2017, Salvatore Sanfilippo <antirez at gmail dot com>
+
+`contrib/brotli` is Copyright 2013 Google Inc.
 
 `base64.c` is copyright (c) 2011-2017 Felicity Tarnell.

@@ -6,12 +6,16 @@
  * including commercial applications, and to alter it and redistribute it
  * freely. This software is provided 'as-is', without any express or implied
  * warranty.
+*/
+/*
+ * hash.h: a simple hashed key-value data store.  well, it used to be; now it's
+ * just a thin wrapper around the radix trie implementation, Rax.
  */
-
 #ifndef HASH_H
 #define HASH_H
 
-#include    <stdlib.h>
+#include   	<stdlib.h>
+#include	"rax.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,18 +54,21 @@ void     hash_free(hash_t);
  * Returns 0 on success.  On errors, returns -1 and errno is set.
  */
 int      hash_set(hash_t, const char *key, void *data);
+int      hash_setn(hash_t, const char *key, size_t keylen, void *data);
 
 /*
  * Retrieve an item from the hash.  Returns the item data, or NULL if the item
  * was not found.
  */
 void    *hash_get(const hash_t, const char *key);
+void    *hash_getn(const hash_t, const char *key, size_t keylen);
 
 /*
  * Remove an item from the hash.  Returns the item value on success.  On error,
  * NULL is returned and errno is set to ENOENT.
  */
-void    *hash_del(hash_t, const char *key);
+void     hash_del(hash_t, const char *key);
+void     hash_deln(hash_t, const char *key, size_t keylen);
 
 /*
  * Return the first entry in the hash where find_fn(value) returns true.
@@ -79,16 +86,17 @@ void	*hash_find(const hash_t, hash_find_fn, void *data);
  * returned.
  */
 struct hash_iter_state {
-	size_t i;
-	void *p;
+	int init;
+	char *key;
+	raxIterator iter;
 };
 
 int	hash_iterate(hash_t, struct hash_iter_state *iterstate,
-		     const char **key, void **value);
+		     const char **key, size_t *keylen, void **value);
 
-#define hash_foreach(HASH, KEY, VALUE)				\
-	for (struct hash_iter_state __s = {0, NULL};		\
-	     hash_iterate(HASH, &__s, KEY, (void **)VALUE);)
+#define hash_foreach(HASH, KEY, KEYLEN, VALUE)				\
+	for (struct hash_iter_state __s = {0, NULL, {}};		\
+	     hash_iterate(HASH, &__s, KEY, KEYLEN, (void **)VALUE);)
 
 #ifdef __cplusplus
 }

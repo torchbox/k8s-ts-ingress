@@ -305,6 +305,7 @@ TSMBuffer	resp;
 TSMLoc		hdrs;
 TSMLoc		hdr;
 const char	*h, *v;
+size_t		 hlen;
 
 	if (event == TS_EVENT_HTTP_TXN_CLOSE) {
 		TSDebug("kubernetes", "set_headers: closing");
@@ -318,9 +319,10 @@ const char	*h, *v;
 
 	TSHttpTxnClientRespGet(txn, &resp, &hdrs);
 
-	if (hdrset) hash_foreach(hdrset, &h, &v) {
-		TSDebug("kubernetes", "set_headers: [%s] = [%s]", h, v);
-		TSMimeHdrFieldCreateNamed(resp, hdrs, h, strlen(h), &hdr);
+	if (hdrset) hash_foreach(hdrset, &h, &hlen, &v) {
+		TSDebug("kubernetes", "set_headers: [%.*s] = [%s]",
+			(int) hlen, h, v);
+		TSMimeHdrFieldCreateNamed(resp, hdrs, h, hlen, &hdr);
 		TSMimeHdrFieldValueStringInsert(resp, hdrs, hdr, 0,
 						v, strlen(v));
 		TSMimeHdrFieldAppend(resp, hdrs, hdr);
@@ -369,12 +371,13 @@ int
 should_ignore_cookie(hash_t globs, const char *cookie)
 {
 const char	*k, *p = strchr(cookie, '=');
+size_t		 klen;
 
 	if (!p)
 		return 0;
 
-	hash_foreach(globs, &k, NULL)
-		if (strmatch(cookie, p, k, k + strlen(k)))
+	hash_foreach(globs, &k, &klen, NULL)
+		if (strmatch(cookie, p, k, k + klen))
 			return 1;
 
 	return 0;
@@ -517,11 +520,10 @@ TSCont			 c, set_headers_cont;
 	/* Do the remap */
 	switch (remap_run(db, &req, &res)) {
 	case RR_SYNTHETIC: {
-	const char	*k, *v;
+		TSContDataSet(set_headers_cont, res.rz_headers);
+		res.rz_headers = NULL;
 
 		sy = synth_new(res.rz_status, res.rz_status_text);
-		hash_foreach(res.rz_headers, &k, &v)
-			synth_add_header(sy, k, v);
 		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
 		synth_set_body(sy, res.rz_body);
 		synth_intercept(sy, txnp);

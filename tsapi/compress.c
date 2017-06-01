@@ -752,6 +752,7 @@ void
 tsi_compress(remap_path_t *rp, TSHttpTxn txn)
 {
 const char	*k;
+size_t		 klen;
 comp_state_t	*state;
 TSCont		 contn;
 
@@ -759,8 +760,8 @@ TSCont		 contn;
 	state->cs_types = hash_new(127, NULL);
 	state->cs_txn = txn;
 
-	hash_foreach(rp->rp_compress_types, &k, NULL)
-		hash_set(state->cs_types, k, HASH_PRESENT);
+	hash_foreach(rp->rp_compress_types, &k, &klen, NULL)
+		hash_setn(state->cs_types, k, klen, HASH_PRESENT);
 
 	/* Set headers (Content-Encoding, Vary, ...) */
 	contn = TSContCreate(set_compress_headers, TSMutexCreate());

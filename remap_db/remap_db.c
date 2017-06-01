@@ -118,7 +118,8 @@ remap_host_get_default_path(remap_host_t *rh)
 void
 remap_host_annotate(remap_host_t *rh, hash_t annotations)
 {
-const char	*key = NULL, *value = NULL;
+const char	*key_ = NULL, *value = NULL;
+size_t		 keylen;
 
 	/*
 	 * There are two ways we could do this: use hash_get for each annotation
@@ -130,12 +131,16 @@ const char	*key = NULL, *value = NULL;
 	 * It also makes the code a bit easier to read.
 	 */
 
-	hash_foreach(annotations, &key, &value) {
+	hash_foreach(annotations, &key_, &keylen, &value) {
+	char	*key = strndup(key_, keylen);
+
 		if (strcmp(key, IN_HSTS_MAX_AGE) == 0)
 			rh->rh_hsts_max_age = atoi(value);
 		else if (strcmp(key, IN_HSTS_INCLUDE_SUBDOMAINS) == 0 &&
 			 strcmp(value, "true") == 0)
 			rh->rh_hsts_subdomains = 1;
+
+		free(key);
 	}
 }
 
@@ -324,7 +329,8 @@ truefalse(const char *str)
 void
 remap_path_annotate(namespace_t *ns, remap_path_t *rp, hash_t annotations)
 {
-const char	*key = NULL, *value = NULL;
+const char	*key_ = NULL, *value = NULL;
+size_t		 keylen;
 
 	/*
 	 * There are two ways we could do this: use hash_get for each annotation
@@ -336,7 +342,9 @@ const char	*key = NULL, *value = NULL;
 	 * It also makes the code a bit easier to read.
 	 */
 
-	hash_foreach(annotations, &key, &value) {
+	hash_foreach(annotations, &key_, &keylen, &value) {
+	char	*key = strndup(key_, keylen);
+
 		TSDebug("kubernetes", "[%s] = [%s]", key, value);
 
 		/* cache-enable: turn caching on or off */
@@ -523,6 +531,7 @@ const char	*key = NULL, *value = NULL;
 		else if (strcmp(key, IN_WHITELIST_SOURCE_RANGE) == 0)
 			rp->rp_auth_addr_list = remap_path_get_addresses(value);
 
+		free(key);
 	}
 }
 
@@ -856,8 +865,10 @@ const char	*pend;
 	/* If there's an ignore list, discard anything on it */
 	if (path->rp_ignore_params) {
 	const char	*p = NULL;
-		hash_foreach(path->rp_ignore_params, &p, NULL) {
-			if (strmatch(param, pend, p, p + strlen(p)))
+	size_t		 plen;
+
+		hash_foreach(path->rp_ignore_params, &p, &plen, NULL) {
+			if (strmatch(param, pend, p, p + plen))
 				return 0;
 		}
 	}
@@ -865,8 +876,10 @@ const char	*pend;
 	/* If there's a whitelist, discard anything not on the whitelist */
 	if (path->rp_whitelist_params) {
 	const char	*p = NULL;
-		hash_foreach(path->rp_whitelist_params, &p, NULL) {
-			if (strmatch(param, pend, p, p + strlen(p)))
+	size_t		 plen;
+
+		hash_foreach(path->rp_whitelist_params, &p, &plen, NULL) {
+			if (strmatch(param, pend, p, p + plen))
 				return 1;
 		}
 

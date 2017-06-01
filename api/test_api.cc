@@ -58,8 +58,9 @@ TEST(API, Ingress) {
 	};
 
 	const char *key, *value;
-	hash_foreach(ing->in_annotations, &key, &value)
-		actual_annotations[key] = value;
+	size_t keylen;
+	hash_foreach(ing->in_annotations, &key, &keylen, &value)
+		actual_annotations[string(key, keylen)] = value;
 
 	EXPECT_EQ(expected_annotations, actual_annotations);
 
@@ -103,8 +104,9 @@ TEST(API, Service) {
 	};
 
 	const char *key, *value;
-	hash_foreach(svc->sv_selector, &key, &value)
-		actual_selectors[key] = value;
+	size_t keylen;
+	hash_foreach(svc->sv_selector, &key, &keylen, &value)
+		actual_selectors[string(key, keylen)] = value;
 
 	EXPECT_EQ(expected_selectors, actual_selectors);
 
@@ -142,8 +144,9 @@ TEST(API, ExternalService) {
 	map<string, string> actual_selectors, expected_selectors;
 
 	const char *label, *value;
-	hash_foreach(svc->sv_selector, &label, &value)
-		actual_selectors[label] = value;
+	size_t labellen;
+	hash_foreach(svc->sv_selector, &label, &labellen, &value)
+		actual_selectors[string(label, labellen)] = value;
 
 	EXPECT_EQ(expected_selectors, actual_selectors);
 
@@ -171,8 +174,9 @@ TEST(API, Secret) {
 	};
 
 	const char *key, *value;
-	hash_foreach(srt->se_data, &key, &value)
-		actual_data[key] = value;
+	size_t keylen;
+	hash_foreach(srt->se_data, &key, &keylen, &value)
+		actual_data[string(key, keylen)] = value;
 
 	EXPECT_EQ(expected_data, actual_data);
 
