@@ -8,7 +8,7 @@
   
   
   
-  <title>Using multiple Ingress controllers - TS Ingress Controller</title>
+  <title>Server Push - TS Ingress Controller</title>
   
 
   <link rel="shortcut icon" href="../img/favicon.ico">
@@ -23,9 +23,9 @@
   
   <script>
     // Current page data
-    var mkdocs_page_name = "Using multiple Ingress controllers";
-    var mkdocs_page_input_path = "classes.md";
-    var mkdocs_page_url = "/classes/";
+    var mkdocs_page_name = "Server Push";
+    var mkdocs_page_input_path = "serverpush.md";
+    var mkdocs_page_url = "/serverpush/";
   </script>
   
   <script src="../js/jquery-2.1.1.min.js"></script>
@@ -81,15 +81,8 @@
 
         
             
-    <li class="toctree-l1 current">
-        <a class="current" href="./">Using multiple Ingress controllers</a>
-        
-            <ul>
-            
-                <li class="toctree-l3"><a href="#using-multiple-ingress-controllers">Using multiple Ingress controllers</a></li>
-                
-            
-            </ul>
+    <li class="toctree-l1 ">
+        <a class="" href="../classes/">Using multiple Ingress controllers</a>
         
     </li>
 
@@ -159,8 +152,20 @@
 
         
             
-    <li class="toctree-l1 ">
-        <a class="" href="../serverpush/">Server Push</a>
+    <li class="toctree-l1 current">
+        <a class="current" href="./">Server Push</a>
+        
+            <ul>
+            
+                <li class="toctree-l3"><a href="#http2-server-push">HTTP/2 Server Push</a></li>
+                
+                    <li><a class="toctree-l4" href="#configuring-server-push">Configuring Server Push</a></li>
+                
+            
+                <li class="toctree-l3"><a href="#server-push-and-caching">Server Push and caching</a></li>
+                
+            
+            </ul>
         
     </li>
 
@@ -190,11 +195,11 @@
     
       
         
-          <li>Installation &raquo;</li>
+          <li>Usage &raquo;</li>
         
       
     
-    <li>Using multiple Ingress controllers</li>
+    <li>Server Push</li>
     <li class="wy-breadcrumbs-aside">
       
         
@@ -208,28 +213,50 @@
           <div role="main">
             <div class="section">
               
-                <h1 id="using-multiple-ingress-controllers">Using multiple Ingress controllers</h1>
-<p>If you want to deploy more than one Ingress controller inside a cluster (for
-example, to test the TS Ingress controller before deploying it properly), you
-will need to use Ingress classes to control which resources should be handled
-by which controller.</p>
-<p>The Ingress class is set as an annotation on the resource:</p>
-<pre><code>metadata:
-  annotations:
-    kubernetes.io/ingress.class: &quot;trafficserver&quot;
+                <h1 id="http2-server-push">HTTP/2 Server Push</h1>
+<p>HTTP/2 server push is a mechanism to allow a server to return multiple documents
+in response to a single HTTP request.  Server push can be used to improve page
+load performance when the server knows that a client requesting one document
+will also request another document; for example, when the client requests an HTML
+page, the server might also push the page's assets in its response.  This avoids
+the need for the client to download and parse the HTML before requesting the
+assets, reducing the total number of HTTP transactions and improving the page
+load time.</p>
+<p>However, server push has the significant disadvantage that the pushed documents
+are <em>always</em> sent to the client, even if the client already has them in its
+cache and wouldn't have requested them otherwise.  Thus, pushing every asset
+used on a page can easily reduce performance (and waste bandwidth) by forcing
+the client to download objects it already has.  We may look at ways of mitigating
+this problem on the server side in a future release.</p>
+<p>Deciding when to use server push is a complicated and application-specific issue,
+which we won't cover here.  The following article may be helpful:</p>
+<ul>
+<li><a href="https://www.smashingmagazine.com/2017/04/guide-http2-server-push/">Smashing Magazine: "A Comprehensive Guide To HTTP/2 Server Push"</a></li>
+</ul>
+<h2 id="configuring-server-push">Configuring Server Push</h2>
+<p>Server Push is enabled by default, and uses the <code>Link</code> field header to
+determine what content to push to the client.</p>
+<p>To push a document, include a <code>Link</code> header field in your response with the
+<code>rel=preload</code> attribute:</p>
+<pre><code class="http">Link: &lt;/path/to/my.css&gt;; rel=preload; as=style
 </code></pre>
 
-<p>The TS Ingress controller will handle any Ingress resource which does not have
-an Ingress class set, or where the Ingress class is set to "trafficserver".</p>
-<p>To change the Ingress classes that TS will handle, set <code>ingress_classes</code> in
-<code>kubernetes.config</code> (or the <code>$TS_INGRESS_CLASSES</code> environment variable) to a
-whitespace-separate list of values, e.g. <code>"trafficserver ts-staging"</code>.  This
-can be used to run multiple copies of the TS Ingress controller in one cluster.
-If you do this, the <code>trafficserver</code> class will not be handled unless you
-explicitly include it in the list.</p>
-<p>For more information, see
-<a href="https://github.com/nginxinc/kubernetes-ingress/tree/master/examples/multiple-ingress-controllers">Using Multiple Ingress Controller</a>
-in the Kubernetes documentation.</p>
+<p>The argument to the <code>as</code> attribute should be one of the standard request
+destinations: "audio", "document", "embed", "font", "image", "manifest", "object",
+"report", "script", "serviceworker", "sharedworker", "style", "track", "video",
+"worker", or "xslt", although TS does not enforce this and will push the object
+anyway.</p>
+<p>If you want to include a <code>rel=preload</code> link but not use server push for that
+resource, add the <code>nopush</code> attribute:</p>
+<pre><code class="http">Link: &lt;/path/to/my/image.jpeg&gt;; rel=preload; as=image; nopush
+</code></pre>
+
+<h1 id="server-push-and-caching">Server Push and caching</h1>
+<p>Before TS can push an object to the client, it must have a copy of the object
+itself.  This means you should almost always enable <a href="../caching/">caching</a> on
+assets you intend to push; otherwise, the client will have to wait while TS
+goes back to the application to fetch each pushed asset, and you have lost a
+significant fraction of the performance you might gain from using server push.</p>
               
             </div>
           </div>
@@ -237,10 +264,8 @@ in the Kubernetes documentation.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../config/" class="btn btn-neutral float-right" title="Configuration">Next <span class="icon icon-circle-arrow-right"></span></a>
       
-      
-        <a href="../docker/" class="btn btn-neutral" title="Using the Docker Image"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../compression/" class="btn btn-neutral" title="Compression"><span class="icon icon-circle-arrow-left"></span> Previous</a>
       
     </div>
   
@@ -270,10 +295,8 @@ in the Kubernetes documentation.</p>
           <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
       
       
-        <span><a href="../docker/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+        <span><a href="../compression/" style="color: #fcfcfc;">&laquo; Previous</a></span>
       
-      
-        <span style="margin-left: 15px"><a href="../config/" style="color: #fcfcfc">Next &raquo;</a></span>
       
     </span>
 </div>
