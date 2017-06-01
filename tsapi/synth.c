@@ -82,7 +82,8 @@ synth_free(synth_t *sy)
 		TSIOBufferDestroy(sy->sy_req_buffer);
 	if (sy->sy_resp_buffer)
 		TSIOBufferDestroy(sy->sy_resp_buffer);
-	TSVConnClose(sy->sy_vc);
+	if (sy->sy_vc)
+		TSVConnClose(sy->sy_vc);
 	free(sy);
 }
 
@@ -161,8 +162,7 @@ synth_t	*sy = TSContDataGet(contn);
 		return TS_SUCCESS;
 
 	default:
-		TSDebug("kubernetes", "synth_handle: unexpected event %d",
-			(int) event);
+		TSError("synth_handle: unexpected event %d", (int) event);
 		synth_free(sy);
 		TSContDestroy(contn);
 		return TS_SUCCESS;
