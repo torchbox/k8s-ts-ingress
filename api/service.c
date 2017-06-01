@@ -105,7 +105,7 @@ json_object_iter	 iter;
 			    && json_object_is_type(tmp, json_type_string)) 
 				port->sp_name = strdup(json_object_get_string(tmp));
 			else
-				port->sp_name = strdup("<default>");
+				port->sp_name = strdup("");
 
 			port->sp_protocol = SV_P_TCP;
 

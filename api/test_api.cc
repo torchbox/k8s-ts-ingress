@@ -155,10 +155,10 @@ TEST(API, Service2) {
 
 	EXPECT_EQ(expected_selectors, actual_selectors);
 
-	service_port_t *port = service_find_port(svc, "<default>", SV_P_TCP);
+	service_port_t *port = service_find_port(svc, "", SV_P_TCP);
 	ASSERT_TRUE(port != NULL);
 
-	EXPECT_STREQ(port->sp_name, "<default>");
+	EXPECT_STREQ(port->sp_name, "");
 	EXPECT_EQ(port->sp_port, 80);
 	EXPECT_EQ(port->sp_protocol, SV_P_TCP);
 	EXPECT_EQ(port->sp_target_port, 8080);
@@ -285,10 +285,10 @@ TEST(API, Endpoints2) {
 	endpoints_subset_t *es = &eps->ep_subsets[0];
 	EXPECT_EQ(0u, es->es_naddrs);
 
-	endpoints_port_t *ep = (endpoints_port_t *)hash_get(es->es_ports, "<default>");
+	endpoints_port_t *ep = (endpoints_port_t *)hash_get(es->es_ports, "");
 	ASSERT_TRUE(ep != nullptr);
 
-	EXPECT_STREQ(ep->et_name, "<default>");
+	EXPECT_STREQ(ep->et_name, "");
 	EXPECT_EQ(ep->et_port, 8080);
 	EXPECT_STREQ(ep->et_protocol, "TCP");
 

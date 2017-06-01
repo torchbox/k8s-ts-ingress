@@ -1179,6 +1179,7 @@ int raxIteratorNextStep(raxIterator *it, int noup) {
         return 0;
     } else if (it->flags & RAX_ITER_JUST_SEEKED) {
         it->flags &= ~RAX_ITER_JUST_SEEKED;
+        it->data = raxGetData(it->node);
         return 1;
     }
 

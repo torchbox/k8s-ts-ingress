@@ -55,16 +55,19 @@ raxIterator	iter;
 	if (!hs)
 		return;
 
-	raxStart(&iter, hs->hs_rax);
-	raxSeek(&iter, "^", NULL, 0);
+	if(hs->hs_rax) {
+		raxStart(&iter, hs->hs_rax);
+		raxSeek(&iter, "^", NULL, 0);
 
-	while (raxNext(&iter)) {
-		if (iter.data && hs->hs_free_fn)
-			hs->hs_free_fn(iter.data);
+		while (raxNext(&iter)) {
+			if (iter.data && hs->hs_free_fn)
+				hs->hs_free_fn(iter.data);
+		}
+
+		raxStop(&iter);
+		raxFree(hs->hs_rax);
 	}
 
-	raxStop(&iter);
-	raxFree(hs->hs_rax);
 	free(hs);
 }
 
@@ -96,6 +99,10 @@ hash_find(const hash_t hs, hash_find_fn fn, void *data)
 {
 raxIterator	it;
 
+	assert(hs);
+	if (!hs->hs_rax)
+		return NULL;
+
 	raxStart(&it, hs->hs_rax);
 	raxSeek(&it, "^", NULL, 0);
 
@@ -123,6 +130,9 @@ hash_setn(hash_t hs, const char *key, size_t keylen, void *value)
 {
 void	*oldvalue = NULL;
 
+	assert(hs);
+	assert(hs->hs_rax);
+
 	raxInsert(hs->hs_rax, (unsigned char *) key, keylen, value, &oldvalue);
 
 	if (oldvalue && hs->hs_free_fn)
@@ -142,6 +152,10 @@ hash_getn(const hash_t hs, const char *key, size_t keylen)
 {
 void	*data;
 
+	assert(hs);
+	if (!hs->hs_rax)
+		return NULL;
+
 	data = raxFind(hs->hs_rax, (unsigned char *)key, keylen);
 	if (data == raxNotFound)
 		return NULL;
@@ -158,6 +172,9 @@ void
 hash_deln(hash_t hs, const char *key, size_t keylen)
 {
 void	*data = NULL;
+
+	assert(hs);
+	assert(hs->hs_rax);
 
 	raxRemove(hs->hs_rax, (unsigned char *)key, keylen, &data);
 
