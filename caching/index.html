@@ -123,6 +123,8 @@
                 
                     <li><a class="toctree-l4" href="#caching-and-url-parameters">Caching and URL parameters</a></li>
                 
+                    <li><a class="toctree-l4" href="#caching-and-cookies">Caching and cookies</a></li>
+                
                     <li><a class="toctree-l4" href="#removing-pages-from-the-cache">Removing pages from the cache</a></li>
                 
                     <li><a class="toctree-l4" href="#x-cache-status-header">X-Cache-Status header</a></li>
@@ -319,6 +321,32 @@ rate across clients.</p>
 <p>These annotations also change the query string sent to the application.  This is
 to ensure the application doesn't accidentally vary the page content based on a
 query parameter that has been ignored for caching.</p>
+<h2 id="caching-and-cookies">Caching and cookies</h2>
+<p>Usually, TS will not cache a response or serve a request from the cache if
+either of the following are true:</p>
+<ul>
+<li>The request has a <code>Cookie</code> header field</li>
+<li>The response has a <code>Set-Cookie</code> header field</li>
+</ul>
+<p>This is true even if the response includes an explicit <code>Cache-Control</code>, and is
+intended to avoid accidental leakage of private data due to misconfiguration.</p>
+<p>However, in some cases your users may have cookies set that do not affect page
+content.  This is common with tracking cookies for page analytics tools; Google
+Analytics, for example, sets several cookies with names like <code>__utma</code>, which are
+only ever referenced from JavaScript and do not affect page content.</p>
+<p>To allow caching to work even with these cookies set, use the
+<code>ingress.kubernetes.io/cache-ignore-cookies</code> annotation:</p>
+<pre><code class="yaml">metadata:
+  annotations:
+    ingress.kubernetes.io/cache-ignore-cookies: &quot;utm_* has_js&quot;
+</code></pre>
+
+<p>The annotation value should be a space-delimited list of UNIX globs; any cookie
+in the request <code>Cookie:</code> header field which matches one of the globs will be
+removed.  If there are no cookies left, then the entire <code>Cookie</code> header field
+will be removed from the request; the request can then be served from the cache,
+or its response can be stored in the cache.</p>
+<p>If any cookies remain after processing, caching will be bypassed as normal.</p>
 <h2 id="removing-pages-from-the-cache">Removing pages from the cache</h2>
 <h3 id="removing-individual-urls">Removing individual URLs</h3>
 <p>You can purge individual URLs from the cache by sending an HTTP <code>PURGE</code> request
@@ -341,7 +369,7 @@ current UNIX timestamp, although any non-zero integer will work.</p>
 <h2 id="x-cache-status-header"><code>X-Cache-Status</code> header</h2>
 <p>When an Ingress has caching enable, TS will include an <code>X-Cache-Status</code> header
 in the HTTP response, which looks like this:</p>
-<pre><code>X-Cache-Status: hit (1496232521)
+<pre><code>X-Cache-Status: hit-fresh (1496232521)
 </code></pre>
 
 <p>The number in brackets is the current cache generation configured on the Ingress.
