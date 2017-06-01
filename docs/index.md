@@ -85,7 +85,22 @@ frame, or ever.
 
 ## Release history
 
-* 1.0.0-alpha6 (unreleased):
+* 1.0.0-alpha8 (unreleased):
+    * No changes yet.
+
+* 1.0.0-alpha7:
+    * Improvement: The Traffic Server version in the Docker image has been
+        upgraded from 7.0.0 to 7.1.x (prerelease).
+    * Improvement: The hash tree implementation has been replaced with a radix
+        tree, reducing memory use for small clusters and providing better (and
+        more predictable) performance for large clusters.
+    * Bug fix: A synthetic response could cause a crash.
+    * Bug fix: An incorrect Cookie header could be sent to the origin.
+    * Bug fix: An incorrect Content-Encoding header could be sent to the client
+        if the client supported compression but the response object was not
+        compressed.
+
+* 1.0.0-alpha6:
     * Incompatible change: The behaviour of the `app-root` annotation was
         changed to match the behaviour of other Ingress controllers.
     * Incompatible change: Several annotations were moved from
@@ -102,6 +117,7 @@ frame, or ever.
     * Bug fix: With certain combinations of OpenSSL and Traffic Server versions,
         a TLS request for an unknown host could hang indefinitely instead of
         returning an error.
+
 * 1.0.0-alpha5:
     * Incompatible change: The `ingress.torchbox.com/auth-address-list`
         annotation was renamed to `ingress.torchbox.com/whitelist-source-range`,
@@ -122,13 +138,16 @@ frame, or ever.
         TS_SSL_CERT_HOOK hook to ensure this works properly in all cases.
     * Bug fix: An Endpoints with more than one port or address could be parsed
         incorrectly or cause a crash.
+
 * 1.0.0-alpha4:
     * Do not return a client error if the requested host or path was not
       found, to allow use with other plugins like healthchecks.
+
 * 1.0.0-alpha3:
     * Greatly improved unit test coverage.
     * Several minor bugs fixed.
     * Support configuration via environment variables.
+
 * 1.0.0-alpha2: Implement IP address authentication.
 * 1.0.0-alpha1: Initial release.
 
