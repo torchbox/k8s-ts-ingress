@@ -362,38 +362,46 @@ const char	*cs;
 	return 1;
 }
 
-static void
-set_content_encoding(comp_state_t *state, TSMBuffer resp, TSMLoc reshdr)
+static int
+set_content_encoding(TSCont contn, TSEvent event, void *edata)
 {
-TSMLoc		hdr;
+TSHttpTxn	txn = edata;
+comp_state_t	*state = TSContDataGet(contn);
+TSMBuffer	resp;
+TSMLoc		hdr, field;
 
 	if (state->cs_type == COMP_NONE)
-		return;
+		return TS_SUCCESS;
+
+	TSHttpTxnClientRespGet(txn, &resp, &hdr);
 
 	/*
 	 * This response is compressible.  Add a header and insert our
 	 * transform.
 	 */
-	TSMimeHdrFieldCreateNamed(resp, reshdr,
+	TSMimeHdrFieldCreateNamed(resp, hdr,
 				  TS_MIME_FIELD_CONTENT_ENCODING,
 				  TS_MIME_LEN_CONTENT_ENCODING,
-				  &hdr);
+				  &field);
 
 	switch (state->cs_type) {
 	case COMP_GZIP:
-		TSMimeHdrFieldValueStringInsert(resp, reshdr, hdr, 0, "gzip", 4);
+		TSMimeHdrFieldValueStringInsert(resp, hdr, field, 0, "gzip", 4);
 		break;
 
 	case COMP_BROTLI:
-		TSMimeHdrFieldValueStringInsert(resp, reshdr, hdr, 0, "br", 2);
+		TSMimeHdrFieldValueStringInsert(resp, hdr, field, 0, "br", 2);
 		break;
 
 	default:
 		assert(!"unknown cs_type");
 	}
 
-	TSMimeHdrFieldAppend(resp, reshdr, hdr);
-	TSHandleMLocRelease(resp, reshdr, hdr);
+	TSMimeHdrFieldAppend(resp, hdr, field);
+	TSHandleMLocRelease(resp, hdr, field);
+	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+	return TS_SUCCESS;
 }
 
 /*
@@ -630,18 +638,19 @@ comp_state_t	*state = TSContDataGet(contn);
 	}
 
 	if (response_can_compress(state, resp, hdr)) {
-	TSCont	transform;
+	TSCont	c;
 
 		/* Tell TS not to cache the transformed data */
 		TSHttpTxnTransformedRespCache(txn, 0);
 		TSHttpTxnUntransformedRespCache(txn, 1);
 
-		transform = TSTransformCreate(transform_event, txn);
-		TSContDataSet(transform, state);
-		TSHttpTxnHookAdd(txn, TS_HTTP_RESPONSE_TRANSFORM_HOOK,
-				 transform);
+		c = TSTransformCreate(transform_event, txn);
+		TSContDataSet(c, state);
+		TSHttpTxnHookAdd(txn, TS_HTTP_RESPONSE_TRANSFORM_HOOK, c);
 
-		set_content_encoding(state, resp, hdr);
+		c = TSContCreate(set_content_encoding, TSMutexCreate());
+		TSContDataSet(c, state);
+		TSHttpTxnHookAdd(txn, TS_HTTP_SEND_RESPONSE_HDR_HOOK, c);
 	}
 
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
@@ -675,18 +684,19 @@ int		 cache_status;
 	}
 
 	if (response_can_compress(state, resp, hdr)) {
-	TSCont	transform;
+	TSCont	c;
 
 		/* Tell TS not to cache the transformed data */
 		TSHttpTxnTransformedRespCache(txn, 0);
 		TSHttpTxnUntransformedRespCache(txn, 1);
 
-		transform = TSTransformCreate(transform_event, txn);
-		TSContDataSet(transform, state);
-		TSHttpTxnHookAdd(txn, TS_HTTP_RESPONSE_TRANSFORM_HOOK,
-				 transform);
+		c = TSTransformCreate(transform_event, txn);
+		TSContDataSet(c, state);
+		TSHttpTxnHookAdd(txn, TS_HTTP_RESPONSE_TRANSFORM_HOOK, c);
 
-		set_content_encoding(state, resp, hdr);
+		c = TSContCreate(set_content_encoding, TSMutexCreate());
+		TSContDataSet(c, state);
+		TSHttpTxnHookAdd(txn, TS_HTTP_SEND_RESPONSE_HDR_HOOK, c);
 	}
 
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
