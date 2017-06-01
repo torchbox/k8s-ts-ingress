@@ -414,14 +414,14 @@ char		*newhdr;
 	newhdr = malloc(1);
 	newhdr[0] = '\0';
 
-	for (r = strtok_r(s, " ,", &t); r; r = strtok_r(NULL, ", ", &t)) {
+	for (r = strtok_r(s, " ;", &t); r; r = strtok_r(NULL, " ;", &t)) {
 		if (should_ignore_cookie(res->rz_path->rp_ignore_cookies, r))
 			continue;
 		TSDebug("kubernetes", "check_cookies: preserving this cookie [%s]",
 			r);
 		newhdr = realloc(newhdr, strlen(newhdr) + strlen(r) + 3);
 		if (*newhdr)
-			strcat(newhdr, ", ");
+			strcat(newhdr, "; ");
 		strcat(newhdr, r);
 	}
 
