@@ -372,11 +372,59 @@ size_t		 hlen;
 	TSHttpTxnConfigStringSet(txn, TS_CONFIG_HTTP_RESPONSE_SERVER_STR,
 			      via_name, via_name_len);
 #endif
+	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdrs);
+	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+	return TS_SUCCESS;
+}
+
 
 	/*
 	 * Do HTTP/2 server push.
 	 */
-	for (int i = 0, end = TSMimeHdrFieldsCount(resp, hdrs); i < end; ++i) {
+int
+server_push(TSCont contp, TSEvent event, void *edata)
+{
+TSHttpTxn	txn = edata;
+TSMBuffer	resp = NULL;
+TSMLoc		hdr, field;
+
+	TSDebug("kubernetes", "server_push: running");
+
+	/*
+	 * We can be called from both TS_EVENT_HTTP_CACHE_LOOKUP_COMPLETE and
+	 * TS_EVENT_HTTP_READ_RESPONSE_HDR.  Pick the correct response to
+	 * process (server response or cached response) to process based on the
+	 * event type.
+	 *
+	 * In the case of a cache lookup, only process cache hits; misses
+	 * will go to origin and we'll be called again later for the server
+	 * response.
+	 */
+	if (event == TS_EVENT_HTTP_READ_RESPONSE_HDR) {
+		if (TSHttpTxnServerRespGet(txn, &resp, &hdr) != TS_SUCCESS) {
+			TSDebug("kubernetes", "server_push: cannot get "
+				"server resp?!");
+			TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+			return TS_SUCCESS;
+		}
+	} else {
+	int	cache_status = 0;
+		TSHttpTxnCacheLookupStatusGet(txn, &cache_status);
+
+		if (cache_status != TS_CACHE_LOOKUP_HIT_FRESH) {
+			TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+			return TS_SUCCESS;
+		}
+
+		if (TSHttpTxnCachedRespGet(txn, &resp, &hdr) != TS_SUCCESS) {
+			TSDebug("kubernetes", "server_push: cannot get "
+				"cached resp?!");
+			TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+			return TS_SUCCESS;
+		}
+	}
+
+	for (int i = 0, end = TSMimeHdrFieldsCount(resp, hdr); i < end; ++i) {
 	const char	*cs;
 	int		 len, n;
 	TSMBuffer	 req;
@@ -384,15 +432,15 @@ size_t		 hlen;
 	TSMLoc		 requrl;
 
 
-		hdr = TSMimeHdrFieldGet(resp, hdrs, i);
-		cs = TSMimeHdrFieldNameGet(resp, hdrs, hdr, &len);
+		field = TSMimeHdrFieldGet(resp, hdr, i);
+		cs = TSMimeHdrFieldNameGet(resp, hdr, field, &len);
 		if (len != 4 || memcmp(cs, "Link", 4)) {
-			TSHandleMLocRelease(resp, hdrs, hdr);
+			TSHandleMLocRelease(resp, hdr, field);
 			continue;
 		}
 
-		n = TSMimeHdrFieldValuesCount(resp, hdrs, hdr);
-		TSDebug("kubernetes", "set_headers: will push %d URLs", n);
+		n = TSMimeHdrFieldValuesCount(resp, hdr, field);
+		TSDebug("kubernetes", "server_push: will push %d URLs", n);
 
 		TSHttpTxnClientReqGet(txn, &req, &reqhdr);
 		TSHttpHdrUrlGet(req, reqhdr, &requrl);
@@ -404,7 +452,7 @@ size_t		 hlen;
 
 			
 			/* Fetch the Link field */
-			cs = TSMimeHdrFieldValueStringGet(resp, hdrs, hdr, i, &len);
+			cs = TSMimeHdrFieldValueStringGet(resp, hdr, field, i, &len);
 			s = strndup(cs, len);
 
 			for (t = strtok_r(s, "; ", &r); t != NULL;
@@ -450,15 +498,15 @@ size_t		 hlen;
 			TSDebug("kubernetes", "push URL is [%.*s]", len, cs);
 			TSHttpTxnServerPush(txn, cs, len);
 
-			TSHandleMLocRelease(resp, hdrs, pushurl);
+			TSHandleMLocRelease(resp, hdr, pushurl);
 		}
 
-		TSHandleMLocRelease(resp, hdrs, hdr);
+		TSHandleMLocRelease(resp, hdr, field);
 		TSHandleMLocRelease(req, reqhdr, requrl);
 		TSHandleMLocRelease(req, TS_NULL_MLOC, reqhdr);
 	}
 
-	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdrs);
+	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
 	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 	return TS_SUCCESS;
 }
@@ -688,6 +736,13 @@ TSCont			 c, set_headers_cont;
 		TSHttpTxnClientReqGet(txnp, &reqp, &hdrs);
 		TSHttpHdrUrlSet(reqp, hdrs, newurl);
 		TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
+	}
+
+	/* Do HTTP/2 server push */
+	if (res.rz_path->rp_server_push) {
+		c = TSContCreate(server_push, TSMutexCreate());
+		TSHttpTxnHookAdd(txnp, TS_HTTP_READ_RESPONSE_HDR_HOOK, c);
+		TSHttpTxnHookAdd(txnp, TS_HTTP_CACHE_LOOKUP_COMPLETE_HOOK, c);
 	}
 
 	/* follow redirects if configured on the Ingress.  */

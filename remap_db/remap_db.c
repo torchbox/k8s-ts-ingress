@@ -159,6 +159,7 @@ int		 rerr;
 		return NULL;
 
 	ret->rp_preserve_host = 1;
+	ret->rp_server_push = 1;
 	ret->rp_cors_origins = hash_new(127, NULL);
 
 	/* Cache by default */
@@ -339,7 +340,8 @@ size_t		 keylen;
 	 * the annotations on the Ingress, which should be the same, it saves
 	 * running a complete hash lookup for every string.
 	 *
-	 * It also makes the code a bit easier to read.
+	 * This is probably not true any more (many more annotations have been
+	 * added), and this code should be refactored.
 	 */
 
 	hash_foreach(annotations, &key_, &keylen, &value) {
@@ -421,6 +423,10 @@ size_t		 keylen;
 		/* follow-redirects: if set, TS will resolve 3xx responses itself */
 		else if (strcmp(key, IN_FOLLOW_REDIRECTS) == 0)
 			rp->rp_follow_redirects = truefalse(value);
+
+		/* server-push: enable/disable http/2 server push processing */
+		else if (strcmp(key, IN_SERVER_PUSH) == 0)
+			rp->rp_server_push = truefalse(value);
 
 		/* secure-backends: use TLS for backend connections */
 		else if (strcmp(key, IN_SECURE_BACKENDS) == 0)

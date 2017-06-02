@@ -89,6 +89,7 @@ typedef struct {
 	char	 *rp_rewrite_target;		/* Rewrite path		     */
 	int	  rp_read_timeout;		/* Origin read timeout	     */
 	int	  rp_compress:1;		/* Compress response	     */
+	int	  rp_server_push:1;		/* Enable HTTP/1 server push */
 	hash_t	  rp_compress_types;		/* Content types to compress */
 
 	/* Authn/authz */

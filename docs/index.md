@@ -79,6 +79,7 @@ frame, or ever.
 * HSTS preload support (in any case, rewrite the HSTS support as it will be
   removed from TS core in some later release)
 * Custom error bodies
+* `X-Next-Hop-Cache-Control`
 * Improve API watch support by first retrieving all objects, then watching with
   resourceVersion.
 
