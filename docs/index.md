@@ -51,6 +51,7 @@ The controller provides the following features:
   e.g. kube-lego);
 * Flexible HTTP caching, including:
     * Cache lifetime controlled by `Cache-Control` or `Expires` headers;
+    * Manipulation of outgoing Cache-Control;
     * Removal from the cache of individual pages or all pages at once;
     * Alternatives (HTTP Vary);
     * Ignoring URL parameters and cookies which do not affect page content.
@@ -60,15 +61,16 @@ The controller provides the following features:
 * Proxying to external (non-Kubernetes) services using Ingress resources;
 * ESI (Edge-Side Includes).
 
-More features are planned for future releases.  If you would like to see a
-particular feature supported, please
-[open a Github issue](https://github.com/torchbox/k8s-ts-ingress/issues).
 
 ## Planned features
 
 A feature being listed here indicates we are interested in implementing it, but
 provides no guarantee that it will be implemented within any particular time
 frame, or ever.
+
+If you would like to see a particular feature supported, whether it's on this
+list or not, please
+[open a Github issue](https://github.com/torchbox/k8s-ts-ingress/issues).
 
 * TLS client certificate authentication.
 * Client session affinity
@@ -79,9 +81,10 @@ frame, or ever.
 * HSTS preload support (in any case, rewrite the HSTS support as it will be
   removed from TS core in some later release)
 * Custom error bodies
-* `X-Next-Hop-Cache-Control`
+* Support [libslz](http://www.libslz.org/) as an alternative to zlib.
 * Improve API watch support by first retrieving all objects, then watching with
   resourceVersion.
+* Wildcard cache purging.
 
 ## Release history
 

@@ -293,12 +293,13 @@ static const char *const status_names[] = {
 }
 
 /*
- * A continuation to set headers on the HTTP reponse.  It expects its
- * continuation data to be a hash_t of string pairs.  This must be hooked to
- * both TS_HTTP_SEND_RESPONSE_HDR and TS_HTTP_TXN_CLOSE_HOOK to ensure the
- * data is freed.
+ * A continuation to set additional fields in the HTTP reponse header.  It
+ * expects its continuation data to be a hash_t of string pairs.  This must be
+ * hooked to * both TS_HTTP_SEND_RESPONSE_HDR and TS_HTTP_TXN_CLOSE_HOOK to
+ * ensure the * data is freed.
  *
- * This also sets the Server and Via headers.
+ * This also sets the Server and Via headers, and handles
+ * X-Next-Hop-Cache-Control.
  */
 int
 set_headers(TSCont contp, TSEvent event, void *edata)
@@ -372,6 +373,41 @@ size_t		 hlen;
 	TSHttpTxnConfigStringSet(txn, TS_CONFIG_HTTP_RESPONSE_SERVER_STR,
 			      via_name, via_name_len);
 #endif
+
+	/*
+	 * Check for X-Next-Hop-Cache-Control.
+	 */
+	hdr = TSMimeHdrFieldFind(resp, hdrs,
+			REMAP_MIME_FIELD_X_NEXT_HOP_CACHE_CONTROL,
+			REMAP_MIME_FIELD_X_NEXT_HOP_CACHE_CONTROL_LEN);
+	if (hdr != TS_NULL_MLOC) {
+	TSMLoc		 cc;
+
+		cc = TSMimeHdrFieldFind(resp, hdrs,
+					TS_MIME_FIELD_CACHE_CONTROL,
+					TS_MIME_LEN_CACHE_CONTROL);
+		if (cc != TS_NULL_MLOC) {
+			TSMimeHdrFieldRemove(resp, hdrs, cc);
+			TSHandleMLocRelease(resp, hdrs, cc);
+		}
+
+		TSMimeHdrFieldCreateNamed(resp, hdrs,
+				TS_MIME_FIELD_CACHE_CONTROL,
+				TS_MIME_LEN_CACHE_CONTROL, &cc);
+
+		for (int i = 0, end = TSMimeHdrFieldValuesCount(resp, hdrs, hdr);
+		     i < end; ++i) {
+		const char	*cs;
+		int		 len;
+			cs = TSMimeHdrFieldValueStringGet(resp, hdrs, hdr, i, &len);
+			TSMimeHdrFieldValueStringInsert(resp, hdrs, cc, -1, cs, len);
+		}
+
+		TSMimeHdrFieldAppend(resp, hdrs, cc);
+		TSMimeHdrFieldRemove(resp, hdrs, hdr);
+		TSHandleMLocRelease(resp, hdrs, hdr);
+	}
+
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdrs);
 	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 	return TS_SUCCESS;

@@ -42,6 +42,10 @@ if [ "$1" = "handle" ]; then
 		printf 'Link: </cached/foo>; rel=preload; as=script\r\n'
 		printf 'Link: </cached/bar>; rel=preload; as=script\r\n'
 	fi
+	if echo "$path" | grep -q "/nexthopcc/"; then
+		printf 'Cache-Control: public, max-age=7200\r\n'
+		printf 'X-Next-Hop-Cache-Control: no-cache, max-age=3600, public\r\n'
+	fi
 	printf '\r\n'
 	printf 'Request method: %s\n' "$method"
 	printf 'Request path: %s\n' "$path"

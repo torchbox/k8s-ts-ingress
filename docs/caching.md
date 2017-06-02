@@ -76,6 +76,41 @@ spec:
           servicePort: http
 ```
 
+## Controlling downstream caching
+
+When a page is cached in Traffic Server, an application can easily
+[remove the page from the cache](#removing-pages-from-the-cache) when it changes.
+This allows the application to set a long cache lifetime and rely on cache
+purging to keep content up to date.
+
+However, the application cannot purge content from clients or downstream caches,
+such as ISP or organisational proxies.  This means if your `Cache-Control`
+header indicates the response should be cached for 30 days, the client may never
+fetch fresh content until 30 days have passed, even if the document is updated
+before then in the TS cache.
+
+In some cases, like static assets which have cache-aware URLs, the content for a
+particular URL will never change, and this behaviour is desirable.  However, it's
+generally _not_ desirable for HTML, where the document content often changes
+without the URL changing.
+
+To prevent clients or downstream proxies from caching responses, you can set the
+`X-Next-Hop-Cache-Control` header field in the response.  If present, TS will
+use this value to replace the `Cache-Control` header field, but still use the
+original `Cache-Control` for its own caching.
+
+A suitable value for HTML content using a 30-day cache lifetime would be:
+
+```http
+X-Next-Hop-Cache-Control: no-cache, max-age=2592000
+```
+
+This means that clients can still cache the document for up to 30 days, but the
+`no-cache` directive requires the document to be revalidated with the origin
+server before it's used.  Since the document should be in the TS cache,
+validation should be quick and won't require the document to be re-sent unless
+it's changed.
+
 ## Caching and URL parameters
 
 When a page is cached, its URL parameters are stored in the cache to ensure that
@@ -195,6 +230,37 @@ integer.  This changes the cache generation for the Ingress; any objects cached
 with a different generation are no longer visible, and have been effectively
 removed from the cache.  Typically the cache generation would be set to the
 current UNIX timestamp, although any non-zero integer will work.
+
+## Caching and static assets
+
+Static assets can be purged from the cache when they change in the same way as
+HTML content.  However, this is quite inefficient: whenever the application is
+redeployed and static assets have changed, either the entire cache needs to be
+purged, or the individual URLs of each asset need to be purged.  Even then, this
+will not purge content from downstream caches, meaning some users may not see
+your updates.  While you could
+[prevent clients from caching static assets](#controlling-downstream-caching),
+this has a deleterious effect on performance.
+
+Instead, your application should change the URL of the assets when their
+content changes.  There are three common ways to do this:
+
+* Define a global "style version" in the application, and append this to the
+  URL as a query parameter: `/css/main.css?42`;
+* Check the timestamp of each asset, and append it to the URL, again as a
+  query parameter: `/css/main.css?1496405714`;
+* Calculate the hash of the content of each asset, and include this as either
+  a part of the filename or a query parameter: `/css/main.abcd1234.css` or
+  `/css/main.css?abcd1234`.
+
+Because the URL of the asset now changes when its content changes, clients will
+automatically fetch the correct version of the asset, without having to clear
+anything from the cache (except the HTML, of course).  In addition, the assets
+can be cached by clients or downstream proxies without the risk that out-of-date
+cached content will be used.
+
+This is an extremely common pattern for caching static assets, so support is
+available for doing it automatically in most web application frameworks.
 
 ## `X-Cache-Status` header
 
