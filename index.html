@@ -256,6 +256,7 @@ to manage a virtual IP address on your cluster.</p>
   e.g. kube-lego);</li>
 <li>Flexible HTTP caching, including:<ul>
 <li>Cache lifetime controlled by <code>Cache-Control</code> or <code>Expires</code> headers;</li>
+<li>Manipulation of outgoing Cache-Control;</li>
 <li>Removal from the cache of individual pages or all pages at once;</li>
 <li>Alternatives (HTTP Vary);</li>
 <li>Ignoring URL parameters and cookies which do not affect page content.</li>
@@ -267,13 +268,13 @@ to manage a virtual IP address on your cluster.</p>
 <li>Proxying to external (non-Kubernetes) services using Ingress resources;</li>
 <li>ESI (Edge-Side Includes).</li>
 </ul>
-<p>More features are planned for future releases.  If you would like to see a
-particular feature supported, please
-<a href="https://github.com/torchbox/k8s-ts-ingress/issues">open a Github issue</a>.</p>
 <h2 id="planned-features">Planned features</h2>
 <p>A feature being listed here indicates we are interested in implementing it, but
 provides no guarantee that it will be implemented within any particular time
 frame, or ever.</p>
+<p>If you would like to see a particular feature supported, whether it's on this
+list or not, please
+<a href="https://github.com/torchbox/k8s-ts-ingress/issues">open a Github issue</a>.</p>
 <ul>
 <li>TLS client certificate authentication.</li>
 <li>Client session affinity</li>
@@ -284,8 +285,10 @@ frame, or ever.</p>
 <li>HSTS preload support (in any case, rewrite the HSTS support as it will be
   removed from TS core in some later release)</li>
 <li>Custom error bodies</li>
+<li>Support <a href="http://www.libslz.org/">libslz</a> as an alternative to zlib.</li>
 <li>Improve API watch support by first retrieving all objects, then watching with
   resourceVersion.</li>
+<li>Wildcard cache purging.</li>
 </ul>
 <h2 id="release-history">Release history</h2>
 <ul>
@@ -445,5 +448,5 @@ of California, based on code written by Guido van Rossum.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-06-01 16:33:35
+Build Date UTC : 2017-06-02 13:28:52
 -->
