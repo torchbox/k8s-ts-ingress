@@ -74,6 +74,7 @@ list or not, please
 
 * TLS client certificate authentication.
 * Client session affinity
+* Backend weights
 * Proxy protocol
 * Rate limiting
 * SSL passthrough
@@ -84,12 +85,25 @@ list or not, please
 * Support [libslz](http://www.libslz.org/) as an alternative to zlib.
 * Improve API watch support by first retrieving all objects, then watching with
   resourceVersion.
-* Wildcard cache purging.
+* Wildcard cache purging and/or cache tags.
 
 ## Release history
 
 * 1.0.0-alpha8 (unreleased):
+    * Incompatible change: The CORS configuration was changed to be both more
+        clear and more flexible.
     * Feature: HTTP/2 Server Push was implemented.
+    * Feature: the `cache-whitelist-cookies annotation was implemented.
+    * Improvement: Two unnecessary plugins were removed from the Docker image
+        configuration (header_rewrite and xdebug).
+    * Improvement: End-to-end test coverage was improved; as a result, several
+        bugs were fixed:
+        * A 401 Unauthorised response did not include a WWW-Authenticate header.
+        * A response including both `Set-Cookie` and `Cache-Control` header
+          fields would be cached even though responses containing `Set-Cookie`
+          fields should not be cached.
+        * The `cache-ignore-query-params` and `cache-whitelist-query-params`
+          annotations did not work correctly.
 
 * 1.0.0-alpha7:
     * Improvement: The Traffic Server version in the Docker image has been

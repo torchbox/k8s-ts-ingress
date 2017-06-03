@@ -186,7 +186,7 @@ TSMLoc		hdrs, newurl;
 	TSUrlPathSet(reqp, newurl, res->rz_urlpath, -1);
 
 	if (res->rz_query)
-		TSUrlHttpParamsSet(reqp, newurl, res->rz_query, -1);
+		TSUrlHttpQuerySet(reqp, newurl, res->rz_query, -1);
 
 	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
 	return newurl;
@@ -295,8 +295,8 @@ static const char *const status_names[] = {
 /*
  * A continuation to set additional fields in the HTTP reponse header.  It
  * expects its continuation data to be a hash_t of string pairs.  This must be
- * hooked to * both TS_HTTP_SEND_RESPONSE_HDR and TS_HTTP_TXN_CLOSE_HOOK to
- * ensure the * data is freed.
+ * hooked to both TS_HTTP_SEND_RESPONSE_HDR and TS_HTTP_TXN_CLOSE_HOOK to
+ * ensure the data is freed.
  *
  * This also sets the Server and Via headers, and handles
  * X-Next-Hop-Cache-Control.
@@ -486,7 +486,7 @@ TSMLoc		hdr, field;
 		TSMLoc		 pushurl;
 		int		 nopush = 0, relpreload = 0;
 
-			
+
 			/* Fetch the Link field */
 			cs = TSMimeHdrFieldValueStringGet(resp, hdr, field, i, &len);
 			s = strndup(cs, len);
@@ -548,7 +548,7 @@ TSMLoc		hdr, field;
 }
 
 int
-should_ignore_cookie(hash_t globs, const char *cookie)
+should_ignore_cookie(remap_path_t *path, const char *cookie)
 {
 const char	*k, *p = strchr(cookie, '=');
 size_t		 klen;
@@ -556,9 +556,18 @@ size_t		 klen;
 	if (!p)
 		return 0;
 
-	hash_foreach(globs, &k, &klen, NULL)
+	/* First, check whether it's explicitly ignored */
+	hash_foreach(path->rp_ignore_cookies, &k, &klen, NULL)
 		if (strmatch(cookie, p, k, k + klen))
 			return 1;
+
+	/* If not, see whether there's a whitelist */
+	if (path->rp_whitelist_cookies) {
+		hash_foreach(path->rp_whitelist_cookies, &k, &klen, NULL)
+			if (strmatch(cookie, p, k, k + klen))
+				return 0;
+		return 1;
+	}
 
 	return 0;
 }
@@ -595,7 +604,7 @@ char		*newhdr;
 	newhdr[0] = '\0';
 
 	for (r = strtok_r(s, " ;", &t); r; r = strtok_r(NULL, " ;", &t)) {
-		if (should_ignore_cookie(res->rz_path->rp_ignore_cookies, r))
+		if (should_ignore_cookie(res->rz_path, r))
 			continue;
 		TSDebug("kubernetes", "check_cookies: preserving this cookie [%s]",
 			r);
@@ -635,13 +644,16 @@ TSHttpTxn	txn = edata;
 TSMBuffer	resp;
 TSMLoc		hdr, field;
 
-	if (TSHttpTxnServerRespGet(txn, &resp, &hdr) != TS_SUCCESS)
+	if (TSHttpTxnServerRespGet(txn, &resp, &hdr) != TS_SUCCESS) {
+		TSDebug("kubernetes", "check_response_cache: can't get resp?!");
 		return TS_SUCCESS;
+	}
 
 	field = TSMimeHdrFieldFind(resp, hdr, "Set-Cookie", -1);
-	if (field) {
+	if (field != TS_NULL_MLOC) {
+		TSDebug("kubernetes", "check_response_cache: cannot cache");
 		/* Response has cookies - do not cache it */
-		TSHttpTxnConfigIntSet(txn, TS_CONFIG_HTTP_CACHE_HTTP, 0);
+		TSHttpTxnServerRespNoStoreSet(txn, 1);
 		TSHandleMLocRelease(resp, hdr, field);
 	}
 
@@ -668,7 +680,7 @@ remap_request_t		 req;
 remap_result_t		 res;
 synth_t			*sy;
 struct sockaddr_in	 addr;
-int			 reenable = 1;
+int			 reenable = 1, ret;
 TSCont			 c, set_headers_cont;
 
 	bzero(&req, sizeof(req));
@@ -698,11 +710,12 @@ TSCont			 c, set_headers_cont;
 		goto cleanup;
 
 	/* Do the remap */
-	switch (remap_run(db, &req, &res)) {
-	case RR_SYNTHETIC: {
-		TSContDataSet(set_headers_cont, res.rz_headers);
-		res.rz_headers = NULL;
+	ret = remap_run(db, &req, &res);
+	TSContDataSet(set_headers_cont, res.rz_headers);
+	res.rz_headers = NULL;
 
+	switch (ret) {
+	case RR_SYNTHETIC: {
 		sy = synth_new(res.rz_status, res.rz_status_text);
 		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
 		synth_set_body(sy, res.rz_body);
@@ -789,11 +802,6 @@ TSCont			 c, set_headers_cont;
 				TS_CONFIG_HTTP_REDIRECT_USE_ORIG_CACHE_KEY, 1);
 	}
 
-	if (res.rz_path->rp_cache) {
-		c = TSContCreate(add_cache_status, TSMutexCreate());
-		TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_RESPONSE_HDR_HOOK, c);
-	}
-
 	/*
 	 * Send HSTS headers.
 	 */
@@ -839,6 +847,10 @@ TSCont			 c, set_headers_cont;
 	char	*cacheurl;
 	size_t	 urllen;
 	int	 can_cache;
+
+		/* Add X-Cache-Status to the response */
+		c = TSContCreate(add_cache_status, TSMutexCreate());
+		TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_RESPONSE_HDR_HOOK, c);
 
 		/*
 		 * Removes any cookies from the request that we don't want,

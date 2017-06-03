@@ -3,8 +3,8 @@
     "kind": "Ingress",
     "metadata": {
         "annotations": {
-            "ingress.kubernetes.io/cache-ignore-params": "fox b*",
-            "ingress.kubernetes.io/cache-whitelist-params": "*x*"
+            "ingress.kubernetes.io/cache-ignore-query-params": "fox b*",
+            "ingress.kubernetes.io/cache-whitelist-query-params": "*x*"
         },
         "creationTimestamp": "2017-04-26T01:34:08Z",
         "generation": 3,

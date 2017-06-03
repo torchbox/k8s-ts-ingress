@@ -3,7 +3,10 @@
     "kind": "Ingress",
     "metadata": {
         "name": "echoheaders",
-        "namespace": "default"
+        "namespace": "default",
+	"annotations": {
+		"ingress.kubernetes.io/ssl-redirect": "false"
+	}
     },
     "spec": {
         "rules": [
@@ -19,6 +22,14 @@
                         }
                     ]
                 }
+            }
+        ],
+        "tls": [
+            {
+                "hosts": [
+                    "echoheaders.test"
+                ],
+                "secretName": "tls-test"
             }
         ]
     }

@@ -202,8 +202,19 @@ removed.  If there are no cookies left, then the entire `Cookie` header field
 will be removed from the request; the request can then be served from the cache,
 or its response can be stored in the cache.
 
+You can also set a whitelist of cookies; any cookie whose name is not in this
+list will be removed from the request:
+
+```yaml
+metadata:
+  annotations:
+     ingress.kubernets.io/cache-whitelist-cookies: "SESS* csrftoken"
+```
 
 If any cookies remain after processing, caching will be bypassed as normal.
+If both `cache-ignore-cookies` and `cache-whitelist-cookies` are configured,
+a cookie will only be permitted if it both matches the whitelist and does not
+match the ignore list.
 
 ## Removing pages from the cache
 

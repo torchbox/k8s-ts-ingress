@@ -2,21 +2,20 @@
     "apiVersion": "extensions/v1beta1",
     "kind": "Ingress",
     "metadata": {
-        "annotations": {
-            "ingress.kubernetes.io/cache-ignore-query-params": "foo b*"
-        },
-        "creationTimestamp": "2017-04-26T01:34:08Z",
-        "generation": 3,
-        "name": "echoheaders",
+        "name": "echoheaders-any-ipbad",
         "namespace": "default",
-        "resourceVersion": "7475305",
-        "selfLink": "/apis/extensions/v1beta1/namespaces/default/ingresses/echoheaders",
-        "uid": "71152265-2a20-11e7-a408-4201ac1fd809"
+        "annotations": {
+            "ingress.kubernetes.io/auth-secret": "authtest",
+            "ingress.kubernetes.io/auth-realm": "auth test",
+            "ingress.kubernetes.io/auth-type": "basic",
+            "ingress.kubernetes.io/whitelist-source-range": "8.8.8.0/24",
+            "ingress.kubernetes.io/auth-satisfy": "any"
+        }
     },
     "spec": {
         "rules": [
             {
-                "host": "echoheaders.gce.t6x.uk",
+                "host": "any-ipbad.echoheaders.test",
                 "http": {
                     "paths": [
                         {
@@ -29,8 +28,5 @@
                 }
             }
         ]
-    },
-    "status": {
-        "loadBalancer": {}
     }
 }

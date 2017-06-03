@@ -35,6 +35,10 @@ if [ "$1" = "handle" ]; then
 	printf 'HTTP/1.0 200 OK\r\n'
 	printf 'Connection: close\r\n'
 	printf 'Content-Type: text/plain;charset=UTF-8\r\n'
+
+	# Set various headers based on the request path.  These are cumulative,
+	# so a request path might be /cached/serverpush/nexthopcc/foobar.
+
 	if echo "$path" | grep -q "/cached/"; then
 		printf 'Cache-Control: public, max-age=3600\r\n'
 	fi
@@ -45,6 +49,9 @@ if [ "$1" = "handle" ]; then
 	if echo "$path" | grep -q "/nexthopcc/"; then
 		printf 'Cache-Control: public, max-age=7200\r\n'
 		printf 'X-Next-Hop-Cache-Control: no-cache, max-age=3600, public\r\n'
+	fi
+	if echo "$path" | grep -q "/setcookie/"; then
+		printf 'Set-Cookie: mycookie=foobar\r\n'
 	fi
 	printf '\r\n'
 	printf 'Request method: %s\n' "$method"

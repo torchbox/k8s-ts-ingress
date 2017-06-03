@@ -2,21 +2,17 @@
     "apiVersion": "extensions/v1beta1",
     "kind": "Ingress",
     "metadata": {
-        "annotations": {
-            "ingress.kubernetes.io/cache-ignore-query-params": "foo b*"
-        },
-        "creationTimestamp": "2017-04-26T01:34:08Z",
-        "generation": 3,
         "name": "echoheaders",
         "namespace": "default",
-        "resourceVersion": "7475305",
-        "selfLink": "/apis/extensions/v1beta1/namespaces/default/ingresses/echoheaders",
-        "uid": "71152265-2a20-11e7-a408-4201ac1fd809"
+        "annotations": {
+            "ingress.kubernetes.io/enable-cors": "true",
+            "ingress.kubernetes.io/cors-max-age": "3600"
+        }
     },
     "spec": {
         "rules": [
             {
-                "host": "echoheaders.gce.t6x.uk",
+                "host": "echoheaders.test",
                 "http": {
                     "paths": [
                         {
@@ -29,8 +25,5 @@
                 }
             }
         ]
-    },
-    "status": {
-        "loadBalancer": {}
     }
 }

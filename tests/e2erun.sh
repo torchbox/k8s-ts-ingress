@@ -81,6 +81,9 @@ start_ts() {
 	cp tests/records.config $idir/etc/trafficserver/records.config
 	cp tests/plugin.config $idir/etc/trafficserver/plugin.config
 
+	# Make sure the cache is empty before starting the test.
+	$idir/bin/traffic_server -Cclear_cache >>$TESTDIR/log 2>&1 || true
+
 	$idir/bin/traffic_server >>$TESTDIR/log 2>&1 &
 	pid=$!
 	echo $pid > $TESTDIR/ts.pid
@@ -207,7 +210,7 @@ _runtest() {
 		status=1
 	fi
 
-	$KUBECTL delete -f tests/e2e/$test/resources >>$TESTDIR/log 2>&1
+	$KUBECTL delete -f tests/e2e/$test/resources >>$TESTDIR/log 2>&1 || true
 }
 
 if [ -z "$E2E_KUBERNETES_VERSION" ]; then
@@ -280,7 +283,13 @@ start_ts
 
 printf '\nRunning tests:\n\n'
 
-for test in $(cd tests/e2e; echo * | sort); do
+if [ -z "$1" ]; then
+	tests="$(cd tests/e2e; echo * | sort)"
+else
+	tests="$*"
+fi
+
+for test in $tests; do
 	_runtest $test
 done
 

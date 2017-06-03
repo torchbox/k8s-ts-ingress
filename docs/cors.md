@@ -14,7 +14,7 @@ headers itself, or you can configure the Ingress resource to do so for you.
 If your application is handling CORS itself, you do not need any of the
 configuration described here.
 
-## Basic CORS configuration
+## CORS configuration
 
 To enable cross-origin requests from any domain, set the
 `ingress.kubernetes.io/enable-cors` annotation on the Ingress resource:
@@ -25,26 +25,83 @@ metadata:
     ingress.kubernetes.io/enable-cors: "true"
 ```
 
-This will allow requests from any origin, with credentials, with the following
-request methods: `GET`, `PUT`, `POST`, and `DELETE`.
+This will allow requests from any origin, without credentials, for the CORS
+basic methods (GET, POST and HEAD).  This is generally sufficient to permit
+cross-origin loading of resources (such as fonts) without compromising the
+security of the application.
 
-This must **only** be used for Ingress resources that serve static assets, or
-dynamic pages that do not use any sort of authentication (including cookies);
-otherwise, any page on the Internet will be able to steal users' credentials.
+If you want to restrict requests to a set of origins, you can set the
+`cors-origins` annotations:
 
-Setting `enable-cors: "true"` is equivalent to setting the following annotations:
-
-```
-ingress.kubernetes.io/access-control-allow-origin: "*"
-ingress.kubernetes.io/access-control-allow-credentials: "true"
-ingress.kubernetes.io/access-control-allow-methods: "GET, PUT, POST, DELETE, OPTIONS"
-ingress.kubernetes.io/access-control-allow-headers: "DNT, Keep-Alive, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Authorization"
-ingress.kubernetes.io/access-control-max-age: "1728000"
+```yaml
+  annotations:
+    ingress.kubernetes.io/enable-cors: "true"
+    ingress.kubernetes.io/cors-origins: "http://example.com http://example.org"
 ```
 
-Note that the nginx Ingress controller adds "`X-CustomHeader`" to the CORS
-header list if `enable-cors` is set.  We believe this is a mistake, and the TS
-implementation will not add that header.
+This would allow cross-origin requests from the two listed origins, but no
+others.
+
+If you want to permit requests with credentials, you can set the `cors-credentials`
+annotation:
+
+```yaml
+  annotations:
+    ingress.kubernetes.io/enable-cors: "true"
+    ingress.kubernetes.io/cors-origins: "http://example.com http://example.org"
+    ingress.kubernetes.io/cors-credentials: "true"
+```
+
+This will permit requests with credentials (such as Cookie headers); be very
+careful with this, as it essentially allows any of the listed origins to make
+requests using the user's credentials.  If you use `cors-credentials`, you must
+also set `cors-origins`; you cannot allow requests with credentials from any
+origin.
+
+By default, requests are allowed for any the CORS simple methods; that is,
+`GET`, `POST` or `HEAD`.  These are the methods which JavaScript can already
+use without CORS.  To permit additional methods, set the `cors-methods`
+annotation:
+
+```yaml
+  annotations:
+    ingress.kubernetes.io/enable-cors: "true"
+    ingress.kubernetes.io/cors-origins: "http://example.com"
+    ingress.kubernetes.io/cors-credentials: "true"
+    ingress.kubernetes.io/cors-methods: "PUT, DELETE"
+```
+
+You do not need to list the simple methods in `cors-methods`, as they are always
+permitted.
+
+By default, the browser will preflight the request with a separate OPTIONS
+request every time it needs to make an access control decision, which adds
+a significant overhead to the request processing time.  If you expect each
+client to make several CORS-authenticated requests, you can set the `cors-max-age`
+annotation to the number of seconds the browser is permitted to cache the
+preflight result:
+
+```yaml
+  annotations:
+    ingress.kubernetes.io/enable-cors: "true"
+    ingress.kubernetes.io/cors-origins: "http://example.com"
+    ingress.kubernetes.io/cors-credentials: "true"
+    ingress.kubernetes.io/cors-max-age: "3600"
+```
+
+By default, the browser will only permit the CORS simple headers in the
+request: `Accept`, `Accept-Language`, `Content-Language`, or `Content-Type` (if
+the value is `application/x-www-form-urlencoded`, `multipath/form-data` or
+`text/plain`).  To allow additional request headers, set the
+`ingress.kubernetes.io/cors-headers` annotation:
+
+```yaml
+  annotations:
+    ingress.kubernetes.io/enable-cors: "true"
+    ingress.kubernetes.io/cors-origins: "http://example.com"
+    ingress.kubernetes.io/cors-credentials: "true"
+    ingress.kubernetes.io/cors-headers: "X-CustomHeader"
+```
 
 ## Advanced configuration
 

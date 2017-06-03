@@ -161,6 +161,7 @@ int		 rerr;
 	ret->rp_preserve_host = 1;
 	ret->rp_server_push = 1;
 	ret->rp_cors_origins = hash_new(127, NULL);
+	hash_set(ret->rp_cors_origins, "*", HASH_PRESENT);
 
 	/* Cache by default */
 	ret->rp_cache = 1;
@@ -402,6 +403,21 @@ size_t		 keylen;
 			free(v);
 		}
 
+		/* cache-whitelist-cookies: cookie names to whitelist in request */
+		else if (strcmp(key, IN_CACHE_WHITELIST_COOKIES) == 0) {
+		char	*v = strdup(value);
+		char	*r, *sr = NULL;
+
+			hash_free(rp->rp_whitelist_cookies);
+			rp->rp_whitelist_cookies = hash_new(127, NULL);
+
+			for (r = strtok_r(v, " \t", &sr); r;
+			     r = strtok_r(NULL, " \t", &sr))
+				hash_set(rp->rp_whitelist_cookies, r, HASH_PRESENT);
+
+			free(v);
+		}
+
 		/* compress-types: set types to compress */
 		else if (strcmp(key, IN_COMPRESS_TYPES) == 0) {
 		char	*v = strdup(value);
@@ -466,24 +482,15 @@ size_t		 keylen;
 		 * CORS; either enable-cors can be specified, or a more
 		 * specific configuration. 
 		*/
-		else if (strcmp(key, IN_ENABLE_CORS) == 0) {
-			/*
-			 * Set a standard, wide-open CORS configuration.
-			 */
-			rp->rp_enable_cors = 1;
-			hash_set(rp->rp_cors_origins, "*", HASH_PRESENT);
-			rp->rp_cors_creds = 1;
-			rp->rp_cors_methods = strdup("GET, PUT, POST, "
-						     "DELETE, OPTIONS");
-			rp->rp_cors_headers = strdup(
-				"DNT, Keep-Alive, User-Agent, "
-				"X-Requested-With, If-Modified-Since, "
-				"Cache-Control, Content-Type, Authorization");
-			rp->rp_cors_max_age = 1728000;
-		}
+		else if (strcmp(key, IN_ENABLE_CORS) == 0)
+			rp->rp_enable_cors = truefalse(value);
 
-		else if (strcmp(key, IN_ACCESS_CONTROL_ALLOW_ORIGIN) == 0) {
+		else if (strcmp(key, IN_CORS_ORIGINS) == 0) {
 		char	*p, *q, *r;
+
+			hash_free(rp->rp_cors_origins);
+			rp->rp_cors_origins = hash_new(1, NULL);
+
 			q = strdup(value);
 			for (p = strtok_r(q, " \t\r\n", &r);
 			     p; p = strtok_r(NULL, " \t\r\n", &r))
@@ -492,14 +499,14 @@ size_t		 keylen;
 			rp->rp_enable_cors = 1;
 		}
 
-		else if (strcmp(key, IN_ACCESS_CONTROL_MAX_AGE) == 0)
+		else if (strcmp(key, IN_CORS_MAX_AGE) == 0)
 			rp->rp_cors_max_age = atoi(value);
-		else if (strcmp(key, IN_ACCESS_CONTROL_ALLOW_HEADERS) == 0)
+		else if (strcmp(key, IN_CORS_HEADERS) == 0)
 			rp->rp_cors_headers = strdup(value);
-		else if (strcmp(key, IN_ACCESS_CONTROL_ALLOW_METHODS) == 0)
+		else if (strcmp(key, IN_CORS_METHODS) == 0)
 			rp->rp_cors_methods = strdup(value);
-		else if (strcmp(key, IN_ACCESS_CONTROL_ALLOW_CREDENTIALS) == 0)
-			rp->rp_cors_creds = strcmp(value, "true") ? 1 : 0;
+		else if (strcmp(key, IN_CORS_CREDENTIALS) == 0)
+			rp->rp_cors_creds = truefalse(value);
 
 		/* 
 		 * Authentication.
@@ -743,38 +750,72 @@ rr_check_cors(const remap_db_t *db, const remap_request_t *req,
 {
 const char		*origin;
 remap_hdrfield_t	*hdr;
-char			 s[32];
 
+	TSDebug("kubernetes", "rr_check_cors: rp_enable_cors=%d",
+		res->rz_path->rp_enable_cors);
+	/*
+	 * If CORS is not enabled, do nothing.
+	 */
 	if (!res->rz_path->rp_enable_cors)
 		return RR_OK;
 
-	if ((hdr = hash_get(req->rr_hdrfields, "origin")) == NULL)
+	/*
+	 * If the request has no Origin header, do nothing.
+	 */
+	if ((hdr = hash_get(req->rr_hdrfields, "origin")) == NULL) {
+		TSDebug("kubernetes", "rr_check_cors: no Origin");
 		return RR_OK;
-	if (hdr->rh_nvalues < 1)
+	}
+
+	if (hdr->rh_nvalues != 1) {
+		TSDebug("kubernetes", "rr_check_cors: incorrect number of values"
+			"for origin: %d", (int) hdr->rh_nvalues);
 		return RR_OK;
+	}
+
 	origin = hdr->rh_values[0];
+	TSDebug("kubernetes", "rr_check_cors: origin is %s", origin);
 
 	/*
-	 * Is this a recognised CORS origin?
+	 * If no Origin list has been specified, the origin is "*".  This is
+	 * treated specially by the CORS specification, so do not use the
+	 * request Origin header.
 	 */
-	if (hash_get(res->rz_path->rp_cors_origins, "*")) {
+	if (hash_get(res->rz_path->rp_cors_origins, "*") == HASH_PRESENT) {
+		TSDebug("kubernetes", "rr_check_cors: using wildcard origin");
 		hash_set(res->rz_headers, "Access-Control-Allow-Origin",
 			 strdup("*"));
-	} else if (hash_get(res->rz_path->rp_cors_origins,  origin)) {
+	/*
+	 * Otherwise, check if the origin is in the list of origins.  In that
+	 * case, we have to Vary by origin as the response changes depending
+	 * on the origin.
+	 */
+	} else if (hash_get(res->rz_path->rp_cors_origins,
+			    origin) == HASH_PRESENT) {
+		TSDebug("kubernetes", "rr_check_cors: using origin %s",
+			origin);
 		hash_set(res->rz_headers, "Access-Control-Allow-Origin",
 			 strdup(origin));
 		hash_set(res->rz_headers, "Vary", strdup("Origin"));
-	} else
+	/*
+	 * Otherwise, we don't recognise this origin, so do nothing.
+	 */
+	} else {
+		TSDebug("kubernetes", "rr_check_cors: origin did not match");
 		return RR_OK;
-
+	}
 
 	/*
-	 * If this is a preflight request, set some extra headers and return
-	 * an empty body.
+	 * If this is not a preflight request, there's nothing more to do.
 	 */
-	if (strcmp(req->rr_method, "OPTIONS"))
+	if (strcmp(req->rr_method, "OPTIONS")) {
+		TSDebug("kubernetes", "rr_check_cors: not preflight");
 		return RR_OK;
+	}
 
+	/*
+	 * Add response headers based on the configuration.
+	 */
 	if (res->rz_path->rp_cors_methods)
 		hash_set(res->rz_headers, "Access-Control-Allow-Methods",
 			 strdup(res->rz_path->rp_cors_methods));
@@ -784,16 +825,30 @@ char			 s[32];
 			 strdup(res->rz_path->rp_cors_headers));
 
 	if (res->rz_path->rp_cors_max_age) {
+	char	s[32];
 		snprintf(s, sizeof(s), "%d", res->rz_path->rp_cors_max_age);
 		hash_set(res->rz_headers, "Access-Control-Max-Age", strdup(s));
 	}
 
-	hash_set(res->rz_headers, "Access-Control-Allow-Credentials",
-		 strdup(res->rz_path->rp_cors_creds ? "true" : "false"));
+	if (res->rz_path->rp_cors_creds)
+		hash_set(res->rz_headers, "Access-Control-Allow-Credentials",
+			 strdup("true"));
 
 	res->rz_status = 204;
 	res->rz_status_text = "No content";
 	return RR_SYNTHETIC;
+}
+
+static void
+set_wwwauth_header(remap_result_t *res)
+{
+char	*hdr;
+size_t	 len;
+
+	len = sizeof("Basic realm=\"\"") + strlen(res->rz_path->rp_auth_realm);
+	hdr = malloc(len);
+	snprintf(hdr, len, "Basic realm=\"%s\"", res->rz_path->rp_auth_realm);
+	hash_set(res->rz_headers, "WWW-Authenticate", hdr);
 }
 
 int
@@ -828,10 +883,10 @@ const char		*rr_auth = NULL;
 
 	/* Only basic auth? */
 	if (!res->rz_path->rp_auth_addr_list) {
-		if (!rr_auth)
-			return RR_ERR_UNAUTHORIZED;
-		if (auth_check_basic(rr_auth, res->rz_path) == 1)
+		if (rr_auth && auth_check_basic(rr_auth, res->rz_path) == 1)
 			return RR_OK;
+
+		set_wwwauth_header(res);
 		return RR_ERR_UNAUTHORIZED;
 	}
 
@@ -839,18 +894,22 @@ const char		*rr_auth = NULL;
 	if (res->rz_path->rp_auth_satisfy == REMAP_SATISFY_ANY) {
 		if (auth_check_address(req->rr_addr, res->rz_path))
 			return RR_OK;
-		if (!rr_auth)
+
+		if (!rr_auth || auth_check_basic(rr_auth, res->rz_path) != 1) {
+			set_wwwauth_header(res);
 			return RR_ERR_UNAUTHORIZED;
-		if (auth_check_basic(rr_auth, res->rz_path) == 1)
-			return RR_OK;
-		return RR_ERR_UNAUTHORIZED;
+		}
+
+		return RR_OK;
 	} else {
 		if (!auth_check_address(req->rr_addr, res->rz_path))
 			return RR_ERR_FORBIDDEN;
-		if (!rr_auth)
+
+		if (!rr_auth || auth_check_basic(rr_auth, res->rz_path) != 1) {
+			set_wwwauth_header(res);
 			return RR_ERR_UNAUTHORIZED;
-		if (auth_check_basic(rr_auth, res->rz_path) != 1)
-			return RR_ERR_UNAUTHORIZED;
+		}
+
 		return RR_OK;
 	}
 }
@@ -865,6 +924,7 @@ int
 keep_parameter(const remap_path_t *path, const char *param)
 {
 const char	*pend;
+
 	if ((pend = strchr(param, '=')) == NULL)
 		pend = param + strlen(param);
 
@@ -873,9 +933,15 @@ const char	*pend;
 	const char	*p = NULL;
 	size_t		 plen;
 
+		TSDebug("kubernetes", "keep_parameter: checking ignore");
+
 		hash_foreach(path->rp_ignore_params, &p, &plen, NULL) {
+			TSDebug("kubernetes", "keep_parameter: check [%.*s]"
+				" against [%.*s]", (int)(pend - param), param,
+				(int) plen, p);
 			if (strmatch(param, pend, p, p + plen))
 				return 0;
+			TSDebug("kubernetes", "keep_parameter: no match");
 		}
 	}
 
@@ -912,9 +978,12 @@ size_t		 len = 0;
 	 * Extract the query parameters we actually want into a hash.
 	 */
 	for (p = strtok_r(q, "&", &sr); p; p = strtok_r(NULL, "&", &sr)) {
+		TSDebug("kubernetes", "make_query: param is [%s]", p);
+
 		if (!keep_parameter(res->rz_path, p))
 			continue;
 
+		TSDebug("kubernetes", "keeping this param");
 		params = realloc(params, sizeof(char *) * (nparams + 1));
 		params[nparams] = strdup(p);
 		++nparams;
