@@ -14,8 +14,13 @@
 #ifndef HASH_H
 #define HASH_H
 
+#define	HASH_USE_RAX	0
+
 #include   	<stdlib.h>
-#include	"rax.h"
+
+#if	HASH_USE_RAX
+# include	"rax.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,17 +91,28 @@ void	*hash_find(const hash_t, hash_find_fn, void *data);
  * returned.
  */
 struct hash_iter_state {
+#if	HASH_USE_RAX
 	int init;
 	char *key;
 	raxIterator iter;
+#else
+	size_t i;
+	void *p;
+#endif
 };
 
 int	hash_iterate(hash_t, struct hash_iter_state *iterstate,
 		     const char **key, size_t *keylen, void **value);
 
-#define hash_foreach(HASH, KEY, KEYLEN, VALUE)				\
+#if	HASH_USE_RAX
+# define hash_foreach(HASH, KEY, KEYLEN, VALUE)				\
 	for (struct hash_iter_state __s = {0, NULL, {}};		\
 	     hash_iterate(HASH, &__s, KEY, KEYLEN, (void **)VALUE);)
+#else
+# define hash_foreach(HASH, KEY, KEYLEN, VALUE)				\
+	for (struct hash_iter_state __s = {0, NULL};			\
+	     hash_iterate(HASH, &__s, KEY, KEYLEN, (void **)VALUE);)
+#endif
 
 #ifdef __cplusplus
 }

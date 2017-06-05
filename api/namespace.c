@@ -10,6 +10,8 @@
 
 #include	<string.h>
 
+#include	<ts/ts.h>
+
 #include	"api.h"
 
 namespace_t *
@@ -51,6 +53,7 @@ namespace_t	*ret;
 void
 namespace_free(namespace_t *ns)
 {
+	TSDebug("kubernetes", "namespace_free: %p", ns);
 	hash_free(ns->ns_ingresses);
 	hash_free(ns->ns_secrets);
 	hash_free(ns->ns_services);

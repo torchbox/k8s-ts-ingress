@@ -23,14 +23,29 @@ port=48080
 ncpid=0
 
 if [ "$1" = "handle" ]; then
+	hasims=no
 	read method path version
 
 	while :; do
 		read line
+		if echo "$line" | grep -qi "If-Modified-Since:"; then
+			hasims=yes
+		fi
+
 		if echo "$line" | grep -q '^[[:space:]]*$'; then
 			break
 		fi
 	done
+
+	printf >&2 'handling request.\n'
+
+	if (echo "$path" | grep -q "/notmodified/") && [ $hasims = yes ]; then
+		printf 'HTTP/1.0 304 Not modified\r\n'
+		printf 'Last-Modified: Wed, 21 Oct 2015 07:28:00 GMT\r\n'
+		printf 'Connection: close\r\n'
+		printf '\r\n\r\n'
+		exit 0
+	fi
 
 	printf 'HTTP/1.0 200 OK\r\n'
 	printf 'Connection: close\r\n'

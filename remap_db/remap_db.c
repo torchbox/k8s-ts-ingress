@@ -250,6 +250,7 @@ struct remap_auth_addr	*rip, *nrip;
 	hash_free(rp->rp_cors_origins);
 	hash_free(rp->rp_compress_types);
 	hash_free(rp->rp_ignore_cookies);
+	hash_free(rp->rp_whitelist_cookies);
 	regfree(&rp->rp_regex);
 
 	for (rip = rp->rp_auth_addr_list; rip; rip = nrip) {
@@ -626,6 +627,10 @@ remap_db_t	*ret;
 void
 remap_db_free(remap_db_t *db)
 {
+	TSDebug("kubernetes", "remap_db_free: %p", db);
+	if (!db)
+		return;
+
 	hash_free(db->rd_hosts);
 	free(db);
 }

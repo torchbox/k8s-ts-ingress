@@ -83,8 +83,6 @@ list or not, please
   removed from TS core in some later release)
 * Custom error bodies
 * Support [libslz](http://www.libslz.org/) as an alternative to zlib.
-* Improve API watch support by first retrieving all objects, then watching with
-  resourceVersion.
 * Wildcard cache purging and/or cache tags.
 
 ## Release history
@@ -104,6 +102,10 @@ list or not, please
           fields should not be cached.
         * The `cache-ignore-query-params` and `cache-whitelist-query-params`
           annotations did not work correctly.
+    * Improvement: The Kubernetes API code was rewritten and is now more
+        reliable, more efficient, and faster to respond to changes in the
+        cluster.
+    * Bug fix: Several memory leaks were fixed.
 
 * 1.0.0-alpha7:
     * Improvement: The Traffic Server version in the Docker image has been

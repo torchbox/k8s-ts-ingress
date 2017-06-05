@@ -34,9 +34,6 @@ TSVConn			 ssl_vc;
 SSL			*ssl = NULL;
 const char		*host = NULL;
 const remap_host_t	*rh;
-TSConfig		 db_cfg = NULL;
-const remap_db_t	*db;
-struct state		*state = TSContDataGet(contn);
 
 	TSDebug("kubernetes", "handle_tls: starting");
 
@@ -47,19 +44,25 @@ struct state		*state = TSContDataGet(contn);
 	/* Host can sometimes be null; do nothing in that case. */
 	if (!host) {
 		TSDebug("kubernetes_tls", "handle_tls: no host name");
-		goto cleanup;
+		return TS_SUCCESS;
 	}
 
 	TSDebug("kubernetes_tls", "handle_tls: doing SNI map for [%s]", host);
 
-	db_cfg = TSConfigGet(state->cfg_slot);
-	db = TSConfigDataGet(db_cfg);
+	/*
+	 * Take a read lock on the cluster state so it doesn't change while
+	 * we're using it.
+	 */
+	pthread_rwlock_rdlock(&state->lock);
 
 	/* Not initialised yet? */
-	if (!db)
-		goto cleanup;
+	if (!state->db) {
+		pthread_rwlock_unlock(&state->lock);
+		TSDebug("kubernetes", "handle_remap: no database");
+		return TS_SUCCESS;
+	}
 
-	if ((rh = remap_db_get_host(db, host)) == NULL) {
+	if ((rh = remap_db_get_host(state->db, host)) == NULL) {
 		TSDebug("kubernetes", "[%s] handle_tls: host not found", host);
 		goto cleanup;
 	}
@@ -77,7 +80,6 @@ struct state		*state = TSContDataGet(contn);
 
 cleanup:
 	TSVConnReenable(ssl_vc);
-	if (db_cfg)
-		TSConfigRelease(state->cfg_slot, db_cfg);
+	pthread_rwlock_unlock(&state->lock);
 	return TS_SUCCESS;
 }

@@ -171,3 +171,81 @@ error:
 	endpoints_free(eps);
 	return NULL;
 }
+
+int
+endpoints_equal(endpoints_t *a, endpoints_t *b)
+{
+size_t			 i, j;
+struct hash_iter_state	 isa, isb;
+
+	if (strcmp(a->ep_name, b->ep_name))
+		return 0;
+	if (strcmp(a->ep_namespace, b->ep_namespace))
+		return 0;
+	if (a->ep_nsubsets != b->ep_nsubsets)
+		return 0;
+
+	for (i = 0; i < a->ep_nsubsets; i++) {
+	endpoints_subset_t	*as = &a->ep_subsets[i],
+				*bs = &b->ep_subsets[i];
+
+		if (as->es_naddrs != bs->es_naddrs)
+			return 0;
+
+		for (j = 0; j < as->es_naddrs; j++) {
+		endpoints_address_t	*aa = &as->es_addrs[j],
+					*ba = &bs->es_addrs[j];
+
+			if (aa->ea_ip == NULL) {
+				if (ba->ea_ip != NULL)
+					return 0;
+			} else if (ba->ea_ip == NULL) {
+				return 0;
+			} else {
+				if (strcmp(aa->ea_ip, ba->ea_ip))
+					return 0;
+			}
+
+			if (aa->ea_nodename == NULL) {
+				if (ba->ea_nodename != NULL)
+					return 0;
+			} else if (ba->ea_nodename == NULL) {
+				return 0;
+			} else {
+				if (strcmp(aa->ea_nodename, ba->ea_nodename))
+					return 0;
+			}
+		}
+
+		bzero(&isa, sizeof(isa));
+		bzero(&isb, sizeof(isb));
+		for (;;) {
+		int			 ra, rb;
+		const char		*ka, *kb;
+		size_t			 kalen, kblen;
+		endpoints_port_t	*pa, *pb;
+
+			ra = hash_iterate(as->es_ports, &isa, &ka, &kalen, (void **)&pa);
+			rb = hash_iterate(bs->es_ports, &isb, &kb, &kblen, (void **)&pb);
+			if (ra != rb)
+				return 0;
+
+			if (!ra)
+				break;
+
+			if (kalen != kblen)
+				return 0;
+			if (memcmp(ka, kb, kalen))
+				return 0;
+			if (strcmp(pa->et_name, pb->et_name))
+				return 0;
+			if (strcmp(pa->et_protocol, pb->et_protocol))
+				return 0;
+			if (pa->et_port != pb->et_port)
+				return 0;
+		}
+	}
+
+	return 1;
+}
+

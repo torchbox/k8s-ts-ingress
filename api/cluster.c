@@ -8,18 +8,25 @@
  * warranty.
  */
 
+#include	<ts/ts.h>
+
 #include	"api.h"
 
 cluster_t *
 cluster_make(void)
 {
 cluster_t	*ret;
+
 	if ((ret = calloc(1, sizeof(*ret))) == NULL)
 		return NULL;
+
 	if ((ret->cs_namespaces = hash_new(127, (hash_free_fn) namespace_free)) == NULL) {
 		free(ret);
 		return NULL;
 	}
+
+	pthread_rwlock_init(&ret->cs_lock, NULL);
+
 	return ret;
 }
 
@@ -40,6 +47,8 @@ namespace_t	*ret;
 void
 cluster_free(cluster_t *cs)
 {
+	TSDebug("kubernetes", "cluster_free: %p", cs);
 	hash_free(cs->cs_namespaces);
+	pthread_rwlock_destroy(&cs->cs_lock);
 	free(cs);
 }

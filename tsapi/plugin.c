@@ -31,18 +31,9 @@ char *via_name;
 int via_name_len;
 char myhostname[HOST_NAME_MAX + 1];
 
-/*
- * Watcher callbacks; called when the Kubernetes cluster state changes.
- */
-static void ingress_cb(watcher_t, wt_event_type_t, json_object *, void *);
-static void service_cb(watcher_t, wt_event_type_t, json_object *, void *);
-static void secret_cb(watcher_t, wt_event_type_t, json_object *, void *);
-static void endpoints_cb(watcher_t, wt_event_type_t, json_object *, void *);
+static void cluster_cb(cluster_t *cluster, void *);
 
-/*
- * Rebuild the map when cluster state changes.
- */
-static int handle_rebuild(TSCont, TSEvent, void *);
+struct state *state;
 
 /*
  * Initialise plugin, load configuration and start our watchers.
@@ -51,17 +42,6 @@ void
 TSPluginInit(int argc, const char **argv)
 {
 TSPluginRegistrationInfo	 info;
-size_t				 i;
-struct state			*state;
-struct {
-	const char *resource;
-	watcher_callback_t callback;
-} watchers[] = {
-	{ "/apis/extensions/v1beta1/ingresses",	ingress_cb },
-	{ "/api/v1/secrets",			secret_cb },
-	{ "/api/v1/services",			service_cb },
-	{ "/api/v1/endpoints",			endpoints_cb },
-};
 
 	via_name_len = snprintf(NULL, 0, "ATS/%s Ingress/%s",
 				TSTrafficServerVersionGet(), PACKAGE_VERSION);
@@ -93,37 +73,19 @@ struct {
 		return;
 	}
 
-	state->cluster_lock = TSMutexCreate();
+	pthread_rwlock_init(&state->lock, NULL);
 	state->cluster = cluster_make();
-	state->cfg_slot = TSConfigSet(0, NULL, (TSConfigDestroyFunc) hash_free);
 
 	/*
-	 * Create continuation to rebuild the maps when something changes.
+	 * Create watcher.
 	 */
-	if ((state->rebuild_cont = TSContCreate(handle_rebuild, TSMutexCreate())) == NULL) {
-		TSError("[kubernetes] Failed to create continuation.");
+	state->watcher = watcher_create(state->config, state->cluster);
+	if (state->watcher == NULL) {
+		TSError("[kubernetes] cannot create watcher: %s", strerror(errno));
 		return;
 	}
-
-	TSContDataSet(state->rebuild_cont, state);
-	/*
-	 * Create watchers.
-	 */
-	for (i = 0; i < sizeof(watchers) / sizeof(*watchers); i++) {
-	watcher_t	wt;
-		wt = watcher_create(state->config, watchers[i].resource);
-
-		if (wt == NULL) {
-			TSError("[kubernetes] cannot create watcher for %s: %s",
-				watchers[i].resource, strerror(errno));
-			return;
-		}
-
-		TSDebug("kubernetes", "created watcher for %s",
-			watchers[i].resource);
-		watcher_set_callback(wt, watchers[i].callback, state);
-		watcher_run(wt, 0);
-	}
+	watcher_set_callback(state->watcher, cluster_cb, state);
+	watcher_run(state->watcher);
 
 	/*
 	 * Create SNI hook to associate Kubernetes SSL_CTXs with incoming
@@ -132,7 +94,6 @@ struct {
 	TSDebug("kubernetes", "co_tls=%d", state->config->co_tls);
 	if (state->config->co_tls) {
 		state->tls_cont = TSContCreate(handle_tls, NULL);
-		TSContDataSet(state->tls_cont, state);
 #ifdef TS_SSL_CERT_HOOK
 		TSHttpHookAdd(TS_SSL_CERT_HOOK, state->tls_cont);
 #else
@@ -145,7 +106,6 @@ struct {
 	 */
 	if (state->config->co_remap) {
 		state->remap_cont = TSContCreate(handle_remap, NULL);
-		TSContDataSet(state->remap_cont, state);
 		TSHttpHookAdd(TS_HTTP_READ_REQUEST_HDR_HOOK, state->remap_cont);
 	}
 
@@ -161,258 +121,8 @@ struct {
 	}
 }
 
-/*
- * Watcher callbacks.  All of these lock the entire cluster state while running;
- * this isn't a problem since cluster changes are fairly infrequent (at most
- * a few per second) and the cluster lock doesn't interfere with request
- * serving.
- */
-
 static void
-ingress_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
+cluster_cb(cluster_t *cluster, void *data)
 {
-ingress_t	*ing;
-namespace_t	*ns;
-struct state	*state = data;
-
-	if ((ing = ingress_make(obj)) == NULL) {
-		TSError("[kubernetes] Could not parse Ingress object: %s",
-			json_object_get_string(obj));
-		return;
-	}
-
-	TSDebug("kubernetes", "something happened with an ingress: %s/%s",
-		ing->in_namespace, ing->in_name);
-
-	TSMutexLock(state->cluster_lock);
-
-	ns = cluster_get_namespace(state->cluster, ing->in_namespace);
-	if (ev == WT_DELETED) {
-		namespace_del_ingress(ns, ing->in_name);
-		ingress_free(ing);
-	} else
-		namespace_put_ingress(ns, ing);
-
-	if (!state->changed) {
-		state->changed = 1;
-		TSContSchedule(state->rebuild_cont, 1000, TS_THREAD_POOL_DEFAULT);
-	}
-
-	TSMutexUnlock(state->cluster_lock);
-}
-
-static void
-secret_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
-{
-secret_t		*secret;
-namespace_t		*ns;
-struct state	*state = data;
-
-	if ((secret = secret_make(obj)) == NULL) {
-		TSError("[kubernetes] Could not parse Secret object: %s",
-			json_object_get_string(obj));
-		return;
-	}
-
-	TSDebug("kubernetes", "something happened with a secret: %s/%s",
-		secret->se_namespace, secret->se_name);
-
-	TSMutexLock(state->cluster_lock);
-
-	ns = cluster_get_namespace(state->cluster, secret->se_namespace);
-	if (ev == WT_DELETED) {
-		namespace_del_secret(ns, secret->se_name);
-		secret_free(secret);
-	} else
-		namespace_put_secret(ns, secret);
-
-	if (!state->changed) {
-		state->changed = 1;
-		TSContSchedule(state->rebuild_cont, 1000, TS_THREAD_POOL_DEFAULT);
-	}
-
-	TSMutexUnlock(state->cluster_lock);
-}
-
-/*
- * Kubernetes updates all endpoints objects every few seconds; to avoid
- * constantly rebuilding the route map, only update if the new Endpoints
- * is different from the last one.
- */
-
-static int
-endpoints_equal(endpoints_t *a, endpoints_t *b)
-{
-size_t			 i, j;
-struct hash_iter_state	 isa, isb;
-
-	if (strcmp(a->ep_name, b->ep_name))
-		return 0;
-	if (strcmp(a->ep_namespace, b->ep_namespace))
-		return 0;
-	if (a->ep_nsubsets != b->ep_nsubsets)
-		return 0;
-
-	for (i = 0; i < a->ep_nsubsets; i++) {
-	endpoints_subset_t	*as = &a->ep_subsets[i],
-				*bs = &b->ep_subsets[i];
-
-		if (as->es_naddrs != bs->es_naddrs)
-			return 0;
-
-		for (j = 0; j < as->es_naddrs; j++) {
-		endpoints_address_t	*aa = &as->es_addrs[j],
-					*ba = &bs->es_addrs[j];
-
-			if (aa->ea_ip == NULL) {
-				if (ba->ea_ip != NULL)
-					return 0;
-			} else if (ba->ea_ip == NULL) {
-				return 0;
-			} else {
-				if (strcmp(aa->ea_ip, ba->ea_ip))
-					return 0;
-			}
-
-			if (aa->ea_nodename == NULL) {
-				if (ba->ea_nodename != NULL)
-					return 0;
-			} else if (ba->ea_nodename == NULL) {
-				return 0;
-			} else {
-				if (strcmp(aa->ea_nodename, ba->ea_nodename))
-					return 0;
-			}
-		}
-
-		bzero(&isa, sizeof(isa));
-		bzero(&isb, sizeof(isb));
-		for (;;) {
-		int			 ra, rb;
-		const char		*ka, *kb;
-		size_t			 kalen, kblen;
-		endpoints_port_t	*pa, *pb;
-
-			ra = hash_iterate(as->es_ports, &isa, &ka, &kalen, (void **)&pa);
-			rb = hash_iterate(bs->es_ports, &isb, &kb, &kblen, (void **)&pb);
-			if (ra != rb)
-				return 0;
-
-			if (!ra)
-				break;
-
-			if (kalen != kblen)
-				return 0;
-			if (memcmp(ka, kb, kalen))
-				return 0;
-			if (strcmp(pa->et_name, pb->et_name))
-				return 0;
-			if (strcmp(pa->et_protocol, pb->et_protocol))
-				return 0;
-			if (pa->et_port != pb->et_port)
-				return 0;
-		}
-	}
-
-	return 1;
-}
-
-static void
-endpoints_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
-{
-endpoints_t		*endpoints, *eps2;
-namespace_t		*ns;
-struct state		*state = data;
-
-	if ((endpoints = endpoints_make(obj)) == NULL) {
-		TSError("[kubernetes] Could not parse Endpoints object: %s",
-			json_object_get_string(obj));
-		return;
-	}
-
-	TSMutexLock(state->cluster_lock);
-
-	ns = cluster_get_namespace(state->cluster, endpoints->ep_namespace);
-
-	if (ev == WT_UPDATED) {
-		if ((eps2 = namespace_get_endpoints(ns, endpoints->ep_name)) != NULL) {
-			if (endpoints_equal(endpoints, eps2)) {
-				endpoints_free(endpoints);
-				TSMutexUnlock(state->cluster_lock);
-				return;
-			}
-		}
-	}
-
-	TSDebug("kubernetes", "something happened with a endpoints: %s/%s",
-		endpoints->ep_namespace, endpoints->ep_name);
-
-	if (ev == WT_DELETED) {
-		namespace_del_endpoints(ns, endpoints->ep_name);
-		endpoints_free(endpoints);
-	} else
-		namespace_put_endpoints(ns, endpoints);
-
-	if (!state->changed) {
-		state->changed = 1;
-		TSContSchedule(state->rebuild_cont, 1000, TS_THREAD_POOL_DEFAULT);
-	}
-
-	TSMutexUnlock(state->cluster_lock);
-}
-
-static void
-service_cb(watcher_t wt, wt_event_type_t ev, json_object *obj, void *data)
-{
-service_t		*service;
-namespace_t		*ns;
-struct state		*state = data;
-
-	if ((service = service_make(obj)) == NULL) {
-		TSError("[kubernetes] Could not parse Service object: %s",
-			json_object_get_string(obj));
-		return;
-	}
-
-	TSDebug("kubernetes", "something happened with a service: %s/%s",
-		service->sv_namespace, service->sv_name);
-
-	TSMutexLock(state->cluster_lock);
-
-	ns = cluster_get_namespace(state->cluster, service->sv_namespace);
-	if (ev == WT_DELETED) {
-		namespace_del_service(ns, service->sv_name);
-		service_free(service);
-	} else
-		namespace_put_service(ns, service);
-
-	if (!state->changed) {
-		state->changed = 1;
-		TSContSchedule(state->rebuild_cont, 1000, TS_THREAD_POOL_DEFAULT);
-	}
-
-	TSMutexUnlock(state->cluster_lock);
-}
-
-/*
- * Rebuild continuation.  This is called after a delay whenever the cluster
- * state changes.
- */
-static int
-handle_rebuild(TSCont contn, TSEvent evt, void *edata)
-{
-struct state	*state = TSContDataGet(contn);
-
-	switch (evt) {
-	case TS_EVENT_TIMEOUT:
-		TSDebug("kubernetes", "timeout event; rebuilding");
-		rebuild_maps(state);
-		return TS_SUCCESS;
-
-	default:
-		TSDebug("kubernetes", "unknown event %d received", (int) evt);
-		return TS_SUCCESS;
-	}
-
-	return TS_SUCCESS;
+	rebuild_maps();
 }

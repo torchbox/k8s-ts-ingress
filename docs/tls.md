@@ -23,6 +23,11 @@ By default, insecure HTTP requests to an Ingress which has TLS configured will
 be redirected to HTTPS with an HTTP 301 response.  To disable this behaviour,
 set the `ingress.kubernetes.io/ssl-redirect` annotation to `false`.
 
+This redirect only happens when a valid TLS certificate could be loaded for the
+Ingress, so if you're using kube-lego and it hasn't issued a certificate yet,
+the redirect won't be done; this allows kube-lego to do the initial domain
+validation correctly.
+
 To force a redirect to HTTPS even when TLS is not configured on the Ingress, set
 the `ingress.kubernetes.io/force-ssl-redirect` annotation to `"true"`.  This
 will not work unless you are offloading TLS termination in front of Traffic

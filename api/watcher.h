@@ -13,23 +13,17 @@
 
 #include	<json.h>
 
+#include	"api.h"
+
 struct k8s_config;
-typedef struct watcher *watcher_t;
+typedef struct watcher watcher_t;
 
-typedef enum {
-	WT_ADDED,
-	WT_UPDATED,
-	WT_DELETED
-} wt_event_type_t;
-
-typedef void (*watcher_callback_t) (watcher_t, wt_event_type_t, json_object *, void *);
-
-watcher_t	watcher_create(struct k8s_config *, const char *resource);
-void		watcher_free(watcher_t);
-int		watcher_run(watcher_t, int);
-void		watcher_set_callback(watcher_t, watcher_callback_t, void *);
-int		watcher_set_client_tls(watcher_t, const char *keyfile, const char *certfile);
-int		watcher_set_client_cafile(watcher_t, const char *cafile);
-int		watcher_set_client_token(watcher_t, const char *token);
+watcher_t	*watcher_create(struct k8s_config *, cluster_t *cluster);
+void		 watcher_free(watcher_t *);
+int		 watcher_run(watcher_t *);
+void		 watcher_set_callback(watcher_t *, cluster_callback_t, void *);
+int		 watcher_set_client_tls(watcher_t *, const char *keyfile, const char *certfile);
+int		 watcher_set_client_cafile(watcher_t *, const char *cafile);
+int		 watcher_set_client_token(watcher_t *, const char *token);
 
 #endif	/* !WATCHER_H */

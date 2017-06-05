@@ -31,9 +31,11 @@ remap_db_from_cluster(k8s_config_t *cfg, cluster_t *cluster)
 namespace_t		*namespace;
 remap_db_t		*db;
 
+	pthread_rwlock_rdlock(&cluster->cs_lock);
 	db = remap_db_new(cfg);
 	hash_foreach(cluster->cs_namespaces, NULL, NULL, &namespace)
 		build_namespace(db, namespace);
+	pthread_rwlock_unlock(&cluster->cs_lock);
 
 	return db;
 }
@@ -141,6 +143,9 @@ secret_t		*secret;
 
 		if (!secret)
 			continue;
+
+		if (rh->rh_ctx)
+			continue;	/* ??? */
 
 		if ((rh->rh_ctx = secret_make_ssl_ctx(secret)) == NULL) {
 			TSDebug("kubernetes", "      %s: can't make ctx",

@@ -34,23 +34,34 @@
 #include	"strmatch.h"
 
 void
-rebuild_maps(struct state *state)
+rebuild_maps(void)
 {
-remap_db_t	*db;
-
-	TSMutexLock(state->cluster_lock);
-	if (!state->changed) {
-		TSDebug("kubernetes", "rebuild_maps: no changes");
-		TSMutexUnlock(state->cluster_lock);
-		return;
-	}
+remap_db_t	*newdb;
 
 	TSDebug("kubernetes", "rebuild_maps: running");
-	db = remap_db_from_cluster(state->config, state->cluster);
-	state->changed = 0;
-	TSMutexUnlock(state->cluster_lock);
 
-	TSConfigSet(state->cfg_slot, db, (TSConfigDestroyFunc)remap_db_free);
+	/*
+	 * Build the new remap_db.  We must have a read lock on both the state
+	 * and the cluster before doing this.  We don't do the rebuild and
+	 * replace at once with a write lock, because want to avoid blocking
+	 * all requests while we rebuild.
+	 */
+	pthread_rwlock_rdlock(&state->lock);
+	pthread_rwlock_rdlock(&state->cluster->cs_lock);
+
+	newdb = remap_db_from_cluster(state->config, state->cluster);
+
+	pthread_rwlock_unlock(&state->cluster->cs_lock);
+	pthread_rwlock_unlock(&state->lock);
+
+	/*
+	 * Now set our new db into the state; we need a write lock on the
+	 * state for this.
+	 */
+	pthread_rwlock_wrlock(&state->lock);
+	remap_db_free(state->db);
+	state->db = newdb;
+	pthread_rwlock_unlock(&state->lock);
 }
 
 /*
@@ -158,6 +169,7 @@ int		 len;
 			s[j] = tolower(s[j]);
 		hash_set(req->rr_hdrfields, s, remap_field);
 		free(s);
+		TSHandleMLocRelease(reqp, hdrs, ts_field);
 	}
 
 	TSHandleMLocRelease(reqp, hdrs, url);
@@ -171,13 +183,10 @@ int		 len;
  * for that.
  */
 TSMLoc
-url_from_remap_result(TSHttpTxn txn, remap_request_t *req,
-		      remap_result_t *res)
+url_from_remap_result(TSHttpTxn txn, TSMBuffer reqp, TSMLoc hdr,
+		      remap_request_t *req, remap_result_t *res)
 {
-TSMBuffer	reqp;
-TSMLoc		hdrs, newurl;
-
-	TSHttpTxnClientReqGet(txn, &reqp, &hdrs);
+TSMLoc		newurl;
 
 	TSUrlCreate(reqp, &newurl);
 	TSUrlSchemeSet(reqp, newurl, res->rz_proto, -1);
@@ -188,7 +197,6 @@ TSMLoc		hdrs, newurl;
 	if (res->rz_query)
 		TSUrlHttpQuerySet(reqp, newurl, res->rz_query, -1);
 
-	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
 	return newurl;
 }
 
@@ -279,16 +287,16 @@ static const char *const status_names[] = {
 		(long) cache_gen);
 
 	TSHttpTxnClientRespGet(txn, &resp, &hdr);
+
 	field = TSMimeHdrFieldFind(resp, hdr, "X-Cache-Status", -1);
 	if (field == TS_NULL_MLOC)
 		TSMimeHdrFieldCreateNamed(resp, hdr,
 				"X-Cache-Status", -1, &field);
 	TSMimeHdrFieldValueStringInsert(resp, hdr, field, 0, buf, -1);
 	TSMimeHdrFieldAppend(resp, hdr, field);
+
 	TSHandleMLocRelease(resp, hdr, field);
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
-
-	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 	return TS_SUCCESS;
 }
 
@@ -304,20 +312,13 @@ static const char *const status_names[] = {
 int
 set_headers(TSCont contp, TSEvent event, void *edata)
 {
-hash_t		hdrset = TSContDataGet(contp);
 TSHttpTxn	txn = edata;
 TSMBuffer	resp;
 TSMLoc		hdrs;
 TSMLoc		hdr;
 const char	*h, *v;
 size_t		 hlen;
-
-	if (event == TS_EVENT_HTTP_TXN_CLOSE) {
-		TSDebug("kubernetes", "set_headers: closing");
-		hash_free(hdrset);
-		TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
-		return TS_SUCCESS;
-	}
+request_ctx_t	*rctx = TSContDataGet(contp);
 
 	assert(event == TS_EVENT_HTTP_SEND_RESPONSE_HDR);
 	TSDebug("kubernetes", "set_headers: running");
@@ -328,15 +329,16 @@ size_t		 hlen;
 	 * Set any header fields in the txn's hdrset; typically these come from
 	 * the remap response.
 	 */
-	if (hdrset) hash_foreach(hdrset, &h, &hlen, &v) {
-		TSDebug("kubernetes", "set_headers: [%.*s] = [%s]",
-			(int) hlen, h, v);
-		TSMimeHdrFieldCreateNamed(resp, hdrs, h, hlen, &hdr);
-		TSMimeHdrFieldValueStringInsert(resp, hdrs, hdr, 0,
-						v, strlen(v));
-		TSMimeHdrFieldAppend(resp, hdrs, hdr);
-		TSHandleMLocRelease(resp, hdrs, hdr);
-	}
+	if (rctx->rq_response_headers)
+		hash_foreach(rctx->rq_response_headers, &h, &hlen, &v) {
+			TSDebug("kubernetes", "set_headers: [%.*s] = [%s]",
+				(int) hlen, h, v);
+			TSMimeHdrFieldCreateNamed(resp, hdrs, h, hlen, &hdr);
+			TSMimeHdrFieldValueStringInsert(resp, hdrs, hdr, 0,
+							v, strlen(v));
+			TSMimeHdrFieldAppend(resp, hdrs, hdr);
+			TSHandleMLocRelease(resp, hdrs, hdr);
+		}
 
 	/*
 	 * Set Via and Server fields.
@@ -404,12 +406,12 @@ size_t		 hlen;
 		}
 
 		TSMimeHdrFieldAppend(resp, hdrs, cc);
+		TSHandleMLocRelease(resp, hdrs, cc);
 		TSMimeHdrFieldRemove(resp, hdrs, hdr);
 		TSHandleMLocRelease(resp, hdrs, hdr);
 	}
 
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdrs);
-	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 	return TS_SUCCESS;
 }
 
@@ -440,22 +442,18 @@ TSMLoc		hdr, field;
 		if (TSHttpTxnServerRespGet(txn, &resp, &hdr) != TS_SUCCESS) {
 			TSDebug("kubernetes", "server_push: cannot get "
 				"server resp?!");
-			TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 			return TS_SUCCESS;
 		}
 	} else {
 	int	cache_status = 0;
 		TSHttpTxnCacheLookupStatusGet(txn, &cache_status);
 
-		if (cache_status != TS_CACHE_LOOKUP_HIT_FRESH) {
-			TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
+		if (cache_status != TS_CACHE_LOOKUP_HIT_FRESH)
 			return TS_SUCCESS;
-		}
 
 		if (TSHttpTxnCachedRespGet(txn, &resp, &hdr) != TS_SUCCESS) {
 			TSDebug("kubernetes", "server_push: cannot get "
 				"cached resp?!");
-			TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 			return TS_SUCCESS;
 		}
 	}
@@ -520,6 +518,7 @@ TSMLoc		hdr, field;
 			 */
 			TSUrlClone(resp, req, requrl, &pushurl);
 			TSUrlPathSet(resp, pushurl, url, strlen(url));
+			free(url);
 			TSDebug("kubernetes", "push header is [%.*s]", len, cs);
 
 			/*
@@ -543,7 +542,6 @@ TSMLoc		hdr, field;
 	}
 
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
-	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 	return TS_SUCCESS;
 }
 
@@ -658,8 +656,69 @@ TSMLoc		hdr, field;
 	}
 
 	TSHandleMLocRelease(resp, TS_NULL_MLOC, hdr);
+	return TS_SUCCESS;
+}
+
+TSReturnCode
+tsi_event(TSCont contn, TSEvent event, void *edata)
+{
+TSHttpTxn	 txn = edata;
+request_ctx_t	*req = TSContDataGet(contn);
+
+	switch (event) {
+	case TS_EVENT_HTTP_CACHE_LOOKUP_COMPLETE:
+		if (req->rq_server_push)
+			server_push(contn, event, edata);
+		if (req->rq_comp_state)
+			comp_check_cached_response(contn, event, edata);
+		break;
+
+	case TS_EVENT_HTTP_SEND_REQUEST_HDR:
+		if (req->rq_compress)
+			comp_remove_aenc(contn, event, edata);
+		break;
+
+	case TS_EVENT_HTTP_READ_RESPONSE_HDR:
+		if (req->rq_can_cache)
+			check_response_cache(contn, event, edata);
+		if (req->rq_server_push)
+			server_push(contn, event, edata);
+		if (req->rq_comp_state)
+			comp_check_server_response(contn, event, edata);
+		break;
+
+	case TS_EVENT_HTTP_SEND_RESPONSE_HDR:
+		set_headers(contn, event, edata);
+		if (req->rq_compress)
+			comp_set_compress_headers(contn, event, edata);
+		if (req->rq_compress_transform)
+			comp_set_content_encoding(contn, event, edata);
+		if (req->rq_cache_enabled)
+			add_cache_status(contn, event, edata);
+		break;
+
+	case TS_EVENT_HTTP_TXN_CLOSE:
+		if (req->rq_compress_transform)
+			TSContDestroy(req->rq_compress_transform);
+		request_ctx_free(req);
+		TSContDestroy(contn);
+		break;
+
+	default:
+		abort();
+	}
+
 	TSHttpTxnReenable(txn, TS_EVENT_HTTP_CONTINUE);
 	return TS_SUCCESS;
+}
+
+void
+request_ctx_free(request_ctx_t *rctx)
+{
+	if (rctx->rq_comp_state)
+		comp_state_free(rctx->rq_comp_state);
+	hash_free(rctx->rq_response_headers);
+	free(rctx);
 }
 
 /*
@@ -673,45 +732,52 @@ handle_remap(TSCont contn, TSEvent event, void *edata)
 {
 TSMLoc			 newurl;
 TSHttpTxn		 txnp = (TSHttpTxn) edata;
-TSConfig		 map_cfg = NULL;
-const remap_db_t	*db;
-struct state		*state = TSContDataGet(contn);
 remap_request_t		 req;
 remap_result_t		 res;
 synth_t			*sy;
 struct sockaddr_in	 addr;
 int			 reenable = 1, ret;
-TSCont			 c, set_headers_cont;
+TSCont			 c;
+request_ctx_t		*rctx;
+
+	rctx = calloc(1, sizeof(*rctx));
 
 	bzero(&req, sizeof(req));
 	bzero(&res, sizeof(res));
 
-	set_headers_cont = TSContCreate(set_headers, TSMutexCreate());
-	TSContDataSet(set_headers_cont, NULL);
-	TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_RESPONSE_HDR_HOOK, set_headers_cont);
-	TSHttpTxnHookAdd(txnp, TS_HTTP_TXN_CLOSE_HOOK, set_headers_cont);
+	/*
+	 * Take a read lock on the cluster state so it doesn't change while
+	 * we're using it.
+	 */
+	pthread_rwlock_rdlock(&state->lock);
+
+	/* Not initialised yet? */
+	if (!state->db) {
+		pthread_rwlock_unlock(&state->lock);
+		TSDebug("kubernetes", "handle_remap: no database");
+		return TS_SUCCESS;
+	}
+
+	c = TSContCreate(tsi_event, TSMutexCreate());
+	TSContDataSet(c, rctx);
+	TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_REQUEST_HDR_HOOK, c);
+	TSHttpTxnHookAdd(txnp, TS_HTTP_READ_RESPONSE_HDR_HOOK, c);
+	TSHttpTxnHookAdd(txnp, TS_HTTP_CACHE_LOOKUP_COMPLETE_HOOK, c);
+	TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_RESPONSE_HDR_HOOK, c);
+	TSHttpTxnHookAdd(txnp, TS_HTTP_TXN_CLOSE_HOOK, c);
 
 	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_NORMALIZE_AE_GZIP, 0);
 	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_INSERT_RESPONSE_VIA_STR, 0);
 	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_INSERT_REQUEST_VIA_STR, 1);
 	TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_RESPONSE_SERVER_ENABLED, 0);
 
-	map_cfg = TSConfigGet(state->cfg_slot);
-	db = TSConfigDataGet(map_cfg);
-
-	/* Not initialised yet? */
-	if (!db) {
-		TSDebug("kubernetes", "handle_remap: no database");
-		goto cleanup;
-	}
-
 	/* Create a remap_request from the TS request */
 	if (request_from_txn(txnp, &req) != 0)
 		goto cleanup;
 
 	/* Do the remap */
-	ret = remap_run(db, &req, &res);
-	TSContDataSet(set_headers_cont, res.rz_headers);
+	ret = remap_run(state->db, &req, &res);
+	rctx->rq_response_headers = res.rz_headers;
 	res.rz_headers = NULL;
 
 	switch (ret) {
@@ -776,23 +842,26 @@ TSCont			 c, set_headers_cont;
 	 * protocol, host:port and other request configuration.
 	 */
 
-	if ((newurl = url_from_remap_result(txnp, &req, &res)) == NULL)
-		goto cleanup;
-	else {
+	{
 	TSMBuffer	reqp;
-	TSMLoc		hdrs;
+	TSMLoc		hdr;
 
-		TSHttpTxnClientReqGet(txnp, &reqp, &hdrs);
-		TSHttpHdrUrlSet(reqp, hdrs, newurl);
-		TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
+		TSHttpTxnClientReqGet(txnp, &reqp, &hdr);
+
+		newurl = url_from_remap_result(txnp, reqp, hdr, &req, &res);
+		if (newurl) {
+			TSHttpHdrUrlSet(reqp, hdr, newurl);
+			TSHandleMLocRelease(reqp, hdr, newurl);
+		}
+
+		TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdr);
+		if (!newurl)
+			goto cleanup;
 	}
 
 	/* Do HTTP/2 server push */
-	if (res.rz_path->rp_server_push) {
-		c = TSContCreate(server_push, TSMutexCreate());
-		TSHttpTxnHookAdd(txnp, TS_HTTP_READ_RESPONSE_HDR_HOOK, c);
-		TSHttpTxnHookAdd(txnp, TS_HTTP_CACHE_LOOKUP_COMPLETE_HOOK, c);
-	}
+	if (res.rz_path->rp_server_push)
+		rctx->rq_server_push = 1;
 
 	/* follow redirects if configured on the Ingress.  */
 	if (res.rz_path->rp_follow_redirects) {
@@ -848,9 +917,7 @@ TSCont			 c, set_headers_cont;
 	size_t	 urllen;
 	int	 can_cache;
 
-		/* Add X-Cache-Status to the response */
-		c = TSContCreate(add_cache_status, TSMutexCreate());
-		TSHttpTxnHookAdd(txnp, TS_HTTP_SEND_RESPONSE_HDR_HOOK, c);
+		rctx->rq_cache_enabled = 1;
 
 		/*
 		 * Removes any cookies from the request that we don't want,
@@ -861,6 +928,8 @@ TSCont			 c, set_headers_cont;
 		check_cookies(txnp, &req, &res, &can_cache);
 
 		if (can_cache) {
+			rctx->rq_can_cache = 1;
+
 			/*
 			 * Set cache generation if it's set on the Ingress.  If it's
 			 * not set, just set it to zero.
@@ -874,10 +943,6 @@ TSCont			 c, set_headers_cont;
 			remap_make_cache_key(&req, &res, &cacheurl, &urllen);
 			TSCacheUrlSet(txnp, cacheurl, urllen);
 			free(cacheurl);
-
-			/* Check if the response should be cached */
-			c = TSContCreate(check_response_cache, TSMutexCreate());
-			TSHttpTxnHookAdd(txnp, TS_HTTP_READ_RESPONSE_HDR_HOOK, c);
 		}
 	}
 
@@ -889,21 +954,14 @@ TSCont			 c, set_headers_cont;
 	TSSkipRemappingSet(txnp, 1);
 
 	/*
-	 * Set any extra response headers we need, e.g. for CORS.
-	 */
-	if (res.rz_headers) {
-		TSContDataSet(set_headers_cont, res.rz_headers);
-		/* prevent the hash being freed later */
-		res.rz_headers = NULL;
-	}
-
-	/*
 	 * Compress the response if enabled.  Do this here so we don't waste
 	 * time compressing any of the tiny error responses that might have
 	 * been generated above.
 	 */
-	if (res.rz_path->rp_compress)
-		tsi_compress(res.rz_path, txnp);
+	if (res.rz_path->rp_compress) {
+		rctx->rq_compress = 1;
+		tsi_compress(rctx, res.rz_path, txnp);
+	}
 
 	/*
 	 * If the target is an IP address (the usual case) we can pass it
@@ -935,7 +993,7 @@ TSCont			 c, set_headers_cont;
 	}
 
 cleanup:
-	TSConfigRelease(state->cfg_slot, map_cfg);
+	pthread_rwlock_unlock(&state->lock);
 
 	remap_request_free(&req);
 	remap_result_free(&res);

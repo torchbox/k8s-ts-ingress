@@ -12,6 +12,7 @@
 #define	K8SAPI_API_H
 
 #include	<sys/types.h>
+#include	<pthread.h>
 
 #include	<openssl/ssl.h>
 #include	<json.h>
@@ -61,6 +62,7 @@ typedef struct {
 
 void		 endpoints_free(endpoints_t *ing);
 endpoints_t	*endpoints_make(json_object *obj);
+int		 endpoints_equal(endpoints_t *, endpoints_t *);
 
 /*
  * Services
@@ -217,10 +219,18 @@ endpoints_t	*namespace_get_endpoints(namespace_t *, const char *);
 void		 namespace_del_endpoints(namespace_t *, const char *);
 
 /*
- * Clusters
+ * Clusters.
  */
-typedef struct {
-	hash_t	cs_namespaces;
+
+struct cluster;
+
+typedef void (*cluster_callback_t) (struct cluster *cluster, void *);
+
+typedef struct cluster {
+	pthread_rwlock_t	 cs_lock;
+	hash_t			 cs_namespaces;
+	cluster_callback_t	 cs_callback;
+	void			*cs_callbackdata;
 } cluster_t;
 
 cluster_t	*cluster_make(void);
