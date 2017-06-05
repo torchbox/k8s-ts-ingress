@@ -278,6 +278,7 @@ list or not, please
 <ul>
 <li>TLS client certificate authentication.</li>
 <li>Client session affinity</li>
+<li>Backend weights</li>
 <li>Proxy protocol</li>
 <li>Rate limiting</li>
 <li>SSL passthrough</li>
@@ -286,16 +287,33 @@ list or not, please
   removed from TS core in some later release)</li>
 <li>Custom error bodies</li>
 <li>Support <a href="http://www.libslz.org/">libslz</a> as an alternative to zlib.</li>
-<li>Improve API watch support by first retrieving all objects, then watching with
-  resourceVersion.</li>
-<li>Wildcard cache purging.</li>
+<li>Wildcard cache purging and/or cache tags.</li>
 </ul>
 <h2 id="release-history">Release history</h2>
 <ul>
 <li>
 <p>1.0.0-alpha8 (unreleased):</p>
 <ul>
+<li>Incompatible change: The CORS configuration was changed to be both more
+    clear and more flexible.</li>
 <li>Feature: HTTP/2 Server Push was implemented.</li>
+<li>Feature: the `cache-whitelist-cookies annotation was implemented.</li>
+<li>Improvement: Two unnecessary plugins were removed from the Docker image
+    configuration (header_rewrite and xdebug).</li>
+<li>Improvement: End-to-end test coverage was improved; as a result, several
+    bugs were fixed:<ul>
+<li>A 401 Unauthorised response did not include a WWW-Authenticate header.</li>
+<li>A response including both <code>Set-Cookie</code> and <code>Cache-Control</code> header
+  fields would be cached even though responses containing <code>Set-Cookie</code>
+  fields should not be cached.</li>
+<li>The <code>cache-ignore-query-params</code> and <code>cache-whitelist-query-params</code>
+  annotations did not work correctly.</li>
+</ul>
+</li>
+<li>Improvement: The Kubernetes API code was rewritten and is now more
+    reliable, more efficient, and faster to respond to changes in the
+    cluster.</li>
+<li>Bug fix: Several memory leaks were fixed.</li>
 </ul>
 </li>
 <li>
@@ -448,5 +466,5 @@ of California, based on code written by Guido van Rossum.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-06-02 13:28:52
+Build Date UTC : 2017-06-05 07:34:32
 -->

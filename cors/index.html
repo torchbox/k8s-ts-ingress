@@ -145,7 +145,7 @@
             
                 <li class="toctree-l3"><a href="#configuring-cross-origing-resource-sharing">Configuring Cross-Origing Resource Sharing</a></li>
                 
-                    <li><a class="toctree-l4" href="#basic-cors-configuration">Basic CORS configuration</a></li>
+                    <li><a class="toctree-l4" href="#cors-configuration">CORS configuration</a></li>
                 
                     <li><a class="toctree-l4" href="#advanced-configuration">Advanced configuration</a></li>
                 
@@ -224,7 +224,7 @@ way to safely permit such requests.</p>
 headers itself, or you can configure the Ingress resource to do so for you.
 If your application is handling CORS itself, you do not need any of the
 configuration described here.</p>
-<h2 id="basic-cors-configuration">Basic CORS configuration</h2>
+<h2 id="cors-configuration">CORS configuration</h2>
 <p>To enable cross-origin requests from any domain, set the
 <code>ingress.kubernetes.io/enable-cors</code> annotation on the Ingress resource:</p>
 <pre><code class="yaml">metadata:
@@ -232,22 +232,70 @@ configuration described here.</p>
     ingress.kubernetes.io/enable-cors: &quot;true&quot;
 </code></pre>
 
-<p>This will allow requests from any origin, with credentials, with the following
-request methods: <code>GET</code>, <code>PUT</code>, <code>POST</code>, and <code>DELETE</code>.</p>
-<p>This must <strong>only</strong> be used for Ingress resources that serve static assets, or
-dynamic pages that do not use any sort of authentication (including cookies);
-otherwise, any page on the Internet will be able to steal users' credentials.</p>
-<p>Setting <code>enable-cors: "true"</code> is equivalent to setting the following annotations:</p>
-<pre><code>ingress.kubernetes.io/access-control-allow-origin: &quot;*&quot;
-ingress.kubernetes.io/access-control-allow-credentials: &quot;true&quot;
-ingress.kubernetes.io/access-control-allow-methods: &quot;GET, PUT, POST, DELETE, OPTIONS&quot;
-ingress.kubernetes.io/access-control-allow-headers: &quot;DNT, Keep-Alive, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Authorization&quot;
-ingress.kubernetes.io/access-control-max-age: &quot;1728000&quot;
+<p>This will allow requests from any origin, without credentials, for the CORS
+basic methods (GET, POST and HEAD).  This is generally sufficient to permit
+cross-origin loading of resources (such as fonts) without compromising the
+security of the application.</p>
+<p>If you want to restrict requests to a set of origins, you can set the
+<code>cors-origins</code> annotations:</p>
+<pre><code class="yaml">  annotations:
+    ingress.kubernetes.io/enable-cors: &quot;true&quot;
+    ingress.kubernetes.io/cors-origins: &quot;http://example.com http://example.org&quot;
 </code></pre>
 
-<p>Note that the nginx Ingress controller adds "<code>X-CustomHeader</code>" to the CORS
-header list if <code>enable-cors</code> is set.  We believe this is a mistake, and the TS
-implementation will not add that header.</p>
+<p>This would allow cross-origin requests from the two listed origins, but no
+others.</p>
+<p>If you want to permit requests with credentials, you can set the <code>cors-credentials</code>
+annotation:</p>
+<pre><code class="yaml">  annotations:
+    ingress.kubernetes.io/enable-cors: &quot;true&quot;
+    ingress.kubernetes.io/cors-origins: &quot;http://example.com http://example.org&quot;
+    ingress.kubernetes.io/cors-credentials: &quot;true&quot;
+</code></pre>
+
+<p>This will permit requests with credentials (such as Cookie headers); be very
+careful with this, as it essentially allows any of the listed origins to make
+requests using the user's credentials.  If you use <code>cors-credentials</code>, you must
+also set <code>cors-origins</code>; you cannot allow requests with credentials from any
+origin.</p>
+<p>By default, requests are allowed for any the CORS simple methods; that is,
+<code>GET</code>, <code>POST</code> or <code>HEAD</code>.  These are the methods which JavaScript can already
+use without CORS.  To permit additional methods, set the <code>cors-methods</code>
+annotation:</p>
+<pre><code class="yaml">  annotations:
+    ingress.kubernetes.io/enable-cors: &quot;true&quot;
+    ingress.kubernetes.io/cors-origins: &quot;http://example.com&quot;
+    ingress.kubernetes.io/cors-credentials: &quot;true&quot;
+    ingress.kubernetes.io/cors-methods: &quot;PUT, DELETE&quot;
+</code></pre>
+
+<p>You do not need to list the simple methods in <code>cors-methods</code>, as they are always
+permitted.</p>
+<p>By default, the browser will preflight the request with a separate OPTIONS
+request every time it needs to make an access control decision, which adds
+a significant overhead to the request processing time.  If you expect each
+client to make several CORS-authenticated requests, you can set the <code>cors-max-age</code>
+annotation to the number of seconds the browser is permitted to cache the
+preflight result:</p>
+<pre><code class="yaml">  annotations:
+    ingress.kubernetes.io/enable-cors: &quot;true&quot;
+    ingress.kubernetes.io/cors-origins: &quot;http://example.com&quot;
+    ingress.kubernetes.io/cors-credentials: &quot;true&quot;
+    ingress.kubernetes.io/cors-max-age: &quot;3600&quot;
+</code></pre>
+
+<p>By default, the browser will only permit the CORS simple headers in the
+request: <code>Accept</code>, <code>Accept-Language</code>, <code>Content-Language</code>, or <code>Content-Type</code> (if
+the value is <code>application/x-www-form-urlencoded</code>, <code>multipath/form-data</code> or
+<code>text/plain</code>).  To allow additional request headers, set the
+<code>ingress.kubernetes.io/cors-headers</code> annotation:</p>
+<pre><code class="yaml">  annotations:
+    ingress.kubernetes.io/enable-cors: &quot;true&quot;
+    ingress.kubernetes.io/cors-origins: &quot;http://example.com&quot;
+    ingress.kubernetes.io/cors-credentials: &quot;true&quot;
+    ingress.kubernetes.io/cors-headers: &quot;X-CustomHeader&quot;
+</code></pre>
+
 <h2 id="advanced-configuration">Advanced configuration</h2>
 <p>If you want to allow cross-origin requests from a specific set of domains, or
 you want to control the request methods permitted or whether credentials should
