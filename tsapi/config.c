@@ -44,9 +44,14 @@ char	*s = strdup(classes), *p, *r;
 	hash_free(cfg->co_classes);
 	cfg->co_classes = hash_new(11, NULL);
 
+	TSDebug("kubernetes", "classes are [%s]", classes);
+
 	for (p = strtok_r(s, " \t\r\n", &r); p != NULL;
-	     p = strtok_r(NULL, " \t\r\n", &r))
+	     p = strtok_r(NULL, " \t\r\n", &r)) {
+		TSDebug("kubernetes", "cfg: will handle Ingress class [%s]", p);
 		hash_set(cfg->co_classes, p, HASH_PRESENT);
+	}
+
 	free(s);
 }
 

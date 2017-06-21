@@ -84,6 +84,10 @@ list or not, please
 * Custom error bodies
 * Support [libslz](http://www.libslz.org/) as an alternative to zlib.
 * Wildcard cache purging and/or cache tags.
+* Clustering (HTCP)
+* Modify response headers (`header-{add,replace}-Name`)
+* Incoming XFF
+* Health check
 
 ## Release history
 
@@ -91,7 +95,7 @@ list or not, please
     * Incompatible change: The CORS configuration was changed to be both more
         clear and more flexible.
     * Feature: HTTP/2 Server Push was implemented.
-    * Feature: the `cache-whitelist-cookies annotation was implemented.
+    * Feature: the `cache-whitelist-cookies` annotation was implemented.
     * Improvement: Two unnecessary plugins were removed from the Docker image
         configuration (header_rewrite and xdebug).
     * Improvement: End-to-end test coverage was improved; as a result, several
@@ -106,6 +110,8 @@ list or not, please
         reliable, more efficient, and faster to respond to changes in the
         cluster.
     * Bug fix: Several memory leaks were fixed.
+    * Bug fix: TS would crash if the connection to the API server failed.
+    * Bug fix: Path handling code could crash with non-default paths.
 
 * 1.0.0-alpha7:
     * Improvement: The Traffic Server version in the Docker image has been

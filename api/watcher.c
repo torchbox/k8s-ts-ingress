@@ -171,7 +171,7 @@ fe_read(char *data, size_t sz, size_t n, void *udata)
 struct fetcher_ctx	*fe = udata;
 size_t			 nread = sz * n;
 
-	TSDebug("kubernetes", "fe_read: read %d", (int) nread);
+	TSDebug("watcher", "fe_read: read %d", (int) nread);
 
 	if (nread == 0)
 		return 0;
@@ -255,7 +255,7 @@ namespace_t	*ns;
 
 	sname = json_object_get_string(name);
 
-	TSDebug("kubernetes", "fetcher_watch_line: change %s from %s",
+	TSDebug("watcher", "fetcher_watch_line: change %s from %s",
 		skind, json_object_get_string(namespace));
 
 	pthread_rwlock_wrlock(&fe->watcher->wt_cluster->cs_lock);
@@ -429,7 +429,7 @@ namespace_t	*ns;
 		return;
 	}
 
-	TSDebug("kubernetes", "fetcher_process_item: adding %s from %s",
+	TSDebug("watcher", "fetcher_process_item: adding %s from %s",
 		kind, json_object_get_string(namespace));
 
 	ns = cluster_get_namespace(cluster,
@@ -477,6 +477,9 @@ const char		*skind;
 
 	TSDebug("watcher", "fetcher_process: running; %d in buf",
 		(int) fe->buflen);
+
+	if (!fe->buf)
+		return;
 
 	/*
 	 * json-c requires a nul-terminated buffer.  We allocate an additional
@@ -620,6 +623,15 @@ hash_t			 tmphash;
 
 		TSDebug("watcher", "fetcher_get_all: fetch for "
 			"%s finished: status=%d", fe->url, msg->data.result);
+
+		if (msg->data.result != CURLM_OK) {
+			TSDebug("watcher", "fetcher_get_all: failed: %s",
+				fe->errbuf);
+			cluster_free(newcluster);
+			fail++;
+			goto cleanup;
+		}
+
 		fetcher_process(fe, newcluster);
 	}
 
@@ -695,7 +707,7 @@ time_t			 deadline;
 
 		/* If any watch finishes, we want to return for a resync */
 		if (running != NRESOURCES) {
-			TSError("kubernetes: a watch finished early");
+			TSError("watcher: a watch finished early");
 			fail++;
 			break;
 		}
@@ -753,7 +765,11 @@ watcher_t	*wt = data;
 	for (;;) {
 		/* First, do a full fetch of resources for each type. */
 		TSDebug("watcher", "watcher_thread: starting resync");
-		fetcher_get_all(wt);
+
+		if (fetcher_get_all(wt) == -1) {
+			sleep(10);
+			continue;
+		}
 
 		/* Then watch for resource changes until the resync timeout */
 		TSDebug("watcher", "watcher_thread: starting watch");

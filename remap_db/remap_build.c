@@ -68,6 +68,8 @@ char	*cls;
 	 * Check whether we should handle this class.
 	 */
 	if ((cls = hash_get(ing->in_annotations, IN_CLASS)) != NULL) {
+		TSDebug("kubernetes", "    ingress class is [%s]", cls);
+
 		if (hash_get(db->rd_config->co_classes, cls) != HASH_PRESENT)
 			return;
 	}

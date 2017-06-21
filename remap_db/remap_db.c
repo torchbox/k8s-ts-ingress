@@ -72,6 +72,13 @@ size_t	i;
 remap_path_t *
 remap_host_find_path(const remap_host_t *rh, const char *path, size_t *pfxsz)
 {
+	/* No path in the request, so this can only match the default path */
+	if (!path) {
+		if (pfxsz)
+			*pfxsz = 0;
+		return rh->rh_paths[0];
+	}
+
 	/* skip 0, the default path */
 	for (size_t i = 1; i < rh->rh_npaths; i++) {
 	remap_path_t	*rp = rh->rh_paths[i];
