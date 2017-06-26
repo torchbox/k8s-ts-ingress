@@ -288,6 +288,10 @@ list or not, please
 <li>Custom error bodies</li>
 <li>Support <a href="http://www.libslz.org/">libslz</a> as an alternative to zlib.</li>
 <li>Wildcard cache purging and/or cache tags.</li>
+<li>Clustering (HTCP)</li>
+<li>Modify response headers (<code>header-{add,replace}-Name</code>)</li>
+<li>Incoming XFF</li>
+<li>Health check</li>
 </ul>
 <h2 id="release-history">Release history</h2>
 <ul>
@@ -297,7 +301,7 @@ list or not, please
 <li>Incompatible change: The CORS configuration was changed to be both more
     clear and more flexible.</li>
 <li>Feature: HTTP/2 Server Push was implemented.</li>
-<li>Feature: the `cache-whitelist-cookies annotation was implemented.</li>
+<li>Feature: the <code>cache-whitelist-cookies</code> annotation was implemented.</li>
 <li>Improvement: Two unnecessary plugins were removed from the Docker image
     configuration (header_rewrite and xdebug).</li>
 <li>Improvement: End-to-end test coverage was improved; as a result, several
@@ -314,6 +318,12 @@ list or not, please
     reliable, more efficient, and faster to respond to changes in the
     cluster.</li>
 <li>Bug fix: Several memory leaks were fixed.</li>
+<li>Bug fix: TS would crash if the connection to the API server failed.</li>
+<li>Bug fix: Path handling code could crash with non-default paths.</li>
+<li>Bug fix: If no configuration file was specified, environment-based
+    configuration would not be loaded either.</li>
+<li>Bug fix: Compilation would fail if the C compiler did not enable
+    C99 by default.</li>
 </ul>
 </li>
 <li>
@@ -466,5 +476,5 @@ of California, based on code written by Guido van Rossum.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-06-05 07:34:32
+Build Date UTC : 2017-06-26 08:54:29
 -->
