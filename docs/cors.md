@@ -102,37 +102,3 @@ the value is `application/x-www-form-urlencoded`, `multipath/form-data` or
     ingress.kubernetes.io/cors-credentials: "true"
     ingress.kubernetes.io/cors-headers: "X-CustomHeader"
 ```
-
-## Advanced configuration
-
-If you want to allow cross-origin requests from a specific set of domains, or
-you want to control the request methods permitted or whether credentials should
-be sent, do not use `enable-cors`; instead, set the
-`ingress.kubernetes.io/access-control-allow-origin` annotation:
-
-```yaml
-ingress.kubernetes.io/access-control-allow-origin: "*"
-```
-
-or:
-
-```yaml
-ingress.kubernetes.io/access-control-allow-origin: "https://mydomain.com https://myothersite.com"
-```
-
-The value should be either `"*"` (meaning all origins) or a whitespace-delimited
-list of origins.
-
-You can use the following set of annotations to configure other CORS headers
-in the response:
-
-* `ingress.kubernetes.io/access-control-allow-credentials`
-* `ingress.kubernetes.io/access-control-allow-methods`
-* `ingress.kubernetes.io/access-control-allow-headers
-* `ingress.kubernetes.io/access-control-max-age`
-
-There is no default for these values, so you will likely want to set all of
-them.
-
-Do not set `ingress.kubernetes.io/enable-cors` at the same time as any of the
-other CORS-related annotations; behaviour in that case is undefined.
