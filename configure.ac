@@ -57,6 +57,11 @@ AC_SUBST(TS_PLUGINDIR)
 
 AC_LANG_C
 AC_PROG_CC([$TS_CC])
+AC_PROG_CC_C99
+AS_IF([test "$ac_cv_prog_cc_c99" = "no" ], [
+	AC_ERROR([a C99 compiler is required to build this plugin])
+])
+
 AC_PROG_CXX([$TS_CXX])
 
 PKG_CHECK_MODULES(JSON, json-c)
