@@ -137,3 +137,24 @@ TEST(Hash, Iterate)
 		hash_free(hs);
 	}
 }
+
+TEST(Hash, IterateEmpty)
+{
+struct hash_iter_state	 iterstate;
+hash_t			 hs = NULL;
+const char		*k = NULL;
+size_t			 klen;
+void			*v = NULL;
+int			 i = 0;
+
+	hs = hash_new(10, NULL);
+	hash_setn(hs, "", 0, HASH_PRESENT);
+
+	memset(&iterstate, 0, sizeof(iterstate));
+	i = hash_iterate(hs, &iterstate, &k, &klen, &v);
+	ASSERT_EQ(i, 1);
+	EXPECT_EQ(klen, 0u);
+	EXPECT_EQ(v, HASH_PRESENT);
+
+	hash_free(hs);
+}
