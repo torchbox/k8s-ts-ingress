@@ -16,7 +16,7 @@
 
 #define	HASH_USE_RAX	0
 
-#include   	<stdlib.h>
+#include	<stdlib.h>
 
 #if	HASH_USE_RAX
 # include	"rax.h"
@@ -45,12 +45,12 @@ typedef struct hash *hash_t;
  * requirement.
  */
 typedef void (*hash_free_fn) (void *);
-hash_t  hash_new(size_t size, hash_free_fn);
+hash_t	hash_new(size_t size, hash_free_fn);
 
 /*
  * Free the memory used by this hash.  Any items it contains are not freed.
  */
-void     hash_free(hash_t);
+void	hash_free(hash_t);
 
 /*
  * Add an item to the hash.  The specified key should not already exist; if it
@@ -58,22 +58,22 @@ void     hash_free(hash_t);
  *
  * Returns 0 on success.  On errors, returns -1 and errno is set.
  */
-int      hash_set(hash_t, const char *key, void *data);
-int      hash_setn(hash_t, const char *key, size_t keylen, void *data);
+int	hash_set(hash_t, const char *key, void *data);
+int	hash_setn(hash_t, const char *key, size_t keylen, void *data);
 
 /*
  * Retrieve an item from the hash.  Returns the item data, or NULL if the item
  * was not found.
  */
-void    *hash_get(const hash_t, const char *key);
-void    *hash_getn(const hash_t, const char *key, size_t keylen);
+void	*hash_get(const hash_t, const char *key);
+void	*hash_getn(const hash_t, const char *key, size_t keylen);
 
 /*
  * Remove an item from the hash.  Returns the item value on success.  On error,
  * NULL is returned and errno is set to ENOENT.
  */
-void     hash_del(hash_t, const char *key);
-void     hash_deln(hash_t, const char *key, size_t keylen);
+void	 hash_del(hash_t, const char *key);
+void	 hash_deln(hash_t, const char *key, size_t keylen);
 
 /*
  * Return the first entry in the hash where find_fn(value) returns true.
@@ -118,4 +118,4 @@ int	hash_iterate(hash_t, struct hash_iter_state *iterstate,
 }
 #endif
 
-#endif  /* !HASH_H */
+#endif	/* !HASH_H */
