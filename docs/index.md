@@ -112,6 +112,8 @@ list or not, please
     * Bug fix: Several memory leaks were fixed.
     * Bug fix: TS would crash if the connection to the API server failed.
     * Bug fix: Path handling code could crash with non-default paths.
+    * Bug fix: If no configuration file was specified, environment-based
+        configuration would not be loaded either.
 
 * 1.0.0-alpha7:
     * Improvement: The Traffic Server version in the Docker image has been

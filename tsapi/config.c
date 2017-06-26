@@ -74,52 +74,12 @@ k8s_config_t	*ret;
 	return ret;
 }
 
-k8s_config_t *
-k8s_config_load(const char *file)
+int
+cfg_load_file(k8s_config_t *cfg, const char *file)
 {
-char		 line[1024], *s, ffile[PATH_MAX + 1];
-FILE		*f = NULL;
-k8s_config_t	*ret = NULL;
-int		 lineno = 0;
-struct stat	 sb;
-
-	if ((ret = k8s_config_new()) == NULL)
-		return NULL;
-
-	/*
-	 * Check for in-cluster service account config.
-	 */
-	if ((f = fopen(SA_TOKEN_FILE, "r")) != NULL) {
-		if (fgets(line, sizeof(line), f) != NULL) {
-		char	*host, *port;
-
-			while (strchr("\r\n", line[strlen(line) - 1]))
-				line[strlen(line) - 1] = '\0';
-
-			ret->co_token = strdup(line);
-
-			host = getenv("KUBERNETES_SERVICE_HOST");
-			port = getenv("KUBERNETES_SERVICE_PORT");
-
-			if (host && port) {
-			char	 buf[256];
-				snprintf(buf, sizeof(buf), "https://%s:%s",
-					 host, port);
-				ret->co_server = strdup(buf);
-			}
-		}
-
-		fclose(f);
-		f = NULL;
-	}
-
-	if (stat(SA_CACERT_FILE, &sb) == 0) {
-		free(ret->co_tls_cafile);
-		ret->co_tls_cafile = strdup(SA_CACERT_FILE);
-	}
-
-	if (file == NULL)
-		return ret;
+FILE	*f = NULL;
+char	 line[1024], ffile[PATH_MAX + 1];
+int	 lineno = 0;
 
 	if (strchr(file, '/') == NULL) {
 		snprintf(ffile, sizeof(ffile), "%s/%s", TSConfigDirGet(), file);
@@ -155,25 +115,25 @@ struct stat	 sb;
 			value++;
 
 		if (strcmp(opt, "server") == 0) {
-			free(ret->co_server);
-			ret->co_server = strdup(value);
+			free(cfg->co_server);
+			cfg->co_server = strdup(value);
 		} else if (strcmp(opt, "token") == 0) {
-			free(ret->co_token);
-			ret->co_token = strdup(value);
+			free(cfg->co_token);
+			cfg->co_token = strdup(value);
 		} else if (strcmp(opt, "certfile") == 0) {
-			free(ret->co_tls_certfile);
-			ret->co_tls_certfile = strdup(value);
+			free(cfg->co_tls_certfile);
+			cfg->co_tls_certfile = strdup(value);
 		} else if (strcmp(opt, "keyfile") == 0) {
-			free(ret->co_tls_keyfile);
-			ret->co_tls_keyfile = strdup(value);
+			free(cfg->co_tls_keyfile);
+			cfg->co_tls_keyfile = strdup(value);
 		} else if (strcmp(opt, "cafile") == 0) {
-			free(ret->co_tls_cafile);
-			ret->co_tls_cafile = strdup(value);
+			free(cfg->co_tls_cafile);
+			cfg->co_tls_cafile = strdup(value);
 		} else if (strcmp(opt, "tls") == 0) {
 			if (strcmp(value, "true") == 0)
-				ret->co_tls = 1;
+				cfg->co_tls = 1;
 			else if (strcmp(value, "false") == 0)
-				ret->co_tls = 0;
+				cfg->co_tls = 0;
 			else {
 				TSError("%s:%d: expected \"true\" or \"false\"",
 					file, lineno);
@@ -181,9 +141,9 @@ struct stat	 sb;
 			}
 		} else if (strcmp(opt, "tls_verify") == 0) {
 			if (strcmp(value, "true") == 0)
-				ret->co_tls_verify = 1;
+				cfg->co_tls_verify = 1;
 			else if (strcmp(value, "false") == 0)
-				ret->co_tls_verify = 0;
+				cfg->co_tls_verify = 0;
 			else {
 				TSError("%s:%d: expected \"true\" or \"false\"",
 					file, lineno);
@@ -191,9 +151,9 @@ struct stat	 sb;
 			}
 		} else if (strcmp(opt, "remap") == 0) {
 			if (strcmp(value, "true") == 0)
-				ret->co_remap = 1;
+				cfg->co_remap = 1;
 			else if (strcmp(value, "false") == 0)
-				ret->co_remap = 0;
+				cfg->co_remap = 0;
 			else {
 				TSError("%s:%d: expected \"true\" or \"false\"",
 					file, lineno);
@@ -201,21 +161,78 @@ struct stat	 sb;
 			}
 		} else if (strcmp(opt, "x_forwarded_proto") == 0) {
 			if (strcmp(value, "true") == 0)
-				ret->co_xfp = 1;
+				cfg->co_xfp = 1;
 			else if (strcmp(value, "false") == 0)
-				ret->co_xfp = 0;
+				cfg->co_xfp = 0;
 			else {
 				TSError("%s:%d: expected \"true\" or \"false\"",
 					file, lineno);
 				goto error;
 			}
 		} else if (strcmp(opt, "ingress_classes") == 0) {
-			cfg_set_ingress_classes(ret, value);
+			cfg_set_ingress_classes(cfg, value);
 		} else {
 			TSError("%s:%d: unknown option \"%s\"",
 				file, lineno, opt);
 			goto error;
 		}
+	}
+
+	return 0;
+
+error:
+	if (f)
+		fclose(f);
+	return -1;
+}
+
+
+k8s_config_t *
+k8s_config_load(const char *file)
+{
+k8s_config_t	*ret = NULL;
+struct stat	 sb;
+char		*s;
+FILE		*f = NULL;
+
+	if ((ret = k8s_config_new()) == NULL)
+		return NULL;
+
+	if (file)
+		if (cfg_load_file(ret, file) == -1)
+			return NULL;
+
+	/*
+	 * Check for in-cluster service account config.
+	 */
+	if ((f = fopen(SA_TOKEN_FILE, "r")) != NULL) {
+	char	 line[2048];
+		if (fgets(line, sizeof(line), f) != NULL) {
+		char	*host, *port;
+
+			while (strchr("\r\n", line[strlen(line) - 1]))
+				line[strlen(line) - 1] = '\0';
+
+			ret->co_token = strdup(line);
+
+			host = getenv("KUBERNETES_SERVICE_HOST");
+			port = getenv("KUBERNETES_SERVICE_PORT");
+
+			if (host && port) {
+			char	 buf[256];
+				snprintf(buf, sizeof(buf), "https://%s:%s",
+					 host, port);
+				ret->co_server = strdup(buf);
+			}
+		}
+
+		fclose(f);
+		f = NULL;
+	}
+
+	if (stat(SA_CACERT_FILE, &sb) == 0) {
+		free(ret->co_tls_cafile);
+		ret->co_tls_cafile = strdup(SA_CACERT_FILE);
 	}
 
 	if ((s = getenv("TS_SERVER")) != NULL) {
@@ -303,9 +320,8 @@ struct stat	 sb;
 	}
 
 	return ret;
+
 error:
-	if (f)
-		fclose(f);
 	k8s_config_free(ret);
 	return NULL;
 }
