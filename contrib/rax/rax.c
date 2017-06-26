@@ -131,7 +131,7 @@ static inline void raxStackFree(raxStack *ts) {
 }
 
 /* ----------------------------------------------------------------------------
- * Radis tree implementation
+ * Radix tree implementation
  * --------------------------------------------------------------------------*/
 
 /* Allocate a new non compressed node with the specified number of children.
@@ -1179,7 +1179,6 @@ int raxIteratorNextStep(raxIterator *it, int noup) {
         return 0;
     } else if (it->flags & RAX_ITER_JUST_SEEKED) {
         it->flags &= ~RAX_ITER_JUST_SEEKED;
-        it->data = raxGetData(it->node);
         return 1;
     }
 
@@ -1432,6 +1431,7 @@ int raxSeek(raxIterator *it, const char *op, unsigned char *ele, size_t len) {
         /* We found our node, since the key matches and we have an
          * "equal" condition. */
         if (!raxIteratorAddChars(it,ele,len)) return 0; /* OOM. */
+        it->data = raxGetData(it->node);
     } else if (lt || gt) {
         /* Exact key not found or eq flag not set. We have to set as current
          * key the one represented by the node we stopped at, and perform
