@@ -21,14 +21,15 @@ COPY	. /usr/src/k8s-ts-ingress
 RUN	set -ex									\
 	&& apt-get update							\
 	&& apt-get -y install libssl-dev libjson-c2 libjson-c-dev libc6-dev	\
-		make gcc g++ pkgconf libcurl3 libcurl4-openssl-dev		\
+		make gcc g++ pkgconf libcurl3 libcurl4-openssl-dev autoconf	\
 	&& cd /usr/src/k8s-ts-ingress						\
+	&& autoreconf -if							\
 	&& ./configure --with-tsxs=/usr/local/bin/tsxs				\
 	&& make									\
 	&& make test								\
 	&& make install								\
 	&& apt-get -y remove libjson-c-dev libc6-dev gcc make pkgconf		\
-		libcurl4-openssl-dev						\
+		libcurl4-openssl-dev autoconf					\
 	&& apt-get -y autoremove						\
 	&& cd /									\
 	&& rm -rf /var/cache/apt /var/lib/apt/lists/* /usr/src/k8s-ts-ingress
