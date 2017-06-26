@@ -114,6 +114,8 @@ list or not, please
     * Bug fix: Path handling code could crash with non-default paths.
     * Bug fix: If no configuration file was specified, environment-based
         configuration would not be loaded either.
+    * Bug fix: Compilation would fail if the C compiler did not enable
+        C99 by default.
 
 * 1.0.0-alpha7:
     * Improvement: The Traffic Server version in the Docker image has been
