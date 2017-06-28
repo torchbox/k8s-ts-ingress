@@ -169,6 +169,13 @@
     </li>
 
         
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../debugging/">Debugging</a>
+        
+    </li>
+
+        
     </ul>
 <li>
           
@@ -221,7 +228,7 @@
 <li><code>example-deployment.yaml</code> uses a Deployment, with a nodePort Service used to
   expose TS.</li>
 </ul>
-<p>These both use the Docker image <code>docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha7</code>.</p>
+<p>These both use the Docker image <code>docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha8</code>.</p>
 <p>You will probably want to read and edit one of these files before using it.</p>
 <p>Unfortunately, there are many different ways to expose an Ingress controller on
 Kubernetes, and we can't document every possible variation, so you will need to
@@ -229,7 +236,8 @@ decide what method is best for your cluster.</p>
 <h2 id="runtime-configuration">Runtime configuration</h2>
 <p>Most Traffic Server configuration (<code>records.config</code> entries) can be changed
 using environment variables; see the
-<a href="https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides">Traffic Server Documentation</a>.  For example, to make Traffic Server listen on port 7080 for HTTP requests,
+<a href="https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides">Traffic Server Documentation</a>.
+For example, to make Traffic Server listen on port 7080 for HTTP requests,
 set <code>PROXY_CONFIG_HTTP_SERVER_PORTS=7080</code>.</p>
 <p>The TS Docker image provides one additional environment variable:</p>
 <ul>

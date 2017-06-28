@@ -147,8 +147,6 @@
                 
                     <li><a class="toctree-l4" href="#cors-configuration">CORS configuration</a></li>
                 
-                    <li><a class="toctree-l4" href="#advanced-configuration">Advanced configuration</a></li>
-                
             
             </ul>
         
@@ -165,6 +163,13 @@
             
     <li class="toctree-l1 ">
         <a class="" href="../serverpush/">Server Push</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../debugging/">Debugging</a>
         
     </li>
 
@@ -295,33 +300,6 @@ the value is <code>application/x-www-form-urlencoded</code>, <code>multipath/for
     ingress.kubernetes.io/cors-credentials: &quot;true&quot;
     ingress.kubernetes.io/cors-headers: &quot;X-CustomHeader&quot;
 </code></pre>
-
-<h2 id="advanced-configuration">Advanced configuration</h2>
-<p>If you want to allow cross-origin requests from a specific set of domains, or
-you want to control the request methods permitted or whether credentials should
-be sent, do not use <code>enable-cors</code>; instead, set the
-<code>ingress.kubernetes.io/access-control-allow-origin</code> annotation:</p>
-<pre><code class="yaml">ingress.kubernetes.io/access-control-allow-origin: &quot;*&quot;
-</code></pre>
-
-<p>or:</p>
-<pre><code class="yaml">ingress.kubernetes.io/access-control-allow-origin: &quot;https://mydomain.com https://myothersite.com&quot;
-</code></pre>
-
-<p>The value should be either <code>"*"</code> (meaning all origins) or a whitespace-delimited
-list of origins.</p>
-<p>You can use the following set of annotations to configure other CORS headers
-in the response:</p>
-<ul>
-<li><code>ingress.kubernetes.io/access-control-allow-credentials</code></li>
-<li><code>ingress.kubernetes.io/access-control-allow-methods</code></li>
-<li>`ingress.kubernetes.io/access-control-allow-headers</li>
-<li><code>ingress.kubernetes.io/access-control-max-age</code></li>
-</ul>
-<p>There is no default for these values, so you will likely want to set all of
-them.</p>
-<p>Do not set <code>ingress.kubernetes.io/enable-cors</code> at the same time as any of the
-other CORS-related annotations; behaviour in that case is undefined.</p>
               
             </div>
           </div>

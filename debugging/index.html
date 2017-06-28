@@ -8,26 +8,30 @@
   
   
   
-  <title>TS Ingress Controller</title>
+  <title>Debugging - TS Ingress Controller</title>
   
 
-  <link rel="shortcut icon" href="./img/favicon.ico">
+  <link rel="shortcut icon" href="../img/favicon.ico">
 
   
   <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
 
-  <link rel="stylesheet" href="./css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="./css/theme_extra.css" type="text/css" />
-  <link rel="stylesheet" href="./css/highlight.css">
+  <link rel="stylesheet" href="../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" type="text/css" />
+  <link rel="stylesheet" href="../css/highlight.css">
 
   
-  <script src="./js/jquery-2.1.1.min.js"></script>
-  <script src="./js/modernizr-2.8.3.min.js"></script>
-  <script type="text/javascript" src="./js/highlight.pack.js"></script>
-  <script src="./js/theme.js"></script>
-  <script>var base_url = '.';</script>
-  <script data-main="./mkdocs/js/search.js" src="./mkdocs/js/require.js"></script>
-
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Debugging";
+    var mkdocs_page_input_path = "debugging.md";
+    var mkdocs_page_url = "/debugging/";
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js"></script>
+  <script src="../js/modernizr-2.8.3.min.js"></script>
+  <script type="text/javascript" src="../js/highlight.pack.js"></script>
+  <script src="../js/theme.js"></script> 
 
   
 </head>
@@ -39,9 +43,9 @@
     
     <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
       <div class="wy-side-nav-search">
-        <a href="." class="icon icon-home"> TS Ingress Controller</a>
+        <a href=".." class="icon icon-home"> TS Ingress Controller</a>
         <div role="search">
-  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
   </form>
 </div>
@@ -52,7 +56,7 @@
           
             <li>
     <li class="toctree-l1 ">
-        <a class="" href=".">Home</a>
+        <a class="" href="..">Home</a>
         
     </li>
 <li>
@@ -64,28 +68,28 @@
         
             
     <li class="toctree-l1 ">
-        <a class="" href="source/">Installing from source</a>
+        <a class="" href="../source/">Installing from source</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="docker/">Using the Docker Image</a>
+        <a class="" href="../docker/">Using the Docker Image</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="classes/">Using multiple Ingress controllers</a>
+        <a class="" href="../classes/">Using multiple Ingress controllers</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="config/">Configuration</a>
+        <a class="" href="../config/">Configuration</a>
         
     </li>
 
@@ -100,63 +104,70 @@
         
             
     <li class="toctree-l1 ">
-        <a class="" href="annotations/">Annotations</a>
+        <a class="" href="../annotations/">Annotations</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="caching/">Caching</a>
+        <a class="" href="../caching/">Caching</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="auth/">Authentication</a>
+        <a class="" href="../auth/">Authentication</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="external/">External proxying</a>
+        <a class="" href="../external/">External proxying</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="tls/">TLS</a>
+        <a class="" href="../tls/">TLS</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="cors/">CORS</a>
+        <a class="" href="../cors/">CORS</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="compression/">Compression</a>
+        <a class="" href="../compression/">Compression</a>
         
     </li>
 
         
             
     <li class="toctree-l1 ">
-        <a class="" href="serverpush/">Server Push</a>
+        <a class="" href="../serverpush/">Server Push</a>
         
     </li>
 
         
             
-    <li class="toctree-l1 ">
-        <a class="" href="debugging/">Debugging</a>
+    <li class="toctree-l1 current">
+        <a class="current" href="./">Debugging</a>
+        
+            <ul>
+            
+                <li class="toctree-l3"><a href="#debugging">Debugging</a></li>
+                
+            
+            </ul>
         
     </li>
 
@@ -174,7 +185,7 @@
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
         <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href=".">TS Ingress Controller</a>
+        <a href="..">TS Ingress Controller</a>
       </nav>
 
       
@@ -182,9 +193,15 @@
         <div class="rst-content">
           <div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
-    <li><a href=".">Docs</a> &raquo;</li>
+    <li><a href="..">Docs</a> &raquo;</li>
     
+      
+        
+          <li>Usage &raquo;</li>
+        
+      
     
+    <li>Debugging</li>
     <li class="wy-breadcrumbs-aside">
       
         
@@ -198,22 +215,30 @@
           <div role="main">
             <div class="section">
               
+                <h1 id="debugging">Debugging</h1>
+<p>To enable debug logging on an Ingress, set the <code>ingress.torchbox.com/debug-log</code>
+annotation:</p>
+<pre><code class="yaml">metadata:
+  annotations:
+    ingress.torchbox.com/debug-log: &quot;true&quot;
+</code></pre>
 
-  <h1 id="search">Search Results</h1>
-
-  <form id="content_search" action="search.html">
-    <span role="status" aria-live="polite" class="ui-helper-hidden-accessible"></span>
-    <input name="q" id="mkdocs-search-query" type="text" class="search_input search-query ui-autocomplete-input" placeholder="Search the Docs" autocomplete="off" autofocus>
-  </form>
-
-  <div id="mkdocs-search-results">
-    Sorry, page not found.
-  </div>
-
-
+<p>This will log the full set of requests and responses for every transaction on
+this Ingress to the Traffic Server <code>error.log</code>.  This should not be enabled
+during normal operation, since it will generate a very large amount of log data,
+but it can be useful to diagnose HTTP-related issues or to investigate bugs in
+Traffic Server or the Ingress controller.</p>
+              
             </div>
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="../serverpush/" class="btn btn-neutral" title="Server Push"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>
@@ -240,6 +265,8 @@
       
           <a href="https://github.com/torchbox/k8s-ts-ingress" class="icon icon-github" style="float: left; color: #fcfcfc"> GitHub</a>
       
+      
+        <span><a href="../serverpush/" style="color: #fcfcfc;">&laquo; Previous</a></span>
       
       
     </span>

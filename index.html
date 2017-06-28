@@ -68,6 +68,8 @@
                 
                     <li><a class="toctree-l4" href="#planned-features">Planned features</a></li>
                 
+                    <li><a class="toctree-l4" href="#known-bugs">Known bugs</a></li>
+                
                     <li><a class="toctree-l4" href="#release-history">Release history</a></li>
                 
                     <li><a class="toctree-l4" href="#license-and-credits">License and credits</a></li>
@@ -175,6 +177,13 @@
     </li>
 
         
+            
+    <li class="toctree-l1 ">
+        <a class="" href="debugging/">Debugging</a>
+        
+    </li>
+
+        
     </ul>
 <li>
           
@@ -249,7 +258,7 @@ to manage a virtual IP address on your cluster.</p>
 <ul>
 <li>Full support for Ingress resources, including many annotations used by other
   controller implementations;</li>
-<li>HTTP/2, including server push;</li>
+<li>HTTP/2, including server push (but see "known bugs", below);</li>
 <li>WebSockets;</li>
 <li>TLS termination, configured in the Ingress resource using Kubernetes Secrets;</li>
 <li>Emulation of the nginx Ingress controller (for services that require it,
@@ -293,15 +302,29 @@ list or not, please
 <li>Incoming XFF</li>
 <li>Health check</li>
 </ul>
+<h2 id="known-bugs">Known bugs</h2>
+<ul>
+<li>A Traffic Server bug
+  (<a href="https://github.com/apache/trafficserver/issues/2076">GH #2076</a>) causes
+  incorrect processing of HTTP/2 PATCH requests which use chunked transfer 
+  encoding.  Requests of this type are very unusual, but <code>docker push</code> has been
+  observed to use them.  As a result, pushing to a private registry hosted
+  behind the TS Ingress controller will fail with 503 Internal Server Error.
+  Workaround: set the annotation <code>ingress.kubernetes.io/http2-enable: "false"</code>
+  to disable HTTP/2 on the affected Ingress, or set
+  <code>$PROXY_CONFIG_HTTP2_ENABLED</code> to <code>"0"</code> to disable HTTP/2 globally.</li>
+</ul>
 <h2 id="release-history">Release history</h2>
 <ul>
 <li>
-<p>1.0.0-alpha8 (unreleased):</p>
+<p>1.0.0-alpha8:</p>
 <ul>
 <li>Incompatible change: The CORS configuration was changed to be both more
     clear and more flexible.</li>
 <li>Feature: HTTP/2 Server Push was implemented.</li>
 <li>Feature: the <code>cache-whitelist-cookies</code> annotation was implemented.</li>
+<li>Feature: the <code>debug-log</code> annotation was implemented.</li>
+<li>Feature: the <code>http2-enable</code> annotation was implemented.</li>
 <li>Improvement: Two unnecessary plugins were removed from the Docker image
     configuration (header_rewrite and xdebug).</li>
 <li>Improvement: End-to-end test coverage was improved; as a result, several
@@ -476,5 +499,5 @@ of California, based on code written by Guido van Rossum.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-06-26 08:54:29
+Build Date UTC : 2017-06-28 04:59:38
 -->
