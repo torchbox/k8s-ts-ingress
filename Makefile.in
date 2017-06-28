@@ -24,7 +24,7 @@ CPPFLAGS=	@LIBCURL_CPPFLAGS@	\
 		-I${ROOT}/api		\
 		-I${ROOT}/auth		\
 		-I${ROOT}/crypt		\
-		-I${ROOT}/remap_db	\
+		-I${ROOT}/remap		\
 		-I${ROOT}/tsapi		\
 		-I${ROOT}/util		\
 		-I${ROOT}/contrib/rax	\
@@ -41,7 +41,7 @@ VPATH=		${ROOT}/crypt		\
 		${ROOT}/util		\
 		${ROOT}/api		\
 		${ROOT}/auth		\
-		${ROOT}/remap_db	\
+		${ROOT}/remap		\
 		${ROOT}/tsapi		\
 		${ROOT}/tests		\
 		${ROOT}/contrib/rax	\
@@ -72,6 +72,8 @@ SRCS=		hash.c		\
 		remap.c		\
 		remap_db.c	\
 		remap_build.c	\
+		remap_path.c	\
+		remap_host.c	\
 		tls.c		\
 		compress.c	\
 		plugin.c	\
