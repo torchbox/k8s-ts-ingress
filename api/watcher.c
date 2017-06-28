@@ -624,7 +624,7 @@ hash_t			 tmphash;
 		TSDebug("watcher", "fetcher_get_all: fetch for "
 			"%s finished: status=%d", fe->url, msg->data.result);
 
-		if (msg->data.result != CURLM_OK) {
+		if (msg->data.result != CURLE_OK) {
 			TSDebug("watcher", "fetcher_get_all: failed: %s",
 				fe->errbuf);
 			cluster_free(newcluster);
