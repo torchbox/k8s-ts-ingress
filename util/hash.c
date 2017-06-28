@@ -386,7 +386,6 @@ hash_del(hash_t hs, const char *key)
 void
 hash_deln(hash_t hs, const char *key, size_t keylen)
 {
-void			*ret;
 uint32_t		 bn;
 struct hashbucket	*hb, *prev = NULL;
 
@@ -408,8 +407,6 @@ struct hashbucket	*hb, *prev = NULL;
 			prev->hb_next = hb->hb_next;
 		else
 			hs->hs_buckets[bn] = hb->hb_next;
-
-		ret = hb->hb_value;
 
 		free(hb->hb_key);
 		free(hb);
