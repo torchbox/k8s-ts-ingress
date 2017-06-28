@@ -20,8 +20,9 @@ COPY	. /usr/src/k8s-ts-ingress
 
 RUN	set -ex									\
 	&& apt-get update							\
-	&& apt-get -y install libssl-dev libjson-c2 libjson-c-dev libc6-dev	\
+	&& apt-get -y install libssl-dev libjson-c3 libjson-c-dev libc6-dev	\
 		make gcc g++ pkgconf libcurl3 libcurl4-openssl-dev autoconf	\
+		zlib1g-dev							\
 	&& cd /usr/src/k8s-ts-ingress						\
 	&& autoreconf -if							\
 	&& ./configure --with-tsxs=/usr/local/bin/tsxs				\
