@@ -139,6 +139,7 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_COMPRESS_ENABLE		A_INGRESS "compress-enable"
 #define	IN_COMPRESS_TYPES		A_INGRESS "compress-types"
 #define	IN_SERVER_PUSH			A_INGRESS "server-push"
+#define	IN_HTTP2_ENABLE			A_INGRESS "http2-enable"
 
 /* Ingress annotations - Torchbox */
 #define	IN_DEBUG_LOG			A_TORCHBOX "debug-log"

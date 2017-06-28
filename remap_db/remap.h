@@ -130,7 +130,8 @@ typedef struct {
 	remap_path_t	**rh_paths;
 	size_t		 rh_npaths;
 	SSL_CTX		*rh_ctx;
-	int		 rh_hsts_subdomains:1;
+	unsigned	 rh_hsts_subdomains:1;
+	unsigned	 rh_http2:1;
 	int		 rh_hsts_max_age;
 } remap_host_t;
 

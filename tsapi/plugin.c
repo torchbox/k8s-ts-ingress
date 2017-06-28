@@ -16,6 +16,7 @@
 #include	<errno.h>
 #include	<string.h>
 #include	<unistd.h>
+#include	<assert.h>
 
 #include	<json.h>
 #include	<curl/curl.h>
@@ -34,6 +35,32 @@ char myhostname[HOST_NAME_MAX + 1];
 static void cluster_cb(cluster_t *cluster, void *);
 
 struct state *state;
+
+int
+tsi_setup_acceptors(TSCont contn, TSEvent event, void *data)
+{
+int	nps;
+
+	assert(event == TS_EVENT_LIFECYCLE_PORTS_READY);
+
+	/*
+	 * To implement selective disabling of HTTP/2 based on hostname, we take
+	 * a copy of each acceptor's ProtocolSet, disable HTTP/2 in the copy,
+	 * and stash it in state.  To disable HTTP/2 later, we can set our saved
+	 * ProtocolSet on the VConn.
+	 */
+
+	nps = TSAcceptorCount();
+	state->protosets = calloc(nps, sizeof(TSNextProtocolSet));
+	for (int i = 0; i < nps; ++i) {
+	TSAcceptor	acpt = TSAcceptorGetbyID(i);
+		state->protosets[i] = TSGetcloneProtoSet(acpt);
+		TSUnregisterProtocol(state->protosets[i],
+				     TS_ALPN_PROTOCOL_HTTP_2_0);
+	}
+
+	return TS_SUCCESS;
+}
 
 /*
  * Initialise plugin, load configuration and start our watchers.
@@ -108,6 +135,13 @@ TSPluginRegistrationInfo	 info;
 		state->remap_cont = TSContCreate(handle_remap, NULL);
 		TSHttpHookAdd(TS_HTTP_READ_REQUEST_HDR_HOOK, state->remap_cont);
 	}
+
+	/*
+	 * Add a lifecycle hook to set up our acceptor protocol handling
+	 * once network initialisation is done.
+	 */
+	state->ports_cont = TSContCreate(tsi_setup_acceptors, NULL);
+	TSLifecycleHookAdd(TS_LIFECYCLE_PORTS_READY_HOOK, state->ports_cont);
 
 	/*
 	 * Register ourselves.

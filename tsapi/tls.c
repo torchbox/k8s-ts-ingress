@@ -78,6 +78,17 @@ const remap_host_t	*rh;
 
 	SSL_set_SSL_CTX(ssl, rh->rh_ctx);
 
+	/*
+	 * Is HTTP/2 disabled on this Ingress?
+	 */
+	if (!rh->rh_http2) {
+	TSAcceptor	acpt = TSAcceptorGet(ssl_vc);
+	int		acptid = TSAcceptorIDGet(acpt);
+
+		/* If yes, set the protocolset we saved earlier */
+		TSRegisterProtocolSet(ssl_vc, state->protosets[acptid]);
+	}
+
 cleanup:
 	TSVConnReenable(ssl_vc);
 	pthread_rwlock_unlock(&state->lock);

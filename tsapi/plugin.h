@@ -51,6 +51,9 @@ struct state {
 
 	TSCont			 tls_cont;
 	TSCont			 remap_cont;
+	TSCont			 ports_cont;
+
+	TSNextProtocolSet	*protosets;
 
 	/*
 	 * TS config slot that our configuration is stored in.  This can be
@@ -60,6 +63,7 @@ struct state {
 	int		 cfg_slot;
 };
 
+int	tsi_setup_acceptors(TSCont, TSEvent, void *);
 int	handle_remap(TSCont, TSEvent, void *);
 int	handle_tls(TSCont, TSEvent, void *);
 void	rebuild_maps(void);

@@ -35,3 +35,8 @@ supported by most Ingress controllers; those beginning with
 * `ingress.kubernetes.io/read-response-timeout": set the time in seconds that
   TS will wait for for the response from the origin.  If this timeout is
   exceeded, an HTTP 504 error will be returned to the client.
+
+* `ingress.kubernetes.io/http2-enable`: if `"false"`, HTTP/2 will be disabled on
+  this Ingress even if it's enabled globally.  This can only be set on the
+  Ingress that contains the default backend for a particular hostname (i.e.,
+  where no `path` attribute is set).

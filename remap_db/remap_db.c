@@ -32,6 +32,14 @@
 
 static void remap_path_add_users(remap_path_t *, secret_t *);
 
+static int
+truefalse(const char *str)
+{
+	if (strcmp(str, "true") == 0)
+		return 1;
+	return 0;
+}
+
 /*
  * remap_host stores a single hostname for remapping.
  */
@@ -46,6 +54,9 @@ remap_host_t	*ret;
 
 	/* Add the default path */
 	remap_host_new_path(ret, NULL);
+
+	ret->rh_http2 = 1;
+
 	return ret;
 }
 
@@ -143,6 +154,11 @@ size_t		 keylen;
 
 		if (strcmp(key, IN_HSTS_MAX_AGE) == 0)
 			rh->rh_hsts_max_age = atoi(value);
+
+		/* http2-enable: enable or disable http/2 */
+		else if (strcmp(key, IN_HTTP2_ENABLE) == 0)
+			rh->rh_http2 = truefalse(value);
+
 		else if (strcmp(key, IN_HSTS_INCLUDE_SUBDOMAINS) == 0 &&
 			 strcmp(value, "true") == 0)
 			rh->rh_hsts_subdomains = 1;
@@ -323,14 +339,6 @@ char			*mstr, *save, *saddr;
 	     
 	free(mstr);
 	return list;
-}
-
-static int
-truefalse(const char *str)
-{
-	if (strcmp(str, "true") == 0)
-		return 1;
-	return 0;
 }
 
 /*
