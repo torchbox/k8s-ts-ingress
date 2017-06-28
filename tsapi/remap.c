@@ -361,6 +361,7 @@ request_ctx_t	*rctx = TSContDataGet(contp);
 		TSMimeHdrFieldValueStringInsert(resp, hdrs, hdr, 0, via, -1);
 		TSHandleMLocRelease(resp, hdrs, hdr);
 	}
+
 #if 1
 	if ((hdr = TSMimeHdrFieldFind(resp, hdrs, "Server", 6)) == TS_NULL_MLOC) {
 		TSMimeHdrFieldCreateNamed(resp, hdrs, "Server", 6, &hdr);
@@ -416,9 +417,9 @@ request_ctx_t	*rctx = TSContDataGet(contp);
 }
 
 
-	/*
-	 * Do HTTP/2 server push.
-	 */
+/*
+ * Do HTTP/2 server push.
+ */
 int
 server_push(TSCont contp, TSEvent event, void *edata)
 {
@@ -431,8 +432,7 @@ TSMLoc		hdr, field;
 	/*
 	 * We can be called from both TS_EVENT_HTTP_CACHE_LOOKUP_COMPLETE and
 	 * TS_EVENT_HTTP_READ_RESPONSE_HDR.  Pick the correct response to
-	 * process (server response or cached response) to process based on the
-	 * event type.
+	 * process (server response or cached response) based on the event type.
 	 *
 	 * In the case of a cache lookup, only process cache hits; misses
 	 * will go to origin and we'll be called again later for the server
@@ -667,6 +667,8 @@ request_ctx_t	*req = TSContDataGet(contn);
 
 	switch (event) {
 	case TS_EVENT_HTTP_CACHE_LOOKUP_COMPLETE:
+		if (req->rq_debug_log)
+			debug_log_cache_lookup_complete(txn);
 		if (req->rq_server_push)
 			server_push(contn, event, edata);
 		if (req->rq_comp_state)
@@ -676,9 +678,13 @@ request_ctx_t	*req = TSContDataGet(contn);
 	case TS_EVENT_HTTP_SEND_REQUEST_HDR:
 		if (req->rq_compress)
 			comp_remove_aenc(contn, event, edata);
+		if (req->rq_debug_log)
+			debug_log_send_request_hdr(txn);
 		break;
 
 	case TS_EVENT_HTTP_READ_RESPONSE_HDR:
+		if (req->rq_debug_log)
+			debug_log_read_response_hdr(txn);
 		if (req->rq_can_cache)
 			check_response_cache(contn, event, edata);
 		if (req->rq_server_push)
@@ -695,6 +701,8 @@ request_ctx_t	*req = TSContDataGet(contn);
 			comp_set_content_encoding(contn, event, edata);
 		if (req->rq_cache_enabled)
 			add_cache_status(contn, event, edata);
+		if (req->rq_debug_log)
+			debug_log_send_response_hdr(txn);
 		break;
 
 	case TS_EVENT_HTTP_TXN_CLOSE:
@@ -779,6 +787,11 @@ request_ctx_t		*rctx;
 	ret = remap_run(state->db, &req, &res);
 	rctx->rq_response_headers = res.rz_headers;
 	res.rz_headers = NULL;
+
+	if (res.rz_path->rp_debug_log) {
+		rctx->rq_debug_log = 1;
+		debug_log_read_request_hdr(txnp);
+	}
 
 	switch (ret) {
 	case RR_SYNTHETIC: {

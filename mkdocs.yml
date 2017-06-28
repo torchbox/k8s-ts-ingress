@@ -22,3 +22,4 @@ pages:
   - CORS: cors.md
   - Compression: compression.md
   - Server Push: serverpush.md
+  - Debugging: debugging.md

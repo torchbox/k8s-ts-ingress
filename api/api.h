@@ -141,7 +141,7 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_SERVER_PUSH			A_INGRESS "server-push"
 
 /* Ingress annotations - Torchbox */
-/* currently none, as all our custom annotations have been standardised */
+#define	IN_DEBUG_LOG			A_TORCHBOX "debug-log"
 
 typedef struct {
 	char	*it_secret_name;

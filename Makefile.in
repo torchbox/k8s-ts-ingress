@@ -75,6 +75,7 @@ SRCS=		hash.c		\
 		tls.c		\
 		compress.c	\
 		plugin.c	\
+		debug.c		\
 		base64.c	\
 		auth.c		\
 		${CRYPT_SRCS}	\

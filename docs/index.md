@@ -96,6 +96,7 @@ list or not, please
         clear and more flexible.
     * Feature: HTTP/2 Server Push was implemented.
     * Feature: the `cache-whitelist-cookies` annotation was implemented.
+    * Feature: the `debug-log` annotation was implemented.
     * Improvement: Two unnecessary plugins were removed from the Docker image
         configuration (header_rewrite and xdebug).
     * Improvement: End-to-end test coverage was improved; as a result, several

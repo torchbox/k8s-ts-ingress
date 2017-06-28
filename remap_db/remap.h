@@ -75,7 +75,7 @@ typedef struct {
 	hash_t		  rp_users;
 
 	/* Caching */
-	int	  rp_cache:1;			/* Enable caching	     */
+	unsigned  rp_cache:1;			/* Enable caching	     */
 	int	  rp_cache_gen;			/* Set cache generation	     */
 	hash_t	  rp_ignore_params;		/* Params to ignore in cache */
 	hash_t	  rp_whitelist_params;		/* Cache param whitelist     */
@@ -83,28 +83,29 @@ typedef struct {
 	hash_t	  rp_whitelist_cookies;		/* Cookie name whitelist     */
 
 	/* TLS */
-	int	  rp_follow_redirects:1;	/* Follow 301/302 redirect   */
-	int	  rp_secure_backends:1;		/* Use TLS to origin	     */
-	int	  rp_no_ssl_redirect:1;		/* Never TLS redirect	     */
-	int	  rp_force_ssl_redirect:1;	/* Always TLS redirect	     */
+	unsigned  rp_follow_redirects:1;	/* Follow 301/302 redirect   */
+	unsigned  rp_secure_backends:1;		/* Use TLS to origin	     */
+	unsigned  rp_no_ssl_redirect:1;		/* Never TLS redirect	     */
+	unsigned  rp_force_ssl_redirect:1;	/* Always TLS redirect	     */
 
 	/* Misc */
-	int	  rp_preserve_host:1;		/* Use origin name as Host   */
+	unsigned  rp_preserve_host:1;		/* Use origin name as Host   */
 	char	 *rp_app_root;			/* Redirect /		     */
 	char	 *rp_rewrite_target;		/* Rewrite path		     */
 	int	  rp_read_timeout;		/* Origin read timeout	     */
-	int	  rp_compress:1;		/* Compress response	     */
-	int	  rp_server_push:1;		/* Enable HTTP/1 server push */
+	unsigned  rp_compress:1;		/* Compress response	     */
+	unsigned  rp_server_push:1;		/* Enable HTTP/1 server push */
+	unsigned  rp_debug_log:1;		/* Log request/response      */
 	hash_t	  rp_compress_types;		/* Content types to compress */
 
 	/* Authn/authz */
-	uint	  rp_auth_type:2;		/* Authentication type	     */
-	uint	  rp_auth_satisfy:1;		/* Auth satisfy (all/any)    */
+	unsigned  rp_auth_type:2;		/* Authentication type	     */
+	unsigned  rp_auth_satisfy:1;		/* Auth satisfy (all/any)    */
 	char	 *rp_auth_realm;		/* Auth realm		     */
 
 	/* CORS */
-	int	  rp_enable_cors:1;		/* Do CORS processing	     */
-	int	  rp_cors_creds:1;		/* Allow credentials	     */
+	unsigned  rp_enable_cors:1;		/* Do CORS processing	     */
+	unsigned  rp_cors_creds:1;		/* Allow credentials	     */
 	hash_t	  rp_cors_origins;		/* Permitted CORS origins    */
 	char	 *rp_cors_methods;		/* CORS methods		     */
 	char	 *rp_cors_headers;		/* CORS headersil	     */

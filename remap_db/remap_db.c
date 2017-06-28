@@ -456,6 +456,10 @@ size_t		 keylen;
 		else if (strcmp(key, IN_SECURE_BACKENDS) == 0)
 			rp->rp_secure_backends = truefalse(value);
 
+		/* debug-log: log request/response */
+		else if (strcmp(key, IN_DEBUG_LOG) == 0)
+			rp->rp_debug_log = truefalse(value);
+
 		/* ssl-redirect: if false, disable http->https redirect */
 		else if (strcmp(key, IN_SSL_REDIRECT) == 0) {
 			rp->rp_no_ssl_redirect = truefalse(value) ? 0 : 1;

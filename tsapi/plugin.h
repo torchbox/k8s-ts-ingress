@@ -127,16 +127,23 @@ void	comp_state_free(comp_state_t *cs);
  * Request state; this persists though the entire connection.
  */
 typedef struct request_ctx {
-	unsigned int	 rq_compress:1;
+	unsigned	 rq_compress:1;
 	comp_state_t	*rq_comp_state;
 	TSCont		 rq_compress_transform;
 
-	unsigned int	 rq_server_push:1;
-	unsigned int	 rq_cache_enabled:1;
-	unsigned int	 rq_can_cache:1;
+	unsigned	 rq_server_push:1;
+	unsigned	 rq_cache_enabled:1;
+	unsigned	 rq_can_cache:1;
+	unsigned	 rq_debug_log:1;
 
 	hash_t		 rq_response_headers;
 } request_ctx_t;
+
+void	debug_log_read_request_hdr(TSHttpTxn txn);
+void	debug_log_cache_lookup_complete(TSHttpTxn txn);
+void	debug_log_send_request_hdr(TSHttpTxn txn);
+void	debug_log_read_response_hdr(TSHttpTxn txn);
+void	debug_log_send_response_hdr(TSHttpTxn txn);
 
 void request_ctx_free(request_ctx_t *);
 #ifdef __cplusplus
