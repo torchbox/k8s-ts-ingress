@@ -788,7 +788,7 @@ request_ctx_t		*rctx;
 	rctx->rq_response_headers = res.rz_headers;
 	res.rz_headers = NULL;
 
-	if (res.rz_path->rp_debug_log) {
+	if (res.rz_path && res.rz_path->rp_debug_log) {
 		rctx->rq_debug_log = 1;
 		debug_log_read_request_hdr(txnp);
 	}

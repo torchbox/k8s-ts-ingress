@@ -36,7 +36,6 @@
  * How often to discard the current cluster state and re-fetch everything from
  * the API server.
  */
-//#define	RESYNC_INTERVAL	300
 #define	RESYNC_INTERVAL	300
 
 struct resource {
