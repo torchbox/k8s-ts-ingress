@@ -103,7 +103,7 @@ list or not, please
 
 ## Release history
 
-* 1.0.0-alpha8 (unreleased):
+* 1.0.0-alpha8:
     * Incompatible change: The CORS configuration was changed to be both more
         clear and more flexible.
     * Feature: HTTP/2 Server Push was implemented.

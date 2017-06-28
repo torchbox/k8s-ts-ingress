@@ -8,7 +8,7 @@ We provide two examples Kubernetes deployments for the TS ingress controller:
 * `example-deployment.yaml` uses a Deployment, with a nodePort Service used to
   expose TS.
  
-These both use the Docker image `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha7`.
+These both use the Docker image `docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha8`.
 
 You will probably want to read and edit one of these files before using it.
 
@@ -20,7 +20,8 @@ decide what method is best for your cluster.
 
 Most Traffic Server configuration (`records.config` entries) can be changed
 using environment variables; see the
-[Traffic Server Documentation](https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides).  For example, to make Traffic Server listen on port 7080 for HTTP requests,
+[Traffic Server Documentation](https://docs.trafficserver.apache.org/en/latest/admin-guide/files/records.config.en.html#environment-overrides).
+For example, to make Traffic Server listen on port 7080 for HTTP requests,
 set `PROXY_CONFIG_HTTP_SERVER_PORTS=7080`.
 
 The TS Docker image provides one additional environment variable:
