@@ -44,7 +44,7 @@ The controller provides the following features:
 
 * Full support for Ingress resources, including many annotations used by other
   controller implementations;
-* HTTP/2, including server push;
+* HTTP/2, including server push (but see "known bugs", below);
 * WebSockets;
 * TLS termination, configured in the Ingress resource using Kubernetes Secrets;
 * Emulation of the nginx Ingress controller (for services that require it,
@@ -88,6 +88,18 @@ list or not, please
 * Modify response headers (`header-{add,replace}-Name`)
 * Incoming XFF
 * Health check
+
+## Known bugs
+
+* A Traffic Server bug
+  ([GH #2076](https://github.com/apache/trafficserver/issues/2076)) causes
+  incorrect processing of HTTP/2 PATCH requests which use chunked transfer 
+  encoding.  Requests of this type are very unusual, but `docker push` has been
+  observed to use them.  As a result, pushing to a private registry hosted
+  behind the TS Ingress controller will fail with 503 Internal Server Error.
+  Workaround: set the annotation `ingress.kubernetes.io/http2-enable: "false"`
+  to disable HTTP/2 on the affected Ingress, or set
+  `$PROXY_CONFIG_HTTP2_ENABLED` to `"0"` to disable HTTP/2 globally.
 
 ## Release history
 
