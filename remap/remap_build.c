@@ -15,13 +15,13 @@
 #include	"hash.h"
 #include	"remap.h"
 
-static void build_namespace(remap_db_t *, namespace_t *);
-static void build_ingress(remap_db_t *, namespace_t *, ingress_t *);
-static void build_ingress_tls(remap_db_t *, namespace_t *,
+static void build_namespace(remap_db_t *, cluster_t *, namespace_t *);
+static void build_ingress(remap_db_t *, cluster_t *, namespace_t *, ingress_t *);
+static void build_ingress_tls(remap_db_t *, cluster_t *, namespace_t *,
 			      ingress_t *, ingress_tls_t *);
-static void build_ingress_rule(remap_db_t *, namespace_t *,
+static void build_ingress_rule(remap_db_t *, cluster_t *, namespace_t *,
 			       ingress_t *, ingress_rule_t *);
-static void build_add_endpoints(remap_db_t *db, namespace_t *ns,
+static void build_add_endpoints(remap_db_t *db, cluster_t *, namespace_t *,
 				remap_path_t *rp, service_t *svc,
 				const char *port_name);
 
@@ -33,7 +33,7 @@ remap_db_t		*db;
 
 	db = remap_db_new(cfg);
 	hash_foreach(cluster->cs_namespaces, NULL, NULL, &namespace)
-		build_namespace(db, namespace);
+		build_namespace(db, cluster, namespace);
 
 	return db;
 }
@@ -42,21 +42,21 @@ remap_db_t		*db;
  * Build a single namespace.
  */
 static void
-build_namespace(remap_db_t *db, namespace_t *ns)
+build_namespace(remap_db_t *db, cluster_t *cs, namespace_t *ns)
 {
 ingress_t		*ingress;
 
 	TSDebug("kubernetes", "namespace %s:", ns->ns_name);
 
 	hash_foreach(ns->ns_ingresses, NULL, NULL, &ingress)
-		build_ingress(db, ns, ingress);
+		build_ingress(db, cs, ns, ingress);
 }
 
 /*
  * Build a single ingress.
  */
 static void
-build_ingress(remap_db_t *db, namespace_t *ns, ingress_t *ing)
+build_ingress(remap_db_t *db, cluster_t *cs, namespace_t *ns, ingress_t *ing)
 {
 char	*cls;
 
@@ -74,15 +74,15 @@ char	*cls;
 
 	/* Rebuild TLS state */
 	for (size_t i = 0; i < ing->in_ntls; i++)
-		build_ingress_tls(db, ns, ing, &ing->in_tls[i]);
+		build_ingress_tls(db, cs, ns, ing, &ing->in_tls[i]);
 
 	/* Rebuild remap state */
 	for (size_t i = 0; i < ing->in_nrules; i++)
-		build_ingress_rule(db, ns, ing, &ing->in_rules[i]);
+		build_ingress_rule(db, cs, ns, ing, &ing->in_rules[i]);
 }
 
 static void
-build_ingress_rule(remap_db_t *db, namespace_t *ns,
+build_ingress_rule(remap_db_t *db, cluster_t *cs, namespace_t *ns,
 		   ingress_t *ing, ingress_rule_t *rule)
 {
 remap_host_t	*rh;
@@ -110,15 +110,15 @@ size_t		 i;
 			 * we don't pick up invalid host-specific annotations
 			 * from subpaths.
 			 */
-			remap_host_annotate(rh, ing->in_annotations);
+			remap_host_annotate(rh, cs, ing->in_annotations);
 			rp = remap_host_get_default_path(rh);
 		}
 
 		if (rp == NULL)
 			continue;
 
-		remap_path_annotate(ns, rp, ing->in_annotations);
-		build_add_endpoints(db, ns, rp, svc, path->ip_service_port);
+		remap_path_annotate(ns, cs, rp, ing->in_annotations);
+		build_add_endpoints(db, cs, ns, rp, svc, path->ip_service_port);
 	}
 }
 
@@ -126,7 +126,7 @@ size_t		 i;
  * Rebuild the tls configuration of an ingress.
  */
 static void
-build_ingress_tls(remap_db_t *db, namespace_t *ns,
+build_ingress_tls(remap_db_t *db, cluster_t *cs, namespace_t *ns,
 		  ingress_t *ing, ingress_tls_t *itls)
 {
 secret_t		*secret;
@@ -167,6 +167,7 @@ secret_t		*secret;
 static void
 build_add_endpoints(
 	remap_db_t *db,
+	cluster_t *cs,
 	namespace_t *ns,
 	remap_path_t *rp,
 	service_t *svc,

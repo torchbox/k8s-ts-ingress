@@ -45,6 +45,7 @@ VPATH=		${ROOT}/crypt		\
 		${ROOT}/tsapi		\
 		${ROOT}/tests		\
 		${ROOT}/contrib/rax	\
+		${ROOT}/contrib/netbsd	\
 		${ROOT}/gtest/src
 
 CRYPT_SRCS=	crypt.c		\
@@ -58,6 +59,7 @@ CRYPT_OBJS=	${CRYPT_SRCS:.c=.o}
 API_SRCS=	cluster.c	\
 		ingress.c	\
 		secret.c	\
+		configmap.c	\
 		service.c	\
 		endpoints.c	\
 		namespace.c

@@ -108,7 +108,7 @@ int		 rerr;
 		remap_path_free(ret);
 		return NULL;
 	}
-	
+
 	pregex[0] = '^';
 	rerr = regcomp(&ret->rp_regex, pregex, REG_EXTENDED);
 	free(pregex);
@@ -182,7 +182,7 @@ char			*mstr, *save, *saddr;
 	     saddr = strtok_r(NULL, ",", &save)) {
 	struct remap_auth_addr	*entry;
 	char			*p = NULL;
-	
+
 		entry = calloc(1, sizeof(*entry));
 		if ((p = strchr(saddr, '/')) != NULL) {
 			*p++ = '\0';
@@ -206,7 +206,7 @@ char			*mstr, *save, *saddr;
 		entry->ra_next = list;
 		list = entry;
 	}
-	     
+
 	free(mstr);
 	return list;
 }
@@ -215,7 +215,8 @@ char			*mstr, *save, *saddr;
  * Configure a remap_path from the given Ingress annotations.
  */
 void
-remap_path_annotate(namespace_t *ns, remap_path_t *rp, hash_t annotations)
+remap_path_annotate(namespace_t *ns, cluster_t *cs,
+		    remap_path_t *rp, hash_t annotations)
 {
 const char	*key_ = NULL, *value = NULL;
 size_t		 keylen;
@@ -370,7 +371,7 @@ size_t		 keylen;
 
 		/*
 		 * CORS; either enable-cors can be specified, or a more
-		 * specific configuration. 
+		 * specific configuration.
 		*/
 		else if (strcmp(key, IN_ENABLE_CORS) == 0)
 			rp->rp_enable_cors = truefalse(value);
@@ -398,7 +399,7 @@ size_t		 keylen;
 		else if (strcmp(key, IN_CORS_CREDENTIALS) == 0)
 			rp->rp_cors_creds = truefalse(value);
 
-		/* 
+		/*
 		 * Authentication.
 		 */
 

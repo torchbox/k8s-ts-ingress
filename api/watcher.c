@@ -45,6 +45,7 @@ struct resource {
 	{ "/api/v1/services", 			NULL },
 	{ "/api/v1/endpoints",			NULL },
 	{ "/api/v1/secrets",			NULL },
+	{ "/api/v1/configmaps",			NULL },
 	{ "/apis/extensions/v1beta1/ingresses",	NULL },
 };
 #define NRESOURCES (sizeof(resources) / sizeof(*resources))
@@ -52,7 +53,6 @@ struct resource {
 struct watcher {
 	k8s_config_t	*wt_config;
 	cluster_t	*wt_cluster;
-
 };
 
 char *
@@ -186,7 +186,7 @@ static void
 fe_watch_line(struct fetcher_ctx *fe, const char *line)
 {
 json_object	*obj, *o, *metadata, *kind, *namespace, *name;
-const char	*stype, *skind, *sname;
+const char	*stype, *skind, *sname, *snamespace;
 int		 deleted = 0;
 namespace_t	*ns;
 
@@ -247,6 +247,8 @@ namespace_t	*ns;
 		return;
 	}
 
+	snamespace = json_object_get_string(namespace);
+
 	if (!json_object_object_get_ex(metadata, "name", &name) ||
 	    !json_object_is_type(name, json_type_string)) {
 		TSError("fetcher_process_item: resource has no name?");
@@ -256,11 +258,10 @@ namespace_t	*ns;
 	sname = json_object_get_string(name);
 
 	TSDebug("watcher", "fetcher_watch_line: change %s from %s",
-		skind, json_object_get_string(namespace));
+		skind, snamespace);
 
 	pthread_rwlock_wrlock(&fe->watcher->wt_cluster->cs_lock);
-	ns = cluster_get_namespace(fe->watcher->wt_cluster,
-				   json_object_get_string(namespace));
+	ns = cluster_get_namespace(fe->watcher->wt_cluster, snamespace);
 
 	/* What sort of object is this? */
 
@@ -297,6 +298,39 @@ namespace_t	*ns;
 				TSError("fetcher_process_item: could not parse Secret");
 		}
 		fe->changed = 1;
+	} else if (strcmp(skind, "ConfigMap") == 0) {
+		/*
+		 * We don't track all configmaps, because that would waste a
+		 * large amount of memory for no reason.  Discard this update
+		 * unless it's for our configuration.
+		 */
+		if (fe->watcher->wt_config->co_configmap_namespace &&
+		    fe->watcher->wt_config->co_configmap_name &&
+		    !strcmp(sname, fe->watcher->wt_config->co_configmap_name) &&
+		    !strcmp(snamespace,
+			    fe->watcher->wt_config->co_configmap_namespace))
+		{
+		configmap_t	*cm;
+			TSDebug("watcher", "event on configmap %s/%s",
+				snamespace, sname);
+
+			if (deleted) {
+				cluster_set_configmap(fe->watcher->wt_cluster,
+						      NULL);
+			} else {
+				if ((cm = configmap_make(o)) != NULL)
+					cluster_set_configmap(
+						fe->watcher->wt_cluster, cm);
+				else
+					TSError("fetch_process_item: could not "
+						"parse configmap");
+			}
+			fe->changed = 1;
+		} else {
+			TSDebug("watcher", "watcher: ignoring CM %s/%s",
+				snamespace, sname);
+		}
+
 	} else if (strcmp(skind, "Endpoints") == 0) {
 		if (deleted) {
 			namespace_del_endpoints(ns, sname);
@@ -463,6 +497,28 @@ namespace_t	*ns;
 			TSError("fetcher_process_item: could not parse Endpoints");
 		else
 			namespace_put_endpoints(ns, eps);
+	} else if (strcmp(kind, "ConfigMapList") == 0) {
+	configmap_t	*cm;
+
+		if ((cm = configmap_make(item)) == NULL)
+			TSError("fetcher_process_item: could not parse ConfigMap");
+			/*
+			 * We don't track all configmaps, because that would waste a
+			 * large amount of memory for no reason.  Discard this update
+			 * unless it's for our configuration.
+			 */
+		else if (fe->watcher->wt_config->co_configmap_namespace &&
+		    fe->watcher->wt_config->co_configmap_name &&
+		    !strcmp(cm->cm_name,
+			    fe->watcher->wt_config->co_configmap_name) &&
+		    !strcmp(cm->cm_namespace,
+			    fe->watcher->wt_config->co_configmap_namespace))
+		{
+			cluster_set_configmap(fe->watcher->wt_cluster, cm);
+		} else {
+			TSDebug("watcher", "watcher: ignoring CM %s/%s",
+				cm->cm_namespace, cm->cm_name);
+		}
 	} else {
 		TSError("fetch_process_item: unknown resource type %s?", kind);
 		return;

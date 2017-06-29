@@ -41,10 +41,6 @@ extern "C" {
 #define REMAP_AUTH_BASIC	0x1
 #define	REMAP_AUTH_DIGEST	0x2
 
-#define	REMAP_TLS_1_0		0x0100
-#define	REMAP_TLS_1_1		0x0101
-#define	REMAP_TLS_1_2		0x0102
-
 /*
  * An entry in the IP whitelist.
  */
@@ -120,7 +116,8 @@ typedef struct {
 
 remap_path_t	*remap_path_new(const char *path);
 void		 remap_path_free(remap_path_t *);
-void		 remap_path_annotate(namespace_t *ns, remap_path_t *, hash_t);
+void		 remap_path_annotate(namespace_t *, cluster_t *,
+				     remap_path_t *, hash_t);
 void		 remap_path_add_address(remap_path_t *, const char *host,
 					int port);
 const remap_target_t
@@ -147,7 +144,7 @@ remap_path_t	*remap_host_find_path(const remap_host_t *,
 				      size_t *pfxsz);
 remap_path_t	*remap_host_new_path(remap_host_t *, const char *path);
 remap_path_t	*remap_host_get_default_path(remap_host_t *);
-void		 remap_host_annotate(remap_host_t *, hash_t);
+void		 remap_host_annotate(remap_host_t *, cluster_t *, hash_t);
 
 /*
  * remap_db stores a built remap database, i.e. remap_host objects.

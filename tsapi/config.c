@@ -32,6 +32,8 @@ k8s_config_free(k8s_config_t *cfg)
 	free(cfg->co_tls_certfile);
 	free(cfg->co_tls_keyfile);
 	free(cfg->co_tls_cafile);
+	free(cfg->co_configmap_namespace);
+	free(cfg->co_configmap_name);
 	hash_free(cfg->co_classes);
 	free(cfg);
 }
@@ -171,6 +173,17 @@ int	 lineno = 0;
 			}
 		} else if (strcmp(opt, "ingress_classes") == 0) {
 			cfg_set_ingress_classes(cfg, value);
+		} else if (strcmp(opt, "configmap") == 0) {
+			char	*p;
+			if ((p = strchr(value, '/')) == NULL) {
+				TSError("%s:%d: expected \"<namespace>/<name>\"",
+					file, lineno);
+				goto error;
+			}
+
+			*p = '\0';
+			cfg->co_configmap_namespace = strdup(value);
+			cfg->co_configmap_name = strdup(p + 1);
 		} else {
 			TSError("%s:%d: unknown option \"%s\"",
 				file, lineno, opt);
@@ -298,6 +311,18 @@ FILE		*f = NULL;
 				" not \"%s\"", s);
 			goto error;
 		}
+	}
+
+	if ((s = getenv("TS_CONFIGMAP")) != NULL) {
+	char	*p;
+		if ((p = strchr(s, '/')) == NULL) {
+			TSError("$TS_CONFIGMAP: expected \"<namespace>/<name>\"");
+			goto error;
+		}
+
+		*p = '\0';
+		ret->co_configmap_namespace = strdup(s);
+		ret->co_configmap_name = strdup(p + 1);
 	}
 
 	if ((s = getenv("TS_INGRESS_CLASSES")) != NULL)

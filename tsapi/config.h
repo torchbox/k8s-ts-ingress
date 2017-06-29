@@ -34,6 +34,8 @@ typedef struct k8s_config {
 	int	 co_remap;
 	hash_t	 co_classes;
 	int	 co_xfp;
+	char	*co_configmap_namespace;
+	char	*co_configmap_name;
 } k8s_config_t;
 
 k8s_config_t	*k8s_config_new(void);

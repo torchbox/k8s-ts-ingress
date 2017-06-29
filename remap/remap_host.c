@@ -39,10 +39,6 @@ remap_host_t	*ret;
 	/* Add the default path */
 	remap_host_new_path(ret, NULL);
 
-	ret->rh_http2 = 1;
-	/* Consider changing this to 1.1 at some point */
-	ret->rh_tls_version = REMAP_TLS_1_0;
-
 	return ret;
 }
 
@@ -116,54 +112,37 @@ remap_host_get_default_path(remap_host_t *rh)
 	return rh->rh_paths[0];
 }
 
-/*
- * Configure a remap_host from the given Ingress annotations.
- */
 void
-remap_host_annotate(remap_host_t *rh, hash_t annotations)
+remap_host_annotate(remap_host_t *rh, cluster_t *cs, hash_t annotations)
 {
-const char	*key_ = NULL, *value = NULL;
-size_t		 keylen;
+const char	*s;
 
-	/*
-	 * There are two ways we could do this: use hash_get for each annotation
-	 * we support, or iterate over all annotations and compare them.  We use
-	 * the second method, because assuming we understand all (or most of)
-	 * the annotations on the Ingress, which should be the same, it saves
-	 * running a complete hash lookup for every string.
-	 *
-	 * It also makes the code a bit easier to read.
-	 */
+	/* hsts-max-age */
+	if ((s = hash_get(annotations, IN_HSTS_MAX_AGE)) != NULL)
+		rh->rh_hsts_max_age = atoi(s);
+	else
+		rh->rh_hsts_max_age = cs->cs_config->cc_hsts_max_age;
 
-	hash_foreach(annotations, &key_, &keylen, &value) {
-	char	*key = strndup(key_, keylen);
+	/* hsts-include-subdomains */
+	if ((s = hash_get(annotations, IN_HSTS_INCLUDE_SUBDOMAINS)) != NULL)
+		rh->rh_hsts_subdomains = truefalse(s);
+	else
+		rh->rh_hsts_subdomains = cs->cs_config->cc_hsts_subdomains;
 
-		TSDebug("kubernetes", "remap_host_annotate: [%s]=[%s]",
-			key, value);
+	/* http2-enable */
+	if ((s = hash_get(annotations, IN_HTTP2_ENABLE)) != NULL)
+		rh->rh_http2 = truefalse(s);
+	else
+		rh->rh_http2 = cs->cs_config->cc_http2;
 
-		if (strcmp(key, IN_HSTS_MAX_AGE) == 0)
-			rh->rh_hsts_max_age = atoi(value);
-
-		/* http2-enable: enable or disable http/2 */
-		else if (strcmp(key, IN_HTTP2_ENABLE) == 0)
-			rh->rh_http2 = truefalse(value);
-
-		else if (strcmp(key, IN_HSTS_INCLUDE_SUBDOMAINS) == 0 &&
-			 strcmp(value, "true") == 0)
-			rh->rh_hsts_subdomains = 1;
-
-		else if (strcmp(key, IN_TLS_MINIMUM_VERSION) == 0) {
-			TSDebug("kubernetes", "TLS version is %s", value);
-
-			if (strcmp(value, IN_TLS_VERSION_1_0) == 0)
-				rh->rh_tls_version = REMAP_TLS_1_0;
-			else if (strcmp(value, IN_TLS_VERSION_1_1) == 0)
-				rh->rh_tls_version = REMAP_TLS_1_1;
-			else if (strcmp(value, IN_TLS_VERSION_1_2) == 0)
-				rh->rh_tls_version = REMAP_TLS_1_2;
-		}
-
-		free(key);
-	}
+	/* tls-minimum-version */
+	if ((s = hash_get(annotations, IN_TLS_MINIMUM_VERSION)) != NULL) {
+		if (strcmp(s, IN_TLS_VERSION_1_0) == 0)
+			rh->rh_tls_version = IN_TLS_VERSION_1_0_VALUE;
+		else if (strcmp(s, IN_TLS_VERSION_1_1) == 0)
+			rh->rh_tls_version = IN_TLS_VERSION_1_1_VALUE;
+		else if (strcmp(s, IN_TLS_VERSION_1_2) == 0)
+			rh->rh_tls_version = IN_TLS_VERSION_1_2_VALUE;
+	} else
+		rh->rh_tls_version = cs->cs_config->cc_tls_minimum_version;
 }
-

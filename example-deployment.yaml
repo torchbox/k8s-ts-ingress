@@ -57,6 +57,11 @@ spec:
         image: docker.io/torchbox/k8s-ts-ingress:1.0.0-alpha8
         imagePullPolicy: IfNotPresent
 
+        # Load the configuration map.
+        env:
+          name: TS_CONFIGMAP
+          value: trafficserver/ts-config
+
         # The memory limit must be large enough for both TS itself, and its RAM
         # cache, which is set to 64MB by default.
         resources:

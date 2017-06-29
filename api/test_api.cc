@@ -229,6 +229,35 @@ TEST(API, Secret) {
 	EXPECT_EQ(0, ts_api_errors);
 }
 
+TEST(API, ConfigMap) {
+	ts_api_errors = 0;
+
+	json_object *obj = test_load_json("tests/configmap.json");
+	ASSERT_TRUE(obj != NULL);
+
+	configmap_t *cm = configmap_make(obj);
+	ASSERT_TRUE(cm != NULL);
+	json_object_put(obj);
+
+	EXPECT_STREQ("default", cm->cm_namespace);
+	EXPECT_STREQ("testconfigmap", cm->cm_name);
+
+	map<string, string> actual_data, expected_data{
+		{ "key1", "value 1" },
+		{ "key2", "other value" },
+	};
+
+	const char *key, *value;
+	size_t keylen;
+	hash_foreach(cm->cm_data, &key, &keylen, &value)
+		actual_data[string(key, keylen)] = value;
+
+	EXPECT_EQ(expected_data, actual_data);
+
+	configmap_free(cm);
+	EXPECT_EQ(0, ts_api_errors);
+}
+
 TEST(API, Endpoints) {
 	ts_api_errors = 0;
 

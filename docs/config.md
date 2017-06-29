@@ -65,3 +65,39 @@ specify the API server URL and any credentials required to authenticate to it.
 * `x_forwarded_proto: <true|false>`: whether to send an `X-Forwarded-Proto`
   header to backends, containing the client protocol (`http` or `https`).
   Default: `true`.  (`$TS_X_FORWARDED_PROTO`)
+
+## ConfigMap configuration
+
+Most configuration is not done in the configuration file (or environment), but
+rather in a Kubernetes ConfigMap.  This makes configuration more flexible and
+removes the need to restart TS to change the configuration.
+
+To use the ConfigMap, set the configuration option `configmap`
+(`$TS_CONFIGMAP`) to `<namespace>/<name>`, where `<namespace>` is the namespace
+containing the ConfigMap and `<name>` is the ConfigMap's name.   For example,
+to load a ConfigMap called `ts-config` from the `trafficserver` namespace:
+
+```
+configmap: trafficserver/ts-config
+```
+
+If you're using the example deployment, this is set to `trafficserver/ts-config`
+by default, but you can override that by changing the value of `$TS_CONFIG` in
+the pod spec.
+
+The ConfigMap contains two kinds of configuration: defaults for annotations
+that can be on an Ingress, and global configuration that cannot be overridden
+by an Ingress.
+
+### Ingress defaults
+
+See the corresponding page for details of the meaning of these annotation:
+
+* `tls-minimum-version`: [TLS](tls.md)
+* `hsts-max-age`: [TLS](tls.md)
+* `hsts-include-subdomains`: [TLS](tls.md)
+* `http2-enable`: [Annotations](annotations.md)
+
+## Global configuration
+
+None yet.

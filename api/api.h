@@ -108,9 +108,11 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_FORCE_SSL_REDIRECT		A_INGRESS "force-ssl-redirect"
 #define	IN_TLS_MINIMUM_VERSION		A_INGRESS "tls-minimum-version"
 #define	IN_TLS_VERSION_1_0		"1.0"
+#define	IN_TLS_VERSION_1_0_VALUE	0x0100
 #define	IN_TLS_VERSION_1_1		"1.1"
+#define	IN_TLS_VERSION_1_1_VALUE	0x0101
 #define	IN_TLS_VERSION_1_2		"1.2"
-#define	IN_TLS_VERSION_1_3		"1.3"
+#define	IN_TLS_VERSION_1_2_VALUE	0x0102
 #define	IN_APP_ROOT			A_INGRESS "app-root"
 #define	IN_REWRITE_TARGET		A_INGRESS "rewrite-target"
 #define	IN_AUTH_TYPE			A_INGRESS "auth-type"
@@ -190,9 +192,21 @@ typedef struct {
 	hash_t	 se_data;
 } secret_t;
 
-void		 secret_free(secret_t *sec);
 secret_t	*secret_make(json_object *obj);
 SSL_CTX		*secret_make_ssl_ctx(secret_t *);
+void		 secret_free(secret_t *sec);
+
+/*
+ * ConfigMaps.  These are basically identical to Secrets but with less base64.
+ */
+typedef struct {
+	char	*cm_name;
+	char	*cm_namespace;
+	hash_t	 cm_data;
+} configmap_t;
+
+configmap_t	*configmap_make(json_object *obj);
+void		 configmap_free(configmap_t *sec);
 
 /*
  * Namespaces
@@ -232,16 +246,31 @@ struct cluster;
 
 typedef void (*cluster_callback_t) (struct cluster *cluster, void *);
 
+/*
+ * Default configuration, stored in the cluster.
+ */
+typedef struct {
+	int		cc_tls_minimum_version;
+	int		cc_hsts_max_age;
+	unsigned	cc_hsts_subdomains:1;
+	unsigned	cc_http2:1;
+} cluster_config_t;
+
+cluster_config_t	*cluster_config_new(void);
+void			 cluster_config_free(cluster_config_t *);
+
 typedef struct cluster {
 	pthread_rwlock_t	 cs_lock;
 	hash_t			 cs_namespaces;
 	cluster_callback_t	 cs_callback;
 	void			*cs_callbackdata;
+	cluster_config_t	*cs_config;
 } cluster_t;
 
 cluster_t	*cluster_make(void);
-void		 cluster_free(cluster_t *cluster);
 namespace_t	*cluster_get_namespace(cluster_t *, const char *nsname);
+void		 cluster_set_configmap(cluster_t *, configmap_t *);
+void		 cluster_free(cluster_t *cluster);
 
 #ifdef __cplusplus
 }

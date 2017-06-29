@@ -86,17 +86,17 @@ int			 ret = 1;
 	 * return a TLS protocol error to the client.
 	 */
 	switch (rh->rh_tls_version) {
-	case REMAP_TLS_1_2:
+	case IN_TLS_VERSION_1_2_VALUE:
 		if (strcmp(version, "TLSv1.1") == 0)
 			goto cleanup;
 		/* fall through */
 
-	case REMAP_TLS_1_1:
+	case IN_TLS_VERSION_1_1_VALUE:
 		if (strcmp(version, "TLSv1") == 0)
 			goto cleanup;
 		/* fall through */
 
-	case REMAP_TLS_1_0:
+	case IN_TLS_VERSION_1_0_VALUE:
 		if (strcmp(version, "SSLv3") == 0)
 			goto cleanup;
 		break;
