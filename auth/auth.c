@@ -137,13 +137,13 @@ int	 i;
 
 	i = pfxlen / 32;
 	switch (i) {
-	case 0: mask[0] = 0;
-	case 1: mask[1] = 0;
-	case 2: mask[2] = 0;
+	case 0: mask[0] = 0; /* fall through */
+	case 1: mask[1] = 0; /* fall through */
+	case 2: mask[2] = 0; /* fall through */
 	case 3: mask[3] = 0;
 	}
 
-	if (pfxlen % 32)
+	if (i < 4 && pfxlen % 32)
 		mask[i] = htonl(~(uint32_t)0 << (32 - (pfxlen % 32)));
 
 	/* Check that each 32-bit section of the address matches the network */
