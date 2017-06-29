@@ -106,8 +106,15 @@ size_t		 i;
 
 		if (path->ip_path)
 			rp = remap_host_new_path(rh, path->ip_path);
-		else
+		else {
+			/*
+			 * Do host annotations here, on the default path, so
+			 * we don't pick up invalid host-specific annotations
+			 * from subpaths.
+			 */
+			remap_host_annotate(rh, ing->in_annotations);
 			rp = remap_host_get_default_path(rh);
+		}
 
 		if (rp == NULL)
 			continue;
@@ -141,10 +148,6 @@ secret_t		*secret;
 	remap_host_t	*rh;
 
 		rh = remap_db_get_or_create_host(db, hostname);
-		remap_host_annotate(rh, ing->in_annotations);
-
-		if (!secret)
-			continue;
 
 		if (rh->rh_ctx)
 			continue;	/* ??? */
