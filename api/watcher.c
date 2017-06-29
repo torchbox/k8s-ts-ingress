@@ -310,7 +310,6 @@ namespace_t	*ns;
 		    !strcmp(snamespace,
 			    fe->watcher->wt_config->co_configmap_namespace))
 		{
-		configmap_t	*cm;
 			TSDebug("watcher", "event on configmap %s/%s",
 				snamespace, sname);
 
@@ -318,10 +317,12 @@ namespace_t	*ns;
 				cluster_set_configmap(fe->watcher->wt_cluster,
 						      NULL);
 			} else {
-				if ((cm = configmap_make(o)) != NULL)
+			configmap_t	*cm;
+				if ((cm = configmap_make(o)) != NULL) {
 					cluster_set_configmap(
 						fe->watcher->wt_cluster, cm);
-				else
+					configmap_free(cm);
+				} else
 					TSError("fetch_process_item: could not "
 						"parse configmap");
 			}
