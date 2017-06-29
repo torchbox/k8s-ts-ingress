@@ -178,6 +178,7 @@ int	 lineno = 0;
 		}
 	}
 
+	fclose(f);
 	return 0;
 
 error:
