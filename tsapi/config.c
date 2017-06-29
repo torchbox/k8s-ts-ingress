@@ -198,9 +198,12 @@ FILE		*f = NULL;
 	if ((ret = k8s_config_new()) == NULL)
 		return NULL;
 
-	if (file)
-		if (cfg_load_file(ret, file) == -1)
+	if (file) {
+		if (cfg_load_file(ret, file) == -1) {
+			k8s_config_free(ret);
 			return NULL;
+		}
+	}
 
 	/*
 	 * Check for in-cluster service account config.
