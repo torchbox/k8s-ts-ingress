@@ -500,26 +500,25 @@ namespace_t	*ns;
 			namespace_put_endpoints(ns, eps);
 	} else if (strcmp(kind, "ConfigMapList") == 0) {
 	configmap_t	*cm;
-
-		if ((cm = configmap_make(item)) == NULL)
-			TSError("fetcher_process_item: could not parse ConfigMap");
+		if ((cm = configmap_make(item)) != NULL) {
 			/*
 			 * We don't track all configmaps, because that would waste a
 			 * large amount of memory for no reason.  Discard this update
 			 * unless it's for our configuration.
 			 */
-		else if (fe->watcher->wt_config->co_configmap_namespace &&
-		    fe->watcher->wt_config->co_configmap_name &&
-		    !strcmp(cm->cm_name,
-			    fe->watcher->wt_config->co_configmap_name) &&
-		    !strcmp(cm->cm_namespace,
-			    fe->watcher->wt_config->co_configmap_namespace))
-		{
-			cluster_set_configmap(fe->watcher->wt_cluster, cm);
-		} else {
-			TSDebug("watcher", "watcher: ignoring CM %s/%s",
-				cm->cm_namespace, cm->cm_name);
-		}
+			if (fe->watcher->wt_config->co_configmap_namespace &&
+			    fe->watcher->wt_config->co_configmap_name &&
+			    !strcmp(cm->cm_name,
+				    fe->watcher->wt_config->co_configmap_name) &&
+			    !strcmp(cm->cm_namespace,
+				    fe->watcher->wt_config->co_configmap_namespace))
+			{
+				cluster_set_configmap(fe->watcher->wt_cluster, cm);
+			}
+
+			configmap_free(cm);
+		} else
+			TSError("fetcher_process_item: could not parse ConfigMap");
 	} else {
 		TSError("fetch_process_item: unknown resource type %s?", kind);
 		return;
