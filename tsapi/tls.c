@@ -98,10 +98,6 @@ int			 ret = 1;
 		if (strcmp(version, "SSLv3") == 0)
 			goto cleanup;
 		break;
-
-	default:
-		ret = 0;
-		goto cleanup;
 	}
 
 	SSL_set_SSL_CTX(ssl, rh->rh_ctx);

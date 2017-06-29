@@ -27,7 +27,7 @@
         "tls": [
             {
                 "hosts": [
-                    "echoheaders.test"
+                    "tls10.echoheaders.test"
                 ],
                 "secretName": "tls-test"
             }
