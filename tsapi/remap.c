@@ -750,11 +750,6 @@ int			 reenable = 1, ret;
 TSCont			 c;
 request_ctx_t		*rctx;
 
-	rctx = calloc(1, sizeof(*rctx));
-
-	bzero(&req, sizeof(req));
-	bzero(&res, sizeof(res));
-
 	/*
 	 * Take a read lock on the cluster state so it doesn't change while
 	 * we're using it.
@@ -767,6 +762,11 @@ request_ctx_t		*rctx;
 		TSDebug("kubernetes", "handle_remap: no database");
 		return TS_SUCCESS;
 	}
+
+	rctx = calloc(1, sizeof(*rctx));
+
+	bzero(&req, sizeof(req));
+	bzero(&res, sizeof(res));
 
 	c = TSContCreate(tsi_event, TSMutexCreate());
 	TSContDataSet(c, rctx);
