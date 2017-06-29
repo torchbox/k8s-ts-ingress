@@ -10,26 +10,23 @@ else
 fi
 
 printf 'travis_fold:start:build-release\r'
-printf '####################################################################\n'
 printf '>>> Building release.\n\n'
 
 # Always build from a release, so we know the release process works.
 make -f Makefile.dist VERSION=$VERSION release
 
-printf 'travis_fold:end:build_release\r'
+printf 'travis_fold:end:build-release\r'
 
 cd k8s-ts-ingress-$VERSION
 
 printf 'travis_fold:start:build-docker\r'
-printf '####################################################################\n'
 printf '>>> Building Docker image.\n\n'
 # This tests the build and runs basic unit tests.
 DOCKER_REPOSITORY=torchbox/k8s-ts-ingress
 docker build --pull -t $DOCKER_REPOSITORY:$COMMIT .
-printf 'travis_fold:end:build_docker\r'
+printf 'travis_fold:end:build-docker\r'
 
 printf 'travis_fold:start:test-e2e\r'
-printf '####################################################################\n'
 printf '>>> Running end-to-end tests.\n\n'
 # Run e2e tests.
 sudo apt-get -qq update
@@ -41,7 +38,6 @@ printf 'travis_fold:end:test-e2e\r'
 # If this is a release, push the Docker image to Docker Hub.
 if [ "$TRAVIS_PULL_REQUEST" = "false" -a -n "$TRAVIS_TAG" ]; then
 	printf 'travis_fold:start:release\r'
-	printf '####################################################################\n'
 	printf '>>> Creating release.\n\n'
 
 	docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
