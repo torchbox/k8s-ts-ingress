@@ -119,7 +119,7 @@ EVP_PKEY	*key = NULL;
 	if ((keyb64 = hash_get(secret->se_data, "tls.key")) == NULL) {
 		TSDebug("kubernetes_api", "secret_make_ssl_ctx %s/%s: no key",
 			secret->se_namespace, secret->se_name);
-		return NULL;
+		goto error;
 	}
 
 	keylen = strlen(keyb64);
