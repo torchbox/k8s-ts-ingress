@@ -794,13 +794,12 @@ request_ctx_t		*rctx;
 	}
 
 	switch (ret) {
-	case RR_SYNTHETIC: {
+	case RR_SYNTHETIC:
 		sy = synth_new(res.rz_status, res.rz_status_text);
 		synth_add_header(sy, "Content-Type", "text/plain;charset=UTF-8");
 		synth_set_body(sy, res.rz_body);
 		synth_intercept(sy, txnp);
 		goto cleanup;
-	}
 
 		/* client errors */
 	case RR_ERR_INVALID_HOST:
@@ -849,6 +848,9 @@ request_ctx_t		*rctx;
 	default:
 		goto cleanup;
 	}
+
+	assert(res.rz_host);
+	assert(res.rz_path);
 
 	/*
 	 * The remap succeeded, so we need to set the new backend
