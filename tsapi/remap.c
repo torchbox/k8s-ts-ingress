@@ -501,8 +501,10 @@ TSMLoc		hdr, field;
 					len = strlen(t);
 
 					if (len >= 3 && t[0] == '<' &&
-					    t[1] == '/' && t[len-1] == '>')
+					    t[1] == '/' && t[len-1] == '>') {
+						free(url);
 						url = strndup(t + 2, len - 3);
+					}
 				}
 			}
 			free(s);
