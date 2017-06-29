@@ -121,11 +121,7 @@ TSPluginRegistrationInfo	 info;
 	TSDebug("kubernetes", "co_tls=%d", state->config->co_tls);
 	if (state->config->co_tls) {
 		state->tls_cont = TSContCreate(handle_tls, NULL);
-#ifdef TS_SSL_CERT_HOOK
-		TSHttpHookAdd(TS_SSL_CERT_HOOK, state->tls_cont);
-#else
-		TSHttpHookAdd(TS_SSL_SNI_HOOK, state->tls_cont);
-#endif
+		TSHttpHookAdd(TS_SSL_SERVERNAME_HOOK, state->tls_cont);
 	}
 
 	/*

@@ -41,6 +41,10 @@ extern "C" {
 #define REMAP_AUTH_BASIC	0x1
 #define	REMAP_AUTH_DIGEST	0x2
 
+#define	REMAP_TLS_1_0		0x0100
+#define	REMAP_TLS_1_1		0x0101
+#define	REMAP_TLS_1_2		0x0102
+
 /*
  * An entry in the IP whitelist.
  */
@@ -133,6 +137,7 @@ typedef struct {
 	unsigned	 rh_hsts_subdomains:1;
 	unsigned	 rh_http2:1;
 	int		 rh_hsts_max_age;
+	int		 rh_tls_version;
 } remap_host_t;
 
 remap_host_t	*remap_host_new(void);

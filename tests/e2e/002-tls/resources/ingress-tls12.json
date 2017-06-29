@@ -1,0 +1,36 @@
+{
+    "apiVersion": "extensions/v1beta1",
+    "kind": "Ingress",
+    "metadata": {
+        "name": "echoheaders-tls12",
+        "namespace": "default",
+	"annotations": {
+	    "ingress.kubernetes.io/tls-minimum-version": "1.2"
+	}
+    },
+    "spec": {
+        "rules": [
+            {
+                "host": "tls12.echoheaders.test",
+                "http": {
+                    "paths": [
+                        {
+                            "backend": {
+                                "serviceName": "echoheaders",
+                                "servicePort": "http"
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "tls": [
+            {
+                "hosts": [
+                    "echoheaders.test"
+                ],
+                "secretName": "tls-test"
+            }
+        ]
+    }
+}

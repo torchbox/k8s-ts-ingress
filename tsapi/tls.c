@@ -32,8 +32,9 @@ handle_tls(TSCont contn, TSEvent evt, void *edata)
 {
 TSVConn			 ssl_vc;
 SSL			*ssl = NULL;
-const char		*host = NULL;
+const char		*host = NULL, *version;
 const remap_host_t	*rh;
+int			 ret = 1;
 
 	TSDebug("kubernetes", "handle_tls: starting");
 
@@ -73,10 +74,39 @@ const remap_host_t	*rh;
 		goto cleanup;
 	}
 
-	TSDebug("kubernetes", "[%s] handle_tls: attached SSL context [%p]",
-		host, rh->rh_ctx);
+	version = SSL_get_version(ssl);
+	TSDebug("kubernetes", "[%s] client TLS version %s, required %04x",
+		host, version, rh->rh_tls_version);
+
+	/*
+	 * We would like to do this with SSL_set_min_proto_version or at least
+	 * SSL_set_options(..., SSL_OP_NO_TLSxxx), but this hook is called too
+	 * late and changing that has no effect.  Instead, just return without
+	 * setting an SSL_CTX; since none is configured by default, this will
+	 * return a TLS protocol error to the client.
+	 */
+	switch (rh->rh_tls_version) {
+	case REMAP_TLS_1_2:
+		if (strcmp(version, "TLSv1.1") == 0)
+			goto cleanup;
+
+	case REMAP_TLS_1_1:
+		if (strcmp(version, "TLSv1") == 0)
+			goto cleanup;
+
+	case REMAP_TLS_1_0:
+		if (strcmp(version, "SSLv3") == 0)
+			goto cleanup;
+		break;
+
+	default:
+		ret = 0;
+		goto cleanup;
+	}
 
 	SSL_set_SSL_CTX(ssl, rh->rh_ctx);
+	TSDebug("kubernetes", "[%s] handle_tls: attached SSL context [%p]",
+		host, rh->rh_ctx);
 
 	/*
 	 * Is HTTP/2 disabled on this Ingress?
@@ -90,7 +120,8 @@ const remap_host_t	*rh;
 	}
 
 cleanup:
+	TSDebug("kubernetes", "[%s] handle_tls: return %d", host, ret);
 	TSVConnReenable(ssl_vc);
 	pthread_rwlock_unlock(&state->lock);
-	return TS_SUCCESS;
+	return 1;
 }

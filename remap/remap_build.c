@@ -154,6 +154,7 @@ secret_t		*secret;
 				hostname);
 			continue;
 		}
+
 		TSDebug("kubernetes", "      %s: added with CTX[%p]",
 			hostname, rh->rh_ctx);
 	}

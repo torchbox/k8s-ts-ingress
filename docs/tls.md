@@ -78,6 +78,29 @@ in the TS `records.config` file to an OpenSSL cypher string, or set the
 PROXY_CONFIG_SSL_SERVER_CIPHER_SUITE=ECDH+AES:DH+AES:RSA+AES:!aNULL:!MD5:!DSS
 ```
 
+## Configuring the minimum TLS version
+
+To set the minimum TLS version on an Ingress, set the
+`ingress.kubernetes.io/tls-minimum-version` annotation:
+
+```yaml
+metadata:
+  annotations:
+    ingress.kubernetes.io/tls-minimum-version: "1.1"
+```
+
+Accepted values are `"1.0"`, `"1.1"` and `"1.2"`.  TLS 1.3 is not supported.
+
+Due to limitations in OpenSSL and Traffic Server, this will not work correctly
+if you have configured TLS certificates in `ssl_multicert.config`.
+
+To configure the global minimum TLS version, set one or more of the following
+environment variables:
+
+* `PROXY_CONFIG_SSL_TLSV1=0`: disable TLS 1.0
+* `PROXY_CONFIG_SSL_TLSV1_1=0`: disable TLS 1.1
+* `PROXY_CONFIG_SSL_TLSV1_2=0`: disable TLS 1.2
+
 ## Using kube-lego
 
 [kube-lego](https://github.com/jetstack/kube-lego) is a Kubernetes controller

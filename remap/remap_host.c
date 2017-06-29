@@ -40,6 +40,8 @@ remap_host_t	*ret;
 	remap_host_new_path(ret, NULL);
 
 	ret->rh_http2 = 1;
+	/* Consider changing this to 1.1 at some point */
+	ret->rh_tls_version = REMAP_TLS_1_0;
 
 	return ret;
 }
@@ -136,6 +138,9 @@ size_t		 keylen;
 	hash_foreach(annotations, &key_, &keylen, &value) {
 	char	*key = strndup(key_, keylen);
 
+		TSDebug("kubernetes", "remap_host_annotate: [%s]=[%s]",
+			key, value);
+
 		if (strcmp(key, IN_HSTS_MAX_AGE) == 0)
 			rh->rh_hsts_max_age = atoi(value);
 
@@ -146,6 +151,17 @@ size_t		 keylen;
 		else if (strcmp(key, IN_HSTS_INCLUDE_SUBDOMAINS) == 0 &&
 			 strcmp(value, "true") == 0)
 			rh->rh_hsts_subdomains = 1;
+
+		else if (strcmp(key, IN_TLS_MINIMUM_VERSION) == 0) {
+			TSDebug("kubernetes", "TLS version is %s", value);
+
+			if (strcmp(value, IN_TLS_VERSION_1_0) == 0)
+				rh->rh_tls_version = REMAP_TLS_1_0;
+			else if (strcmp(value, IN_TLS_VERSION_1_1) == 0)
+				rh->rh_tls_version = REMAP_TLS_1_1;
+			else if (strcmp(value, IN_TLS_VERSION_1_2) == 0)
+				rh->rh_tls_version = REMAP_TLS_1_2;
+		}
 
 		free(key);
 	}
