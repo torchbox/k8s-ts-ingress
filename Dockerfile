@@ -20,7 +20,7 @@ COPY	. /usr/src/k8s-ts-ingress
 
 RUN	set -ex									\
 	&& apt-get update							\
-	&& apt-get -y install libssl-dev libjson-c3 libjson-c-dev libc6-dev	\
+	&& apt-get -y install libssl1.0-dev libjson-c3 libjson-c-dev libc6-dev	\
 		make gcc g++ pkgconf libcurl3 libcurl4-openssl-dev autoconf	\
 		zlib1g-dev							\
 	&& cd /usr/src/k8s-ts-ingress						\
@@ -30,7 +30,7 @@ RUN	set -ex									\
 	&& make test								\
 	&& make install								\
 	&& apt-get -y remove libjson-c-dev libc6-dev gcc make pkgconf		\
-		libcurl4-openssl-dev autoconf					\
+		libcurl4-openssl-dev autoconf libssl1.0-dev			\
 	&& apt-get -y autoremove						\
 	&& cd /									\
 	&& rm -rf /var/cache/apt /var/lib/apt/lists/* /usr/src/k8s-ts-ingress

@@ -102,6 +102,8 @@ TEST_OBJS=	gtest-all.o		\
 		strmatch.o		\
 		auth.o			\
 		remap_db.o		\
+		remap_path.o		\
+		remap_host.o		\
 		remap_build.o		\
 		config.o		\
 		${TEST_SRCS:.cc=.o}	\
