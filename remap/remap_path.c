@@ -47,11 +47,6 @@ remap_path_t	*ret;
 char		*pregex;
 int		 rerr;
 
-	if (*path != '/') {
-		errno = EINVAL;
-		return NULL;
-	}
-
 	if ((ret = calloc(1, sizeof(*ret))) == NULL)
 		return NULL;
 
@@ -95,6 +90,12 @@ int		 rerr;
 
 	if (!path)
 		return ret;
+
+	if (*path != '/') {
+		errno = EINVAL;
+		remap_path_free(ret);
+		return NULL;
+	}
 
 	/*
 	* Path is required to begin with '/'.  However, when TS provides us the
