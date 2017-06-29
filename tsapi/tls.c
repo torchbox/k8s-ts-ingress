@@ -89,10 +89,12 @@ int			 ret = 1;
 	case REMAP_TLS_1_2:
 		if (strcmp(version, "TLSv1.1") == 0)
 			goto cleanup;
+		/* fall through */
 
 	case REMAP_TLS_1_1:
 		if (strcmp(version, "TLSv1") == 0)
 			goto cleanup;
+		/* fall through */
 
 	case REMAP_TLS_1_0:
 		if (strcmp(version, "SSLv3") == 0)
