@@ -23,7 +23,7 @@ printf 'travis_fold:start:build-docker\r'
 printf '>>> Building Docker image.\n\n'
 # This tests the build and runs basic unit tests.
 DOCKER_REPOSITORY=torchbox/k8s-ts-ingress
-docker build --pull --build-arg build_number=${TRAVIS_BUILD_NUMBER} \
+docker build --pull --build-arg build_id=${TRAVIS_BUILD_NUMBER} \
 					     -t $DOCKER_REPOSITORY:$COMMIT .
 printf 'travis_fold:end:build-docker\r'
 
