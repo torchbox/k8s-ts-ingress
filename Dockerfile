@@ -41,7 +41,6 @@ RUN	set -ex									\
 COPY	docker/init.sh /
 RUN	chmod 755 /init.sh
 COPY	docker/remap.config docker/records.config docker/plugin.config		\
-	docker/healthchecks.config docker/ip_allow.config			\
-	/usr/local/etc/trafficserver/
+	docker/ip_allow.config	/usr/local/etc/trafficserver/
 
 CMD	[ "/init.sh" ]
