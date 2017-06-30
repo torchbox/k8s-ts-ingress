@@ -44,6 +44,7 @@ debug_log_read_request_hdr(TSHttpTxn txn)
 TSMBuffer	 req;
 TSMLoc		 hdr, url;
 const char	*cs;
+char		*s;
 int		 i, version;
 
 	if (TSHttpTxnClientReqGet(txn, &req, &hdr) != TS_SUCCESS) {
@@ -57,10 +58,9 @@ int		 i, version;
 		txn, i, cs, TS_HTTP_MAJOR(version), TS_HTTP_MINOR(version));
 
 	TSHttpHdrUrlGet(req, hdr, &url);
-	cs = TSUrlStringGet(req, url, &i);
+	s = TSUrlStringGet(req, url, &i);
 	TSError("[kubernetes] txn %p: req url: %.*s", txn, i, cs);
-	TSfree(cs);
-
+	TSfree(s);
 	TSHandleMLocRelease(req, hdr, url);
 
 	TSError("[kubernetes] txn %p: --- dump request header ---", txn);
@@ -111,7 +111,7 @@ debug_log_send_request_hdr(TSHttpTxn txn)
 {
 TSMBuffer	 req;
 TSMLoc		 hdr, url;
-const char	*cs;
+char		*s;
 int		 i;
 
 	if (TSHttpTxnServerReqGet(txn, &req, &hdr) != TS_SUCCESS) {
@@ -121,9 +121,9 @@ int		 i;
 	}
 
 	TSHttpHdrUrlGet(req, hdr, &url);
-	cs = TSUrlStringGet(req, url, &i);
-	TSError("[kubernetes] txn %p: origin send request url %.*s", txn, i, cs);
-	TSfree(cs);
+	s = TSUrlStringGet(req, url, &i);
+	TSError("[kubernetes] txn %p: origin send request url %.*s", txn, i, s);
+	TSfree(s);
 	TSHandleMLocRelease(req, hdr, url);
 
 	TSError("[kubernetes] txn %p: --- dump origin request header ---", txn);
