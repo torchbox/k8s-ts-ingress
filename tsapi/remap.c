@@ -208,6 +208,7 @@ set_host_field(TSHttpTxn txnp, const char *host)
 {
 TSMBuffer	reqp;
 TSMLoc		hdrs, host_hdr;
+TSReturnCode	ret;
 
 	TSHttpTxnClientReqGet(txnp, &reqp, &hdrs);
 
@@ -219,11 +220,14 @@ TSMLoc		hdrs, host_hdr;
 		TSHandleMLocRelease(reqp, hdrs, host_hdr);
 	}
 
-	TSMimeHdrFieldCreateNamed(reqp, hdrs, "Host", 4, &host_hdr);
-	TSMimeHdrFieldValueStringInsert(reqp, hdrs, host_hdr, 0, host, strlen(host));
-	TSMimeHdrFieldAppend(reqp, hdrs, host_hdr);
+	ret = TSMimeHdrFieldCreateNamed(reqp, hdrs, "Host", 4, &host_hdr);
+	if (ret == TS_SUCCESS) {
+		TSMimeHdrFieldValueStringInsert(reqp, hdrs, host_hdr, 0,
+						host, strlen(host));
+		TSMimeHdrFieldAppend(reqp, hdrs, host_hdr);
+		TSHandleMLocRelease(reqp, hdrs, host_hdr);
+	}
 
-	TSHandleMLocRelease(reqp, hdrs, host_hdr);
 	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
 }
 
@@ -232,6 +236,7 @@ add_xfp(TSHttpTxn txn)
 {
 TSMBuffer	reqp;
 TSMLoc		hdrs, xfp;
+TSReturnCode	ret;
 
 	TSHttpTxnClientReqGet(txn, &reqp, &hdrs);
 
@@ -244,21 +249,23 @@ TSMLoc		hdrs, xfp;
 		TSHandleMLocRelease(reqp, hdrs, xfp);
 	}
 
-	TSMimeHdrFieldCreateNamed(reqp, hdrs,
+	ret = TSMimeHdrFieldCreateNamed(reqp, hdrs,
 				REMAP_MIME_FIELD_X_FORWARDED_PROTO,
 				REMAP_MIME_FIELD_X_FORWARDED_PROTO_LEN,
 				&xfp);
 
-	if (TSHttpTxnClientProtocolStackContains(txn, "tls"))
-		TSMimeHdrFieldValueStringInsert(reqp, hdrs, xfp, 0,
-					     "https", 5);
-	else
-		TSMimeHdrFieldValueStringInsert(reqp, hdrs, xfp, 0,
-					     "http", 4);
+	if (ret == TS_SUCCESS) {
+		if (TSHttpTxnClientProtocolStackContains(txn, "tls"))
+			TSMimeHdrFieldValueStringInsert(reqp, hdrs, xfp, 0,
+						     "https", 5);
+		else
+			TSMimeHdrFieldValueStringInsert(reqp, hdrs, xfp, 0,
+						     "http", 4);
 
-	TSMimeHdrFieldAppend(reqp, hdrs, xfp);
+		TSMimeHdrFieldAppend(reqp, hdrs, xfp);
+		TSHandleMLocRelease(reqp, hdrs, xfp);
+	}
 
-	TSHandleMLocRelease(reqp, hdrs, xfp);
 	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdrs);
 }
 
@@ -331,13 +338,18 @@ request_ctx_t	*rctx = TSContDataGet(contp);
 	 */
 	if (rctx->rq_response_headers)
 		hash_foreach(rctx->rq_response_headers, &h, &hlen, &v) {
+		TSReturnCode	ret;
+
 			TSDebug("kubernetes", "set_headers: [%.*s] = [%s]",
 				(int) hlen, h, v);
-			TSMimeHdrFieldCreateNamed(resp, hdrs, h, hlen, &hdr);
-			TSMimeHdrFieldValueStringInsert(resp, hdrs, hdr, 0,
-							v, strlen(v));
-			TSMimeHdrFieldAppend(resp, hdrs, hdr);
-			TSHandleMLocRelease(resp, hdrs, hdr);
+			ret = TSMimeHdrFieldCreateNamed(resp, hdrs, h, hlen,
+							&hdr);
+			if (ret == TS_SUCCESS) {
+				TSMimeHdrFieldValueStringInsert(resp, hdrs, hdr,
+						0, v, strlen(v));
+				TSMimeHdrFieldAppend(resp, hdrs, hdr);
+				TSHandleMLocRelease(resp, hdrs, hdr);
+			}
 		}
 
 	/*
@@ -384,7 +396,8 @@ request_ctx_t	*rctx = TSContDataGet(contp);
 			REMAP_MIME_FIELD_X_NEXT_HOP_CACHE_CONTROL,
 			REMAP_MIME_FIELD_X_NEXT_HOP_CACHE_CONTROL_LEN);
 	if (hdr != TS_NULL_MLOC) {
-	TSMLoc		 cc;
+	TSMLoc		cc;
+	TSReturnCode	ret;
 
 		cc = TSMimeHdrFieldFind(resp, hdrs,
 					TS_MIME_FIELD_CACHE_CONTROL,
@@ -394,21 +407,23 @@ request_ctx_t	*rctx = TSContDataGet(contp);
 			TSHandleMLocRelease(resp, hdrs, cc);
 		}
 
-		TSMimeHdrFieldCreateNamed(resp, hdrs,
+		ret = TSMimeHdrFieldCreateNamed(resp, hdrs,
 				TS_MIME_FIELD_CACHE_CONTROL,
 				TS_MIME_LEN_CACHE_CONTROL, &cc);
+		if (ret == TS_SUCCESS) {
+			for (int i = 0, end = TSMimeHdrFieldValuesCount(resp, hdrs, hdr);
+			     i < end; ++i) {
+			const char	*cs;
+			int		 len;
+				cs = TSMimeHdrFieldValueStringGet(resp, hdrs, hdr, i, &len);
+				TSMimeHdrFieldValueStringInsert(resp, hdrs, cc, -1, cs, len);
+			}
 
-		for (int i = 0, end = TSMimeHdrFieldValuesCount(resp, hdrs, hdr);
-		     i < end; ++i) {
-		const char	*cs;
-		int		 len;
-			cs = TSMimeHdrFieldValueStringGet(resp, hdrs, hdr, i, &len);
-			TSMimeHdrFieldValueStringInsert(resp, hdrs, cc, -1, cs, len);
+			TSMimeHdrFieldAppend(resp, hdrs, cc);
+			TSHandleMLocRelease(resp, hdrs, cc);
+			TSMimeHdrFieldRemove(resp, hdrs, hdr);
 		}
 
-		TSMimeHdrFieldAppend(resp, hdrs, cc);
-		TSHandleMLocRelease(resp, hdrs, cc);
-		TSMimeHdrFieldRemove(resp, hdrs, hdr);
 		TSHandleMLocRelease(resp, hdrs, hdr);
 	}
 
