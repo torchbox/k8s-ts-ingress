@@ -99,6 +99,10 @@
                 
                     <li><a class="toctree-l4" href="#global-configuration">Global configuration</a></li>
                 
+                    <li><a class="toctree-l4" href="#configmap-configuration">ConfigMap configuration</a></li>
+                
+                    <li><a class="toctree-l4" href="#global-configuration_1">Global configuration</a></li>
+                
             
             </ul>
         
@@ -292,6 +296,33 @@ specify the API server URL and any credentials required to authenticate to it.</
   Default: <code>true</code>.  (<code>$TS_X_FORWARDED_PROTO</code>)</p>
 </li>
 </ul>
+<h2 id="configmap-configuration">ConfigMap configuration</h2>
+<p>Most configuration is not done in the configuration file (or environment), but
+rather in a Kubernetes ConfigMap.  This makes configuration more flexible and
+removes the need to restart TS to change the configuration.</p>
+<p>To use the ConfigMap, set the configuration option <code>configmap</code>
+(<code>$TS_CONFIGMAP</code>) to <code>&lt;namespace&gt;/&lt;name&gt;</code>, where <code>&lt;namespace&gt;</code> is the namespace
+containing the ConfigMap and <code>&lt;name&gt;</code> is the ConfigMap's name.   For example,
+to load a ConfigMap called <code>ts-config</code> from the <code>trafficserver</code> namespace:</p>
+<pre><code>configmap: trafficserver/ts-config
+</code></pre>
+
+<p>If you're using the example deployment, this is set to <code>trafficserver/ts-config</code>
+by default, but you can override that by changing the value of <code>$TS_CONFIG</code> in
+the pod spec.</p>
+<p>The ConfigMap contains two kinds of configuration: defaults for annotations
+that can be on an Ingress, and global configuration that cannot be overridden
+by an Ingress.</p>
+<h3 id="ingress-defaults">Ingress defaults</h3>
+<p>See the corresponding page for details of the meaning of these annotation:</p>
+<ul>
+<li><code>tls-minimum-version</code>: <a href="../tls/">TLS</a></li>
+<li><code>hsts-max-age</code>: <a href="../tls/">TLS</a></li>
+<li><code>hsts-include-subdomains</code>: <a href="../tls/">TLS</a></li>
+<li><code>http2-enable</code>: <a href="../annotations/">Annotations</a></li>
+</ul>
+<h2 id="global-configuration_1">Global configuration</h2>
+<p>None yet.</p>
               
             </div>
           </div>

@@ -148,6 +148,10 @@
                 
                     <li><a class="toctree-l4" href="#configuring-the-tls-cypher-list">Configuring the TLS cypher list</a></li>
                 
+                    <li><a class="toctree-l4" href="#configuring-the-minimum-tls-version">Configuring the minimum TLS version</a></li>
+                
+                    <li><a class="toctree-l4" href="#configuring-detault-tls-certificates">Configuring detault TLS certificates</a></li>
+                
                     <li><a class="toctree-l4" href="#using-kube-lego">Using kube-lego</a></li>
                 
             
@@ -287,6 +291,45 @@ in the TS <code>records.config</code> file to an OpenSSL cypher string, or set t
 <pre><code>PROXY_CONFIG_SSL_SERVER_CIPHER_SUITE=ECDH+AES:DH+AES:RSA+AES:!aNULL:!MD5:!DSS
 </code></pre>
 
+<h2 id="configuring-the-minimum-tls-version">Configuring the minimum TLS version</h2>
+<p>To set the minimum TLS version on an Ingress, set the
+<code>ingress.kubernetes.io/tls-minimum-version</code> annotation:</p>
+<pre><code class="yaml">metadata:
+  annotations:
+    ingress.kubernetes.io/tls-minimum-version: &quot;1.1&quot;
+</code></pre>
+
+<p>Accepted values are <code>"1.0"</code>, <code>"1.1"</code> and <code>"1.2"</code>.  TLS 1.3 is not supported.</p>
+<p>Due to limitations in OpenSSL and Traffic Server, this will not work correctly
+if you have configured TLS certificates in <code>ssl_multicert.config</code>.</p>
+<p>To configure the global minimum TLS version, set one or more of the following
+environment variables:</p>
+<ul>
+<li><code>PROXY_CONFIG_SSL_TLSV1=0</code>: disable TLS 1.0</li>
+<li><code>PROXY_CONFIG_SSL_TLSV1_1=0</code>: disable TLS 1.1</li>
+<li><code>PROXY_CONFIG_SSL_TLSV1_2=0</code>: disable TLS 1.2</li>
+</ul>
+<h2 id="configuring-detault-tls-certificates">Configuring detault TLS certificates</h2>
+<p>Default certificates can be configured by setting <code>tls-certificates</code>
+<a href="../config/#configmap-configuration">ConfigMap configuration</a>.  This can be used
+to provide TLS without giving users access to the TLS certificate and key, or to
+use a wildcard certificate for all Ingresses in a particular domain without
+having to configure a copy of the certificate in every namespace.</p>
+<p><code>tls-certificates</code> should be a whitespace-separated list of
+<code>[&lt;domain&gt;[,&lt;domain&gt;...]]:&lt;namespace&gt;/&lt;cert&gt;</code>, which maps the given TLS
+certificate to that domain.  This certificate will be used for every host
+configured in that Ingress, even if it does not have TLS configured.  If TLS is
+configured explicitly for a particular host in the Ingress, the Ingress
+configuration will be used instead of the default certificate.</p>
+<p>For example, to use the certificate <code>staging-cert</code> in the namespace
+<code>trafficserver</code> for all Ingresses in <code>myapp-staging.com</code>:</p>
+<pre><code>tls-certificates: *myapp-staging.com:trafficserver/staging-cert
+</code></pre>
+
+<p><code>*.domain.com</code> will match <code>sub.domain.com</code>, but not <code>domain.com</code> or
+<code>sub.sub.domain.com</code>.</p>
+<p><code>*domain.com</code> will match both <code>domain.com</code> and <code>sub.domain.com</code>, but not
+<code>otherdomain.com</code> or <code>sub.sub.domain.com</code>.</p>
 <h2 id="using-kube-lego">Using kube-lego</h2>
 <p><a href="https://github.com/jetstack/kube-lego">kube-lego</a> is a Kubernetes controller
 that automatically provisions TLS certificates using an ACME provider such as

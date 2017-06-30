@@ -317,6 +317,22 @@ list or not, please
 <h2 id="release-history">Release history</h2>
 <ul>
 <li>
+<p>1.0.0-alpha9 (unreleased):</p>
+<ul>
+<li>Feature: the <code>tls-minimum-version</code> annotation was implemented.</li>
+<li>Feature: the global ConfigMap was implemented.</li>
+<li>Feature: the <code>tls-certificates</code> configmap option was implemented.</li>
+<li>Bug fix: a request for <code>/</code> on an Ingress which had <code>rewrite-target</code> set on
+    its default path would crash.</li>
+<li>Bug fix: annotations which are host-specific rather than path-specific
+    (such as <code>hsts-max-age</code>) could be set wrongly.</li>
+<li>Bug fix: if TS received an HTTP request before it had finished syncing the
+    initial cluster state, it would leak memory.</li>
+<li>Improvement: The plugin was added to Coverity SCAN.  As a result, several
+    minor bugs were fixed and code quality was improved.</li>
+</ul>
+</li>
+<li>
 <p>1.0.0-alpha8:</p>
 <ul>
 <li>Incompatible change: The CORS configuration was changed to be both more
@@ -499,5 +515,5 @@ of California, based on code written by Guido van Rossum.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-06-28 04:59:38
+Build Date UTC : 2017-06-30 12:32:48
 -->
