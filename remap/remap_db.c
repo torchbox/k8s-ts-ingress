@@ -20,6 +20,7 @@
 #include	<stdlib.h>
 #include	<errno.h>
 #include	<string.h>
+#include	<assert.h>
 
 #include	<regex.h>
 
@@ -500,13 +501,17 @@ size_t	 pfxsz;
 
 	/* Check for rewrite-target */
 	if (ret->rz_path->rp_rewrite_target) {
-	size_t	blen =	strlen(req->rr_path) - pfxsz
-			+ strlen(ret->rz_path->rp_rewrite_target) + 1;
+		if (req->rr_path) {
+		size_t	blen =	strlen(req->rr_path) - pfxsz
+				+ strlen(ret->rz_path->rp_rewrite_target) + 1;
 
-		ret->rz_urlpath = malloc(blen);
-		snprintf(ret->rz_urlpath, blen, "%s%s",
-			 ret->rz_path->rp_rewrite_target,
-			 req->rr_path + pfxsz);
+			ret->rz_urlpath = malloc(blen);
+			snprintf(ret->rz_urlpath, blen, "%s%s",
+				 ret->rz_path->rp_rewrite_target,
+				 req->rr_path + pfxsz);
+		} else {
+			ret->rz_urlpath = strdup(ret->rz_path->rp_rewrite_target);
+		}
 	} else {
 		if (req->rr_path)
 			ret->rz_urlpath = strdup(req->rr_path);
