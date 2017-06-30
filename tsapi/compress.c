@@ -149,7 +149,7 @@ void
 gzip_init(comp_state_t *state)
 {
 	bzero(&state->cs_zstream, sizeof(state->cs_zstream));
-	deflateInit2(&state->cs_zstream, 3, Z_DEFLATED, 15, 8,
+	deflateInit2(&state->cs_zstream, 3, Z_DEFLATED, 15 + 16, 8,
 		    Z_DEFAULT_STRATEGY);
 }
 
