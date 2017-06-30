@@ -59,13 +59,14 @@ int		 i, version;
 	TSHttpHdrUrlGet(req, hdr, &url);
 	cs = TSUrlStringGet(req, url, &i);
 	TSError("[kubernetes] txn %p: req url: %.*s", txn, i, cs);
+	TSfree(cs);
+
 	TSHandleMLocRelease(req, hdr, url);
 
 	TSError("[kubernetes] txn %p: --- dump request header ---", txn);
 	debug_dump_header(txn, req, hdr);
 	TSHandleMLocRelease(req, TS_NULL_MLOC, hdr);
 	TSError("[kubernetes] txn %p: --- end request header ---", txn);
-
 }
 
 void
@@ -122,6 +123,7 @@ int		 i;
 	TSHttpHdrUrlGet(req, hdr, &url);
 	cs = TSUrlStringGet(req, url, &i);
 	TSError("[kubernetes] txn %p: origin send request url %.*s", txn, i, cs);
+	TSfree(cs);
 	TSHandleMLocRelease(req, hdr, url);
 
 	TSError("[kubernetes] txn %p: --- dump origin request header ---", txn);
