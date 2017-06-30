@@ -35,6 +35,9 @@ remap_db_t		*db;
 	hash_foreach(cluster->cs_namespaces, NULL, NULL, &namespace)
 		build_namespace(db, cluster, namespace);
 
+	if (cluster->cs_config->cc_healthcheck)
+		db->rd_healthcheck = strdup(cluster->cs_config->cc_healthcheck);
+
 	return db;
 }
 

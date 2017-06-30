@@ -153,6 +153,7 @@ void		 remap_host_annotate(remap_host_t *, cluster_t *, hash_t);
  */
 typedef struct {
 	k8s_config_t	*rd_config;
+	char		*rd_healthcheck;
 	hash_t		 rd_hosts;
 } remap_db_t;
 

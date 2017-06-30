@@ -189,6 +189,18 @@ cluster_config_t	*cc;
 	if ((s = hash_get(cm->cm_data, "tls-certificates")) != NULL)
 		cluster_config_add_certs(cc, s);
 
+	/* healthcheck-path */
+	if ((s = hash_get(cm->cm_data, "healthcheck-path")) != NULL) {
+		if (*cc->cc_healthcheck != '/')
+			TSError("kubernetes: invalid healthcheck-path \"%s\"",
+				s);
+		else
+			cc->cc_healthcheck = strdup(s);
+	}
+
+	if (cc->cc_healthcheck == NULL)
+		cc->cc_healthcheck = strdup("/__trafficserver_alive");
+
 	cluster_config_free(cs->cs_config);
 	cs->cs_config = cc;
 }

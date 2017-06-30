@@ -262,11 +262,12 @@ typedef struct cluster_cert {
 typedef TAILQ_HEAD(cluster_cert_list, cluster_cert) cluster_cert_list_t;
 
 typedef struct {
-	int			cc_tls_minimum_version;
-	int			cc_hsts_max_age;
-	unsigned		cc_hsts_subdomains:1;
-	unsigned		cc_http2:1;
-	cluster_cert_list_t	cc_certs;
+	int			 cc_tls_minimum_version;
+	int			 cc_hsts_max_age;
+	unsigned		 cc_hsts_subdomains:1;
+	unsigned		 cc_http2:1;
+	char			*cc_healthcheck;
+	cluster_cert_list_t	 cc_certs;
 } cluster_config_t;
 
 cluster_config_t	*cluster_config_new(void);

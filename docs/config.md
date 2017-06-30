@@ -100,4 +100,10 @@ See the corresponding page for details of the meaning of these annotation:
 
 ## Global configuration
 
-None yet.
+* `healthcheck-path`: TS will return a synthetic 200 response to any request for
+  this path, regardless of Host header.  This will only work once TS has
+  finished its first cluster sync after startup; it can therefore be used as a
+  Kubernetes livenessProbe or load balancer healthcheck to ensure TS does not
+  receive requests before it's ready.  If not set, defaults to
+  `/__trafficserver_alive`.
+* `tls-certificates`: [TLS](tls.md)

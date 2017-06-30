@@ -78,7 +78,6 @@ list or not, please
 * Proxy protocol
 * Rate limiting
 * SSL passthrough
-* Global / default configuration
 * HSTS preload support (in any case, rewrite the HSTS support as it will be
   removed from TS core in some later release)
 * Custom error bodies
@@ -107,6 +106,7 @@ list or not, please
     * Feature: the `tls-minimum-version` annotation was implemented.
     * Feature: the global ConfigMap was implemented.
     * Feature: the `tls-certificates` configmap option was implemented.
+    * Feature: built-in TS healthchecks were implemented.
     * Bug fix: a request for `/` on an Ingress which had `rewrite-target` set on
         its default path would crash.
     * Bug fix: annotations which are host-specific rather than path-specific

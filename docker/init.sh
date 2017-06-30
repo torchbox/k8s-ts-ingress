@@ -40,7 +40,4 @@ echo "CONFIG proxy.config.proxy_name STRING $(hostname)" \
 
 chown -R nobody:nogroup /var/log/trafficserver /var/lib/trafficserver
 
-# We are running.
-touch /run/ts-alive
-
 exec /usr/local/bin/traffic_cop -o
