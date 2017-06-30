@@ -103,6 +103,19 @@ list or not, please
 
 ## Release history
 
+* 1.0.0-alpha9 (unreleased):
+    * Feature: the `tls-minimum-version` annotation was implemented.
+    * Feature: the global ConfigMap was implemented.
+    * Feature: the `tls-certificates` configmap option was implemented.
+    * Bug fix: a request for `/` on an Ingress which had `rewrite-target` set on
+        its default path would crash.
+    * Bug fix: annotations which are host-specific rather than path-specific
+        (such as `hsts-max-age`) could be set wrongly.
+    * Bug fix: if TS received an HTTP request before it had finished syncing the
+        initial cluster state, it would leak memory.
+    * Improvement: The plugin was added to Coverity SCAN.  As a result, several
+        minor bugs were fixed and code quality was improved.
+
 * 1.0.0-alpha8:
     * Incompatible change: The CORS configuration was changed to be both more
         clear and more flexible.

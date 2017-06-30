@@ -14,20 +14,21 @@ ROOT=		@top_srcdir@
 
 CC=		@CC@
 CXX=		@CXX@
-CPPFLAGS=	@LIBCURL_CPPFLAGS@	\
-		@CPPFLAGS@		\
-		-I${TS_INCDIR}		\
-		-I.			\
-		-I${ROOT}		\
-		-I${ROOT}/gtest		\
-		-I${ROOT}/gtest/include	\
-		-I${ROOT}/api		\
-		-I${ROOT}/auth		\
-		-I${ROOT}/crypt		\
-		-I${ROOT}/remap		\
-		-I${ROOT}/tsapi		\
-		-I${ROOT}/util		\
-		-I${ROOT}/contrib/rax	\
+CPPFLAGS=	@LIBCURL_CPPFLAGS@		\
+		@CPPFLAGS@			\
+		-I${TS_INCDIR}			\
+		-I.				\
+		-I${ROOT}			\
+		-I${ROOT}/gtest			\
+		-I${ROOT}/gtest/include		\
+		-I${ROOT}/api			\
+		-I${ROOT}/auth			\
+		-I${ROOT}/crypt			\
+		-I${ROOT}/remap			\
+		-I${ROOT}/tsapi			\
+		-I${ROOT}/util			\
+		-I${ROOT}/contrib/rax		\
+		-I${ROOT}/contrib/netbsd	\
 		-I${ROOT}/contrib/brotli/include
 
 JSON_CFLAGS=	@JSON_CFLAGS@

@@ -1,0 +1,11 @@
+{
+    "apiVersion": "v1",
+    "data": {
+        "tls-certificates": "default.echoheaders.test:default/tls-test"
+    },
+    "kind": "ConfigMap",
+    "metadata": {
+        "name": "ts-config",
+        "namespace": "default"
+    }
+}

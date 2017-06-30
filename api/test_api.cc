@@ -327,3 +327,25 @@ TEST(API, Endpoints2) {
 
 	EXPECT_EQ(0, ts_api_errors);
 }
+
+TEST(API, DomainMatch) {
+	EXPECT_EQ(1, domain_match("mydomain.com", "mydomain.com"));
+	EXPECT_EQ(0, domain_match("mydomain.com", "notmydomain.com"));
+	EXPECT_EQ(0, domain_match("mydomain.com", "mydomain.com.com"));
+	EXPECT_EQ(0, domain_match("mydomain.com", "mydomain.co.uk"));
+	EXPECT_EQ(0, domain_match("mydomain.com", "www.mydomain.com"));
+
+	EXPECT_EQ(1, domain_match("*.mydomain.com", "www.mydomain.com"));
+	EXPECT_EQ(0, domain_match("*.mydomain.com", "mydomain.com"));
+	EXPECT_EQ(0, domain_match("*.mydomain.com", "sub.dom.mydomain.com"));
+	EXPECT_EQ(0, domain_match("*.mydomain.com", "notmydomain.com"));
+	EXPECT_EQ(0, domain_match("*.mydomain.com", "mydomain.com.com"));
+	EXPECT_EQ(0, domain_match("*.mydomain.com", "mydomain.co.uk"));
+
+	EXPECT_EQ(1, domain_match("*mydomain.com", "mydomain.com"));
+	EXPECT_EQ(1, domain_match("*mydomain.com", "www.mydomain.com"));
+	EXPECT_EQ(0, domain_match("*mydomain.com", "sub.dom.mydomain.com"));
+	EXPECT_EQ(0, domain_match("*mydomain.com", "notmydomain.com"));
+	EXPECT_EQ(0, domain_match("*mydomain.com", "mydomain.com.com"));
+	EXPECT_EQ(0, domain_match("*mydomain.com", "mydomain.co.uk"));
+}

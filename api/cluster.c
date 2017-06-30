@@ -73,16 +73,71 @@ cluster_config_t	*cc;
 	/* Consider changing this to TLS 1.1 at some point */
 	cc->cc_tls_minimum_version = IN_TLS_VERSION_1_0_VALUE;
 
+	TAILQ_INIT(&cc->cc_certs);
+
 	return cc;
 }
 
 void
 cluster_config_free(cluster_config_t *cc)
 {
+cluster_cert_t	*crt, *tmp;
+
 	if (!cc)
 		return;
 
+	TAILQ_FOREACH_SAFE(crt, &cc->cc_certs, cr_entry, tmp) {
+		free(crt->cr_domain);
+		free(crt->cr_namespace);
+		free(crt->cr_name);
+		free(crt);
+	}
+
 	free(cc);
+}
+
+/*
+ * Parser the tls-certificate options, which is a whitespace-separated list of
+ * [domain[,domain...]:namespace/certname.  We don't process the list at all
+ * here because we might not have a copy of the necessary secrets; just store
+ * the details so the remap rebuild can use it.
+ */
+void
+cluster_config_add_certs(cluster_config_t *cc, const char *certs)
+{
+char	*s, *p;
+
+	s = strdup(certs);
+	while ((p = strsep(&s, " \t,")) != NULL) {
+	char	*certns, *certname, *dom;
+
+		if ((certns = index(p, ':')) == NULL) {
+			TSError("kubernetes: invalid tls-certificates "
+				"entry: %s", p);
+			continue;
+		}
+
+		*certns++ = '\0';
+		
+		if ((certname = index(certns, '/')) == NULL) {
+			TSError("kubernetes: invalid certificate name in "
+				"tls-certificate: %s", certns);
+			continue;
+		}
+
+		*certname++ = '\0';
+
+		while ((dom = strsep(&p, ",")) != NULL) {
+		cluster_cert_t	*crt;
+			crt = calloc(1, sizeof(*crt));
+			crt->cr_domain = strdup(dom);
+			crt->cr_namespace = strdup(certns);
+			crt->cr_name = strdup(certname);
+			TAILQ_INSERT_TAIL(&cc->cc_certs, crt, cr_entry);
+		}
+	}
+
+	free(s);
 }
 
 /*
@@ -130,8 +185,81 @@ cluster_config_t	*cc;
 				"in configmap", s);
 	}
 
+	/* tls-certificates */
+	if ((s = hash_get(cm->cm_data, "tls-certificates")) != NULL)
+		cluster_config_add_certs(cc, s);
+
 	cluster_config_free(cs->cs_config);
 	cs->cs_config = cc;
+}
+
+/*
+ * Match a hostname against a TLS certificate's host.  This is not a normal
+ * wildcard match.  
+ *
+ * If the pattern is exactly '*', then the result is true and the host is
+ * ignored.
+ *
+ * If the pattern doesn't start with '*', then an exact match is performed.
+ *
+ * If the pattern starts with '*.', then the leading * is removed from the
+ * pattern and the first domain component is removed from the host, and an
+ * exact match is done on the result.
+ *
+ * If the pattern starts with '*' but the second character is not '.' (e.g.
+ * '*mydomain.com'), then both comparisons are done.
+ */
+int
+domain_match(const char *pat, const char *str)
+{
+	if (strcmp(pat, "*") == 0)
+		return 1;
+
+	/* A valid domain must have at least two components, "a.b". */
+	if (strlen(str) < 3 || strlen(pat) < 3)
+		return 0;
+
+	/* exact.domain.com */
+	if (*pat != '*')
+		return strcmp(pat, str) == 0;
+
+	/* *.domain.com */
+	if (pat[0] == '*' && pat[1] == '.') {
+	const char	*dc;
+		if ((dc = index(str, '.')) == NULL)
+			return 0;
+		return strcmp(pat + 2, dc + 1) == 0;
+	}
+
+	/* *domain.com */
+	if (pat[0] == '*' && pat[1] != '.') {
+	const char	*dc;
+
+		/* Check for exact domain match */
+		if (strcmp(pat + 1, str) == 0)
+			return 1;
+
+		/* Check for wildcard match */
+		if ((dc = index(str, '.')) == NULL)
+			return 0;
+
+		return strcmp(pat + 1, dc + 1) == 0;
+	}
+
+	return 0;
+}
+
+cluster_cert_t *
+cluster_get_cert_for_hostname(cluster_t *cs, const char *host)
+{
+cluster_cert_t	*crt;
+
+	TAILQ_FOREACH(crt, &cs->cs_config->cc_certs, cr_entry) {
+		if (domain_match(crt->cr_domain, host))
+			return crt;
+	}
+
+	return NULL;
 }
 
 void

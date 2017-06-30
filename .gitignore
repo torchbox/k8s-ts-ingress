@@ -29,3 +29,5 @@
 /configure
 /_docs
 /contrib/brotli/Makefile
+/dist.tar
+/cov-int*

@@ -144,6 +144,8 @@ remap_path_t	*remap_host_find_path(const remap_host_t *,
 				      size_t *pfxsz);
 remap_path_t	*remap_host_new_path(remap_host_t *, const char *path);
 remap_path_t	*remap_host_get_default_path(remap_host_t *);
+void		 remap_host_attach_default_tls(remap_host_t *, cluster_t *,
+					       const char *host);
 void		 remap_host_annotate(remap_host_t *, cluster_t *, hash_t);
 
 /*

@@ -72,13 +72,13 @@ char	*cls;
 			return;
 	}
 
-	/* Rebuild TLS state */
-	for (size_t i = 0; i < ing->in_ntls; i++)
-		build_ingress_tls(db, cs, ns, ing, &ing->in_tls[i]);
-
 	/* Rebuild remap state */
 	for (size_t i = 0; i < ing->in_nrules; i++)
 		build_ingress_rule(db, cs, ns, ing, &ing->in_rules[i]);
+
+	/* Rebuild TLS state */
+	for (size_t i = 0; i < ing->in_ntls; i++)
+		build_ingress_tls(db, cs, ns, ing, &ing->in_tls[i]);
 }
 
 static void
@@ -89,6 +89,12 @@ remap_host_t	*rh;
 size_t		 i;
 
 	rh = remap_db_get_or_create_host(db, rule->ir_host);
+
+	/*
+	 * Attach default TLS contexts here.  The context will be replaced by
+	 * build_ingress_tls if the TLS provides its own TLS configuration.
+	 */
+	remap_host_attach_default_tls(rh, cs, rule->ir_host);
 
 	for (i = 0; i < rule->ir_npaths; i++) {
 	ingress_path_t	*path = &rule->ir_paths[i];
@@ -147,8 +153,14 @@ secret_t		*secret;
 
 		rh = remap_db_get_or_create_host(db, hostname);
 
-		if (rh->rh_ctx)
-			continue;	/* ??? */
+		if (rh->rh_ctx) {
+			/*
+			 * Might already have a context attached if the host
+			 * matched the default certificates.
+			 */
+			SSL_CTX_free(rh->rh_ctx);
+			rh->rh_ctx = NULL;
+		}
 
 		if ((rh->rh_ctx = secret_make_ssl_ctx(secret)) == NULL) {
 			TSDebug("kubernetes", "      %s: can't make ctx",

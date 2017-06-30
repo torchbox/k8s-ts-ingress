@@ -70,3 +70,17 @@ printf '.'
 output=$(curl 2>&1 -kvisS --tlsv1.2 --resolve tls12.echoheaders.test:58443:127.0.0.1 \
 		https://tls12.echoheaders.test:58443/)
 expect_output 'HTTP/[012.]* 200'
+
+# Test default TLS.
+printf '.'
+output=$(curl 2>&1 -ksS --cacert tests/test-cert.pem			\
+		--resolve default.echoheaders.test:58443:127.0.0.1	\
+		https://default.echoheaders.test:58443/this-is-a-test)
+expect_output "Request path: /this-is-a-test"
+
+printf '.'
+output=$(curl 2>&1 -ksS --cacert tests/test-cert.pem			\
+		--resolve notdefault.echoheaders.test:58443:127.0.0.1	\
+		https://notdefault.echoheaders.test:58443/this-is-a-test)
+expect_output 'alert handshake failure'
+expect_output -v "Request path: /this-is-a-test"

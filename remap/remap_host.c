@@ -12,6 +12,8 @@
  * associated with every Ingress, and contains one or more remap_paths.
  */
 
+#include	<assert.h>
+
 #include	<ts/ts.h>
 
 #include	"remap.h"
@@ -145,4 +147,43 @@ const char	*s;
 			rh->rh_tls_version = IN_TLS_VERSION_1_2_VALUE;
 	} else
 		rh->rh_tls_version = cs->cs_config->cc_tls_minimum_version;
+}
+
+/*
+ * Attach default TLS certificates to this host.  These come from the cluster
+ * global configuration.
+ */
+void
+remap_host_attach_default_tls(remap_host_t *rh, cluster_t *cs, const char *host)
+{
+cluster_cert_t	*crt;
+namespace_t	*ns;
+secret_t	*srt;
+
+	assert(rh);
+	assert(cs);
+	assert(host);
+
+	if ((crt = cluster_get_cert_for_hostname(cs, host)) == NULL)
+		return;
+
+	if ((ns = cluster_get_namespace(cs, crt->cr_namespace)) == NULL) {
+		TSError("kubernetes: warning: default tls certificate %s/%s"
+			" was not found on the cluster", crt->cr_namespace,
+			crt->cr_name);
+		return;
+	}
+
+	if ((srt = namespace_get_secret(ns, crt->cr_name)) == NULL) {
+		TSError("kubernetes: warning: default tls certificate %s/%s"
+			" was not found on the cluster", crt->cr_namespace,
+			crt->cr_name);
+		return;
+	}
+
+	if ((rh->rh_ctx = secret_make_ssl_ctx(srt)) == NULL) {
+		TSError("kubernetes: warning: default tls certificate %s/%s"
+			" is invalid", crt->cr_namespace, crt->cr_name);
+		return;
+	}
 }

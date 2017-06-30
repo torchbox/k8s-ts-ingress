@@ -18,12 +18,15 @@
 #include	<json.h>
 
 #include	"hash.h"
+#include	"tsqueue.h"
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 char	*_k8s_get_ssl_error(void);
+int	 domain_match(const char *pat, const char *str);
 
 /*
  * Annotation prefixes.  ingress.kubernetes.io is for standard annotations,
@@ -249,11 +252,21 @@ typedef void (*cluster_callback_t) (struct cluster *cluster, void *);
 /*
  * Default configuration, stored in the cluster.
  */
+typedef struct cluster_cert {
+	TAILQ_ENTRY(cluster_cert) cr_entry;
+
+	char	*cr_domain;
+	char	*cr_namespace;
+	char	*cr_name;
+} cluster_cert_t;
+typedef TAILQ_HEAD(cluster_cert_list, cluster_cert) cluster_cert_list_t;
+
 typedef struct {
-	int		cc_tls_minimum_version;
-	int		cc_hsts_max_age;
-	unsigned	cc_hsts_subdomains:1;
-	unsigned	cc_http2:1;
+	int			cc_tls_minimum_version;
+	int			cc_hsts_max_age;
+	unsigned		cc_hsts_subdomains:1;
+	unsigned		cc_http2:1;
+	cluster_cert_list_t	cc_certs;
 } cluster_config_t;
 
 cluster_config_t	*cluster_config_new(void);
@@ -270,6 +283,7 @@ typedef struct cluster {
 cluster_t	*cluster_make(void);
 namespace_t	*cluster_get_namespace(cluster_t *, const char *nsname);
 void		 cluster_set_configmap(cluster_t *, configmap_t *);
+cluster_cert_t	*cluster_get_cert_for_hostname(cluster_t *, const char *);
 void		 cluster_free(cluster_t *cluster);
 
 #ifdef __cplusplus

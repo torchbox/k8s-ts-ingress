@@ -101,6 +101,34 @@ environment variables:
 * `PROXY_CONFIG_SSL_TLSV1_1=0`: disable TLS 1.1
 * `PROXY_CONFIG_SSL_TLSV1_2=0`: disable TLS 1.2
 
+## Configuring detault TLS certificates
+
+Default certificates can be configured by setting `tls-certificates`
+[ConfigMap configuration](config.md#configmap-configuration).  This can be used
+to provide TLS without giving users access to the TLS certificate and key, or to
+use a wildcard certificate for all Ingresses in a particular domain without
+having to configure a copy of the certificate in every namespace.
+
+`tls-certificates` should be a whitespace-separated list of
+`[<domain>[,<domain>...]]:<namespace>/<cert>`, which maps the given TLS
+certificate to that domain.  This certificate will be used for every host
+configured in that Ingress, even if it does not have TLS configured.  If TLS is
+configured explicitly for a particular host in the Ingress, the Ingress
+configuration will be used instead of the default certificate.
+
+For example, to use the certificate `staging-cert` in the namespace
+`trafficserver` for all Ingresses in `myapp-staging.com`:
+
+```
+tls-certificates: *myapp-staging.com:trafficserver/staging-cert
+```
+
+`*.domain.com` will match `sub.domain.com`, but not `domain.com` or
+`sub.sub.domain.com`.
+
+`*domain.com` will match both `domain.com` and `sub.domain.com`, but not
+`otherdomain.com` or `sub.sub.domain.com`.
+    
 ## Using kube-lego
 
 [kube-lego](https://github.com/jetstack/kube-lego) is a Kubernetes controller
