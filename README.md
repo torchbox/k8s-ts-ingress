@@ -15,6 +15,20 @@ If you want to add Kubernetes support to an existing instance of TS, you should
 build the plugin from source.  If you want to deploy TS inside a Kubernetes
 cluster, you can use the pre-built Docker image.
 
+## Features
+
+* HTTP/2, including Server Push
+* Websockets
+* HTTP response caching (including `PURGE` support and outgoing Cache-Control
+  manipulation)
+* Default TLS certificates (e.g. use one wildcard certificate for all Ingresses
+  in that domain)
+* On-the-fly HTTP compression
+* Proxying to external services (via Endpoints or ExternalName)
+* Fully configurable CORS response headers
+* kube-lego support
+* Access control by HTTP Basic authentication, client IP address, or both
+
 ## Quick start
 
 To deploy the image on an existing Kubernetes 1.6 (or later) cluster:

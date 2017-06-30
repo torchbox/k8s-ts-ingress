@@ -61,7 +61,6 @@ The controller provides the following features:
 * Proxying to external (non-Kubernetes) services using Ingress resources;
 * ESI (Edge-Side Includes).
 
-
 ## Planned features
 
 A feature being listed here indicates we are interested in implementing it, but
@@ -86,7 +85,6 @@ list or not, please
 * Clustering (HTCP)
 * Modify response headers (`header-{add,replace}-Name`)
 * Incoming XFF
-* Health check
 
 ## Known bugs
 
