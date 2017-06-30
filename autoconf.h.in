@@ -1,5 +1,8 @@
 /* autoconf.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Numeric id of this build */
+#undef BUILD_ID
+
 /* Define to 1 if you have the `crypto' library (-lcrypto). */
 #undef HAVE_LIBCRYPTO
 

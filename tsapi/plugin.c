@@ -28,9 +28,10 @@
 #include	"plugin.h"
 #include	"autoconf.h"
 
-char *via_name;
-int via_name_len;
-char myhostname[HOST_NAME_MAX + 1];
+char	*ingress_version;
+char	*via_name;
+int	 via_name_len;
+char	 myhostname[HOST_NAME_MAX + 1];
 
 static void cluster_cb(cluster_t *cluster, void *);
 
@@ -69,12 +70,24 @@ void
 TSPluginInit(int argc, const char **argv)
 {
 TSPluginRegistrationInfo	 info;
+size_t				 i;
+
+#ifdef BUILD_ID
+	i = snprintf(NULL, 0, "%s#%s", PACKAGE_VERSION, BUILD_ID);
+	ingress_version = malloc(i + 1);
+	snprintf(ingress_version, i + 1, "%s#%s", PACKAGE_VERSION, BUILD_ID);
+#else
+	i = snprintf(NULL, 0, "%s", PACKAGE_VERSION);
+	ingress_version = malloc(i + 1);
+	snprintf(ingress_version, i + 1, "%s", PACKAGE_VERSION);
+#endif
 
 	via_name_len = snprintf(NULL, 0, "ATS/%s Ingress/%s",
-				TSTrafficServerVersionGet(), PACKAGE_VERSION);
+				TSTrafficServerVersionGet(),
+				ingress_version);
 	via_name = malloc(via_name_len + 1);
-	via_name_len = snprintf(via_name, via_name_len + 1, "ATS/%s Ingress/%s",
-				TSTrafficServerVersionGet(), PACKAGE_VERSION);
+	snprintf(via_name, via_name_len + 1, "ATS/%s Ingress/%s",
+		 TSTrafficServerVersionGet(), ingress_version);
 
 	if (gethostname(myhostname, sizeof(myhostname)) == -1)
 		strcpy(myhostname, "unknown");

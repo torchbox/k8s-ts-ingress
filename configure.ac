@@ -14,13 +14,21 @@ dnl LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM
 dnl OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 dnl SOFTWARE.
 
-AC_INIT([k8s-ts-ingress], [1.0.0-alpha8])
+AC_INIT([k8s-ts-ingress], [1.0.0-alpha9])
 
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 
 AC_CONFIG_MACRO_DIRS([acinclude])
 AC_CONFIG_HEADERS([autoconf.h])
+
+BUILD_ID=unknown
+AC_ARG_WITH([build-id],
+	[AS_HELP_STRING([--with-build-id=ID], [set build id])],
+	[BUILD_ID="$withval"])
+AS_IF([test "$BUILD_ID" != "unknown"], [
+	AC_DEFINE_UNQUOTED([BUILD_ID], ["$BUILD_ID"], [Numeric id of this build])
+])
 
 AC_ARG_WITH([tsxs],
 	[AS_HELP_STRING([--with-tsxs[=PATH]], [path to Traffic Server tsxs])],

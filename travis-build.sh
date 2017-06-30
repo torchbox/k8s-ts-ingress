@@ -6,7 +6,7 @@ set -e
 if [ -n "$TRAVIS_TAG" ]; then
 	VERSION="$TRAVIS_TAG"
 else
-	VERSION=$COMMIT
+	VERSION="$(sed -ne '/AC_INIT/ {s/.*, \[\(.*\)\].*/\1/; p}' configure.ac)-dev"
 fi
 
 printf 'travis_fold:start:build-release\r'
@@ -23,7 +23,8 @@ printf 'travis_fold:start:build-docker\r'
 printf '>>> Building Docker image.\n\n'
 # This tests the build and runs basic unit tests.
 DOCKER_REPOSITORY=torchbox/k8s-ts-ingress
-docker build --pull -t $DOCKER_REPOSITORY:$COMMIT .
+docker build --pull --build-arg build_number=${TRAVIS_BUILD_NUMBER} \
+					     -t $DOCKER_REPOSITORY:$COMMIT .
 printf 'travis_fold:end:build-docker\r'
 
 printf 'travis_fold:start:test-e2e\r'
@@ -36,7 +37,7 @@ tests/e2erun.sh
 printf 'travis_fold:end:test-e2e\r'
 
 # If this is a release, push the Docker image to Docker Hub.
-if [ "$TRAVIS_PULL_REQUEST" = "false" -a -n "$TRAVIS_TAG" ]; then
+if [ "$TRAVIS_PULL_REQUEST" = "false" ];
 	printf 'travis_fold:start:release\r'
 	printf '>>> Creating release.\n\n'
 

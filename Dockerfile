@@ -16,6 +16,8 @@
 
 FROM	torchbox/trafficserver:7.1.x-1.0
 
+ARG	build_id=unknown
+
 COPY	. /usr/src/k8s-ts-ingress
 
 RUN	set -ex									\
@@ -25,7 +27,8 @@ RUN	set -ex									\
 		zlib1g-dev							\
 	&& cd /usr/src/k8s-ts-ingress						\
 	&& autoreconf -if							\
-	&& ./configure --with-tsxs=/usr/local/bin/tsxs				\
+	&& ./configure	--with-tsxs=/usr/local/bin/tsxs				\
+			--with-build-id=$build_id				\
 	&& make									\
 	&& make test								\
 	&& make install								\
