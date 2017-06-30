@@ -25,6 +25,9 @@ int64_t	gzip_produce(comp_state_t *, unsigned const char *input, size_t inlen);
 int64_t	gzip_finish(comp_state_t *);
 void	gzip_free(comp_state_t *);
 
+/* deflate - other than init, identical to gzip*/
+void	deflate_init(comp_state_t *);
+
 /* brotli */
 void	br_init(comp_state_t *);
 int64_t	br_produce(comp_state_t *, unsigned const char *input, size_t inlen);
@@ -135,10 +138,18 @@ uint8_t		*next_out;
 }
 
 void
+deflate_init(comp_state_t *state)
+{
+	bzero(&state->cs_zstream, sizeof(state->cs_zstream));
+	deflateInit2(&state->cs_zstream, 3, Z_DEFLATED, 15, 8,
+		    Z_DEFAULT_STRATEGY);
+}
+
+void
 gzip_init(comp_state_t *state)
 {
 	bzero(&state->cs_zstream, sizeof(state->cs_zstream));
-	deflateInit2(&state->cs_zstream, 3, Z_DEFLATED, 15 + 16, 8,
+	deflateInit2(&state->cs_zstream, 3, Z_DEFLATED, 15, 8,
 		    Z_DEFAULT_STRATEGY);
 }
 
@@ -227,7 +238,7 @@ request_can_compress(TSMBuffer reqp, TSMLoc hdr)
 const char	*cs;
 int		 len;
 TSMLoc		 aenc;
-int		 has_gzip = 0, has_br = 0;
+int		 has_gzip = 0, has_br = 0, has_deflate = 0;
 
 	aenc = TSMimeHdrFieldFind(reqp, hdr, "Accept-Encoding", -1);
 	if (!aenc)
@@ -241,6 +252,10 @@ int		 has_gzip = 0, has_br = 0;
 		if ((len == 4 && memcmp(cs, "gzip", 4) == 0)
 		    || (len >= 4 && memcmp(cs, "gzip;", 5) == 0))
 			has_gzip = 1;
+
+		if ((len == 7 && memcmp(cs, "deflate", 7) == 0)
+		    || (len >= 7 && memcmp(cs, "deflate;", 8) == 0))
+			has_deflate = 1;
 
 		if ((len == 2 && memcmp(cs, "br", 2) == 0)
 		    || (len >= 2 && memcmp(cs, "br;", 2) == 0))
@@ -256,6 +271,8 @@ int		 has_gzip = 0, has_br = 0;
 	 */
 	if (has_br)
 		return COMP_BROTLI;
+	if (has_deflate)
+		return COMP_DEFLATE;
 	if (has_gzip)
 		return COMP_GZIP;
 	return COMP_NONE;
@@ -347,6 +364,11 @@ TSMLoc		hdr, field;
 		TSMimeHdrFieldValueStringInsert(resp, hdr, field, 0, "gzip", 4);
 		break;
 
+	case COMP_DEFLATE:
+		TSMimeHdrFieldValueStringInsert(resp, hdr, field, 0,
+						"deflate", 7);
+		break;
+
 	case COMP_BROTLI:
 		TSMimeHdrFieldValueStringInsert(resp, hdr, field, 0, "br", 2);
 		break;
@@ -411,6 +433,13 @@ compress_init(TSHttpTxn txn, TSCont contn, comp_state_t *state)
 
 	case COMP_GZIP:
 		state->cs_init = gzip_init;
+		state->cs_produce = gzip_produce;
+		state->cs_finish = gzip_finish;
+		state->cs_free = gzip_free;
+		break;
+
+	case COMP_DEFLATE:
+		state->cs_init = deflate_init;
 		state->cs_produce = gzip_produce;
 		state->cs_finish = gzip_finish;
 		state->cs_free = gzip_free;

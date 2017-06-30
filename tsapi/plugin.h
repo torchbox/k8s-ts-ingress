@@ -75,7 +75,8 @@ extern struct state *state;
  */
 #define	COMP_NONE	0
 #define	COMP_GZIP	1
-#define	COMP_BROTLI	2
+#define	COMP_DEFLATE	2
+#define	COMP_BROTLI	3
 
 struct comp_state;
 

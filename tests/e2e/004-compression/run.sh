@@ -23,10 +23,19 @@ output=$(curl -isS --resolve echoheaders.test:58080:127.0.0.1 \
 expect_output "Vary: Accept-Encoding"
 expect_output -v "Content-Encoding"
 
-output=$(curl -isS --compressed --resolve echoheaders.test:58080:127.0.0.1 \
+output=$(curl -isS --compressed -H'Accept-Encoding: gzip'	\
+		--resolve echoheaders.test:58080:127.0.0.1	\
 		http://echoheaders.test:58080/this-is-a-test)
 expect_output "Vary: Accept-Encoding"
 expect_output "Content-Encoding: gzip"
+expect_output "Request path: /this-is-a-test"
+
+# Test deflate here as well.
+output=$(curl -isS --compressed -H'Accept-Encoding: deflate'	\
+		--resolve echoheaders.test:58080:127.0.0.1	\
+		http://echoheaders.test:58080/this-is-a-test)
+expect_output "Vary: Accept-Encoding"
+expect_output "Content-Encoding: deflate"
 expect_output "Request path: /this-is-a-test"
 
 # Cached compression.
