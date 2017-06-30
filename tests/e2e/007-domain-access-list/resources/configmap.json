@@ -1,0 +1,11 @@
+{
+    "apiVersion": "v1",
+    "data": {
+        "domain-access-list": "*echoheaders.test:default *.test:otherns"
+    },
+    "kind": "ConfigMap",
+    "metadata": {
+        "name": "ts-config",
+        "namespace": "default"
+    }
+}

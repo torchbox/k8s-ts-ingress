@@ -133,6 +133,7 @@ typedef struct {
 	SSL_CTX		*rh_ctx;
 	unsigned	 rh_hsts_subdomains:1;
 	unsigned	 rh_http2:1;
+	unsigned	 rh_tls_passthrough:1;
 	int		 rh_hsts_max_age;
 	int		 rh_tls_version;
 } remap_host_t;

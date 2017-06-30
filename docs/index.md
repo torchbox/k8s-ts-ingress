@@ -1,7 +1,7 @@
 # Traffic Server ingress controller
 
-**WARNING: This is alpha code, do not use it in production.**  (If you do,
-please report bugs.)
+*Note*: This software is still in development.  While we are using it internally,
+we do not recommend deploying it in a production cluster at this time.
 
 [Traffic Server](https://trafficserver.apache.org/) is a high-performance,
 extensible HTTP proxy server with a rich feature set, including TLS termination,
@@ -38,54 +38,6 @@ to manage a virtual IP address on your cluster.
 For more detailed installation instructions, see the documentation for
 [building from source](source.md) or [Deploying on Kubernetes](docker.md).
 
-## Features
-
-The controller provides the following features:
-
-* Full support for Ingress resources, including many annotations used by other
-  controller implementations;
-* HTTP/2, including server push (but see "known bugs", below);
-* WebSockets;
-* TLS termination, configured in the Ingress resource using Kubernetes Secrets;
-* Emulation of the nginx Ingress controller (for services that require it,
-  e.g. kube-lego);
-* Flexible HTTP caching, including:
-    * Cache lifetime controlled by `Cache-Control` or `Expires` headers;
-    * Manipulation of outgoing Cache-Control;
-    * Removal from the cache of individual pages or all pages at once;
-    * Alternatives (HTTP Vary);
-    * Ignoring URL parameters and cookies which do not affect page content.
-* HTTP compression (gzip and Brotli);
-* Authorization using HTTP Basic authentication or client IP address;
-* A complete, configurable CORS implementation;
-* Proxying to external (non-Kubernetes) services using Ingress resources;
-* ESI (Edge-Side Includes).
-
-## Planned features
-
-A feature being listed here indicates we are interested in implementing it, but
-provides no guarantee that it will be implemented within any particular time
-frame, or ever.
-
-If you would like to see a particular feature supported, whether it's on this
-list or not, please
-[open a Github issue](https://github.com/torchbox/k8s-ts-ingress/issues).
-
-* TLS client certificate authentication.
-* Client session affinity
-* Backend weights
-* Proxy protocol
-* Rate limiting
-* SSL passthrough
-* HSTS preload support (in any case, rewrite the HSTS support as it will be
-  removed from TS core in some later release)
-* Custom error bodies
-* Support [libslz](http://www.libslz.org/) as an alternative to zlib.
-* Wildcard cache purging and/or cache tags.
-* Clustering (HTCP)
-* Modify response headers (`header-{add,replace}-Name`)
-* Incoming XFF
-
 ## Known bugs
 
 * A Traffic Server bug
@@ -103,8 +55,9 @@ list or not, please
 * 1.0.0-alpha9 (unreleased):
     * Feature: the `tls-minimum-version` annotation was implemented.
     * Feature: the global ConfigMap was implemented.
-    * Feature: the `tls-certificates` configmap option was implemented.
+    * Feature: the `tls-certificates` ConfigMap option was implemented.
     * Feature: built-in TS healthchecks were implemented.
+    * Feature: the `domain-access-list` ConfigMap option was implemented.
     * Bug fix: a request for `/` on an Ingress which had `rewrite-target` set on
         its default path would crash.
     * Bug fix: annotations which are host-specific rather than path-specific

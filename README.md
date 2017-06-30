@@ -1,7 +1,8 @@
 Traffic Server ingress controller for Kubernetes
 ================================================
 
-**WARNING: This is alpha code, do not use it in production.**
+*Note*: This software is still in development.  While we are using it internally,
+we do not recommend deploying it in a production cluster at this time.
 
 This is a Kubernetes ingress controller plugin for
 [Traffic Server](https://trafficserver.apache.org/), a high-performance,
@@ -19,15 +20,50 @@ cluster, you can use the pre-built Docker image.
 
 * HTTP/2, including Server Push
 * Websockets
-* HTTP response caching (including `PURGE` support and outgoing Cache-Control
-  manipulation)
+* HTTP response caching (including `PURGE` support, efficient whole-domain
+  purging, outgoing Cache-Control manipulation, and the ability to ignore
+  certain cookies or URL param)
+* Flexible HTTP caching, including:
+    * Cache lifetime controlled by `Cache-Control` or `Expires` headers;
+    * Manipulation of outgoing Cache-Control;
+    * Support for `PURGE` of individual pages, or efficient clearing of the
+      entire cache;
+    * Alternatives (HTTP Vary);
+    * Improve cache hit rate by ignoring URL parameters and cookies which do not
+      affect page content.
+* Domain access control (configure which namespaces can use which domains)
 * Default TLS certificates (e.g. use one wildcard certificate for all Ingresses
   in that domain)
 * On-the-fly HTTP compression
 * Proxying to external services (via Endpoints or ExternalName)
 * Fully configurable CORS response headers
-* kube-lego support
+* nginx Ingress controller compatibility, including kube-lego support
 * Access control by HTTP Basic authentication, client IP address, or both
+
+## Planned features
+
+A feature being listed here indicates we are interested in implementing it, but
+provides no guarantee that it will be implemented within any particular time
+frame, or ever.
+
+If you would like to see a particular feature supported, whether it's on this
+list or not, please
+[open a Github issue](https://github.com/torchbox/k8s-ts-ingress/issues).
+
+* TLS client certificate authentication.
+* Client session affinity
+* Backend weights
+* Proxy protocol
+* Rate limiting
+* HSTS preload support (in any case, rewrite the HSTS support as it will be
+  removed from TS core in some later release)
+* Custom error bodies
+* Support [libslz](http://www.libslz.org/) as an alternative to zlib.
+* Wildcard cache purging and/or cache tags.
+* Clustering (HTCP)
+* Modify response headers (`header-{add,replace}-Name`)
+* Incoming XFF
+* SSL passthrough
 
 ## Quick start
 

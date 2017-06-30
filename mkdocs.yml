@@ -13,6 +13,7 @@ pages:
   - Using the Docker Image: docker.md
   - Using multiple Ingress controllers: classes.md
   - Configuration: config.md
+  - Domain access control: domainaccess.md
 - Usage:
   - Annotations: annotations.md
   - Caching: caching.md

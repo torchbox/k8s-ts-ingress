@@ -74,6 +74,7 @@ cluster_config_t	*cc;
 	cc->cc_tls_minimum_version = IN_TLS_VERSION_1_0_VALUE;
 
 	TAILQ_INIT(&cc->cc_certs);
+	TAILQ_INIT(&cc->cc_domains);
 
 	return cc;
 }
@@ -81,16 +82,23 @@ cluster_config_t	*cc;
 void
 cluster_config_free(cluster_config_t *cc)
 {
-cluster_cert_t	*crt, *tmp;
+cluster_cert_t		*crt, *crttmp;
+cluster_domain_t	*dom, *domtmp;
 
 	if (!cc)
 		return;
 
-	TAILQ_FOREACH_SAFE(crt, &cc->cc_certs, cr_entry, tmp) {
+	TAILQ_FOREACH_SAFE(crt, &cc->cc_certs, cr_entry, crttmp) {
 		free(crt->cr_domain);
 		free(crt->cr_namespace);
 		free(crt->cr_name);
 		free(crt);
+	}
+
+	TAILQ_FOREACH_SAFE(dom, &cc->cc_domains, da_entry, domtmp) {
+		hash_free(dom->da_namespaces);
+		free(dom->da_domain);
+		free(dom);
 	}
 
 	free(cc);
@@ -201,6 +209,39 @@ cluster_config_t	*cc;
 	if (cc->cc_healthcheck == NULL)
 		cc->cc_healthcheck = strdup("/__trafficserver_alive");
 
+	/* domain-access-list */
+	if ((s = hash_get(cm->cm_data, "domain-access-list")) != NULL) {
+	char	*p = strdup(s), *q;
+
+		while ((q = strsep(&p, " \t\n\r")) != NULL) {
+		char	*nslist;
+
+			if ((nslist = index(q, ':')) == NULL) {
+				TSError("kubernetes: warning: invalid domain "
+					"access list entry: %s", q);
+			} else {
+			char			*ns;
+			cluster_domain_t	*cdl;
+
+				*nslist++ = '\0';
+
+				cdl = calloc(1, sizeof(*cdl));
+				cdl->da_domain = strdup(q);
+				cdl->da_namespaces = hash_new(13, NULL);
+
+				while ((ns = strsep(&nslist, ",")) != NULL) {
+					hash_set(cdl->da_namespaces, ns,
+						 HASH_PRESENT);
+				}
+
+				TAILQ_INSERT_TAIL(&cc->cc_domains, cdl, 
+						  da_entry);
+			}
+		}
+
+		free(p);
+	}
+
 	cluster_config_free(cs->cs_config);
 	cs->cs_config = cc;
 }
@@ -272,6 +313,27 @@ cluster_cert_t	*crt;
 	}
 
 	return NULL;
+}
+
+int
+cluster_domain_for_ns(cluster_t *cs, const char *dom, const char *ns)
+{
+cluster_domain_t	*cd;
+
+	if (TAILQ_EMPTY(&cs->cs_config->cc_domains))
+		return 1;
+
+	TAILQ_FOREACH(cd, &cs->cs_config->cc_domains, da_entry) {
+		if (strcmp(cd->da_domain, "*") == 0 ||
+		    domain_match(cd->da_domain, dom)) {
+			if (hash_get(cd->da_namespaces, "*") == HASH_PRESENT)
+				return 1;
+
+			return hash_get(cd->da_namespaces, ns) == HASH_PRESENT;
+		}
+	}
+
+	return 0;
 }
 
 void

@@ -109,6 +109,7 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_SECURE_BACKENDS		A_INGRESS "secure-backends"
 #define	IN_SSL_REDIRECT			A_INGRESS "ssl-redirect"
 #define	IN_FORCE_SSL_REDIRECT		A_INGRESS "force-ssl-redirect"
+#define	IN_SSL_PASSTHROUGH		A_INGRESS "ssl-passthrough"
 #define	IN_TLS_MINIMUM_VERSION		A_INGRESS "tls-minimum-version"
 #define	IN_TLS_VERSION_1_0		"1.0"
 #define	IN_TLS_VERSION_1_0_VALUE	0x0100
@@ -252,6 +253,8 @@ typedef void (*cluster_callback_t) (struct cluster *cluster, void *);
 /*
  * Default configuration, stored in the cluster.
  */
+
+/* A default certificate entry */
 typedef struct cluster_cert {
 	TAILQ_ENTRY(cluster_cert) cr_entry;
 
@@ -261,12 +264,22 @@ typedef struct cluster_cert {
 } cluster_cert_t;
 typedef TAILQ_HEAD(cluster_cert_list, cluster_cert) cluster_cert_list_t;
 
+/* A domain access list entry */
+typedef struct cluster_domain {
+	TAILQ_ENTRY(cluster_domain) da_entry;
+
+	char	*da_domain;
+	hash_t	 da_namespaces;
+} cluster_domain_t;
+typedef TAILQ_HEAD(cluster_domain_list, cluster_domain) cluster_domain_list_t;
+
 typedef struct {
 	int			 cc_tls_minimum_version;
 	int			 cc_hsts_max_age;
 	unsigned		 cc_hsts_subdomains:1;
 	unsigned		 cc_http2:1;
 	char			*cc_healthcheck;
+	cluster_domain_list_t	 cc_domains;
 	cluster_cert_list_t	 cc_certs;
 } cluster_config_t;
 
@@ -285,6 +298,8 @@ cluster_t	*cluster_make(void);
 namespace_t	*cluster_get_namespace(cluster_t *, const char *nsname);
 void		 cluster_set_configmap(cluster_t *, configmap_t *);
 cluster_cert_t	*cluster_get_cert_for_hostname(cluster_t *, const char *);
+int		 cluster_domain_for_ns(cluster_t *, const char *dom,
+				       const char *ns);
 void		 cluster_free(cluster_t *cluster);
 
 #ifdef __cplusplus

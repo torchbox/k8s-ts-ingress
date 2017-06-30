@@ -1,0 +1,25 @@
+{
+    "apiVersion": "extensions/v1beta1",
+    "kind": "Ingress",
+    "metadata": {
+        "name": "echoheaders2",
+        "namespace": "default"
+    },
+    "spec": {
+        "rules": [
+            {
+                "host": "notechoheaders.test",
+                "http": {
+                    "paths": [
+                        {
+                            "backend": {
+                                "serviceName": "echoheaders",
+                                "servicePort": "http"
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+}

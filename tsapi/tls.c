@@ -102,19 +102,43 @@ int			 ret = 1;
 		break;
 	}
 
-	SSL_set_SSL_CTX(ssl, rh->rh_ctx);
-	TSDebug("kubernetes", "[%s] handle_tls: attached SSL context [%p]",
-		host, rh->rh_ctx);
+#ifdef NOTYET
+	/* TLS passthrough? */
+	if (rh->rh_tls_passthrough) {
+	remap_path_t		*rp = rh->rh_paths[0];
+	remap_target_t		*target = remap_path_pick_target(rp);
+	struct sockaddr_in	 addr;
 
-	/*
-	 * Is HTTP/2 disabled on this Ingress?
-	 */
-	if (!rh->rh_http2) {
-	TSAcceptor	acpt = TSAcceptorGet(ssl_vc);
-	int		acptid = TSAcceptorIDGet(acpt);
+		bzero(&addr, sizeof(addr));
+		if (inet_pton(AF_INET, res.rz_target->rt_host, &addr.sin_addr) != 1) {
+			TSError("kubernetes: %s: could not find target host",
+				host);
+			goto cleanup;
+		}
 
-		/* If yes, set the protocolset we saved earlier */
-		TSRegisterProtocolSet(ssl_vc, state->protosets[acptid]);
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(target->rt_port);
+		TSHttpTxnServerAddrSet(txnp, (struct sockaddr *) &addr);
+			TSVConnTunnel(ssl_vc);
+			TSDebug("kubernetes", "[%s] handle_tls: will blind tunnel",
+				host);
+	} else
+#endif
+	{
+		SSL_set_SSL_CTX(ssl, rh->rh_ctx);
+		TSDebug("kubernetes", "[%s] handle_tls: attached SSL context [%p]",
+			host, rh->rh_ctx);
+
+		/*
+		 * Is HTTP/2 disabled on this Ingress?
+		 */
+		if (!rh->rh_http2) {
+		TSAcceptor	acpt = TSAcceptorGet(ssl_vc);
+		int		acptid = TSAcceptorIDGet(acpt);
+
+			/* If yes, set the protocolset we saved earlier */
+			TSRegisterProtocolSet(ssl_vc, state->protosets[acptid]);
+		}
 	}
 
 cleanup:

@@ -91,6 +91,13 @@ build_ingress_rule(remap_db_t *db, cluster_t *cs, namespace_t *ns,
 remap_host_t	*rh;
 size_t		 i;
 
+	if (!cluster_domain_for_ns(cs, rule->ir_host, ns->ns_name)) {
+		TSError("kubernetes: ignoring Ingress %s host %s since "
+			"namespace %s does not have access to this domain",
+			ing->in_name, rule->ir_host, ns->ns_name);
+		return;
+	}
+
 	rh = remap_db_get_or_create_host(db, rule->ir_host);
 
 	/*
@@ -153,6 +160,13 @@ secret_t		*secret;
 	for (size_t i = 0; i < itls->it_nhosts; i++) {
 	const char	*hostname = itls->it_hosts[i];
 	remap_host_t	*rh;
+
+		if (!cluster_domain_for_ns(cs, hostname, ns->ns_name)) {
+			TSError("kubernetes: ignoring Ingress %s TLS %s since "
+				"namespace %s does not have access to this "
+				"domain", ing->in_name, hostname, ns->ns_name);
+			return;
+		}
 
 		rh = remap_db_get_or_create_host(db, hostname);
 

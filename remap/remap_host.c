@@ -147,6 +147,10 @@ const char	*s;
 			rh->rh_tls_version = IN_TLS_VERSION_1_2_VALUE;
 	} else
 		rh->rh_tls_version = cs->cs_config->cc_tls_minimum_version;
+
+	/* ssl-passthrough */
+	if ((s = hash_get(annotations, IN_SSL_PASSTHROUGH)) != NULL)
+		rh->rh_tls_passthrough = truefalse(s);
 }
 
 /*
