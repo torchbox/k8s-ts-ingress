@@ -6,7 +6,7 @@ set -e
 if [ -n "$TRAVIS_TAG" ]; then
 	VERSION="$TRAVIS_TAG"
 else
-	VERSION="$(sed -ne '/AC_INIT/ {s/.*, \[\(.*\)\].*/\1/; p}' configure.ac)-dev"
+	VERSION="v$(sed -ne '/AC_INIT/ {s/.*, \[\(.*\)\].*/\1/; p}' configure.ac)-dev"
 fi
 
 printf 'travis_fold:start:build-release\r'
