@@ -458,7 +458,8 @@ size_t	 pfxsz;
 	memset(ret, 0, sizeof(*ret));
 	ret->rz_headers = hash_new(127, free);
 
-	if (req->rr_path && !strcmp(req->rr_path, db->rd_healthcheck + 1)) {
+	if (req->rr_path && db->rd_healthcheck &&
+	    !strcmp(req->rr_path, db->rd_healthcheck + 1)) {
 		ret->rz_status = 200;
 		ret->rz_status_text = "OK";
 		return RR_SYNTHETIC;
