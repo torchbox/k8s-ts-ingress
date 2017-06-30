@@ -109,6 +109,13 @@
     </li>
 
         
+            
+    <li class="toctree-l1 ">
+        <a class="" href="../domainaccess/">Domain access control</a>
+        
+    </li>
+
+        
     </ul>
 <li>
           
@@ -322,7 +329,15 @@ by an Ingress.</p>
 <li><code>http2-enable</code>: <a href="../annotations/">Annotations</a></li>
 </ul>
 <h2 id="global-configuration_1">Global configuration</h2>
-<p>None yet.</p>
+<ul>
+<li><code>healthcheck-path</code>: TS will return a synthetic 200 response to any request for
+  this path, regardless of Host header.  This will only work once TS has
+  finished its first cluster sync after startup; it can therefore be used as a
+  Kubernetes livenessProbe or load balancer healthcheck to ensure TS does not
+  receive requests before it's ready.  If not set, defaults to
+  <code>/__trafficserver_alive</code>.</li>
+<li><code>tls-certificates</code>: <a href="../tls/">TLS</a></li>
+</ul>
               
             </div>
           </div>
@@ -330,7 +345,7 @@ by an Ingress.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../annotations/" class="btn btn-neutral float-right" title="Annotations">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../domainaccess/" class="btn btn-neutral float-right" title="Domain access control">Next <span class="icon icon-circle-arrow-right"></span></a>
       
       
         <a href="../classes/" class="btn btn-neutral" title="Using multiple Ingress controllers"><span class="icon icon-circle-arrow-left"></span> Previous</a>
@@ -366,7 +381,7 @@ by an Ingress.</p>
         <span><a href="../classes/" style="color: #fcfcfc;">&laquo; Previous</a></span>
       
       
-        <span style="margin-left: 15px"><a href="../annotations/" style="color: #fcfcfc">Next &raquo;</a></span>
+        <span style="margin-left: 15px"><a href="../domainaccess/" style="color: #fcfcfc">Next &raquo;</a></span>
       
     </span>
 </div>

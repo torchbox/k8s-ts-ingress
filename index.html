@@ -64,10 +64,6 @@
                 
                     <li><a class="toctree-l4" href="#quick-start">Quick start</a></li>
                 
-                    <li><a class="toctree-l4" href="#features">Features</a></li>
-                
-                    <li><a class="toctree-l4" href="#planned-features">Planned features</a></li>
-                
                     <li><a class="toctree-l4" href="#known-bugs">Known bugs</a></li>
                 
                     <li><a class="toctree-l4" href="#release-history">Release history</a></li>
@@ -109,6 +105,13 @@
             
     <li class="toctree-l1 ">
         <a class="" href="config/">Configuration</a>
+        
+    </li>
+
+        
+            
+    <li class="toctree-l1 ">
+        <a class="" href="domainaccess/">Domain access control</a>
         
     </li>
 
@@ -224,8 +227,8 @@
             <div class="section">
               
                 <h1 id="traffic-server-ingress-controller">Traffic Server ingress controller</h1>
-<p><strong>WARNING: This is alpha code, do not use it in production.</strong>  (If you do,
-please report bugs.)</p>
+<p><em>Note</em>: This software is still in development.  While we are using it internally,
+we do not recommend deploying it in a production cluster at this time.</p>
 <p><a href="https://trafficserver.apache.org/">Traffic Server</a> is a high-performance,
 extensible HTTP proxy server with a rich feature set, including TLS termination,
 caching, and edge-side includes (ESI).  This plugin allows Traffic Server to
@@ -253,55 +256,6 @@ those ports, or use Kubernetes'
 to manage a virtual IP address on your cluster.</p>
 <p>For more detailed installation instructions, see the documentation for
 <a href="source/">building from source</a> or <a href="docker/">Deploying on Kubernetes</a>.</p>
-<h2 id="features">Features</h2>
-<p>The controller provides the following features:</p>
-<ul>
-<li>Full support for Ingress resources, including many annotations used by other
-  controller implementations;</li>
-<li>HTTP/2, including server push (but see "known bugs", below);</li>
-<li>WebSockets;</li>
-<li>TLS termination, configured in the Ingress resource using Kubernetes Secrets;</li>
-<li>Emulation of the nginx Ingress controller (for services that require it,
-  e.g. kube-lego);</li>
-<li>Flexible HTTP caching, including:<ul>
-<li>Cache lifetime controlled by <code>Cache-Control</code> or <code>Expires</code> headers;</li>
-<li>Manipulation of outgoing Cache-Control;</li>
-<li>Removal from the cache of individual pages or all pages at once;</li>
-<li>Alternatives (HTTP Vary);</li>
-<li>Ignoring URL parameters and cookies which do not affect page content.</li>
-</ul>
-</li>
-<li>HTTP compression (gzip and Brotli);</li>
-<li>Authorization using HTTP Basic authentication or client IP address;</li>
-<li>A complete, configurable CORS implementation;</li>
-<li>Proxying to external (non-Kubernetes) services using Ingress resources;</li>
-<li>ESI (Edge-Side Includes).</li>
-</ul>
-<h2 id="planned-features">Planned features</h2>
-<p>A feature being listed here indicates we are interested in implementing it, but
-provides no guarantee that it will be implemented within any particular time
-frame, or ever.</p>
-<p>If you would like to see a particular feature supported, whether it's on this
-list or not, please
-<a href="https://github.com/torchbox/k8s-ts-ingress/issues">open a Github issue</a>.</p>
-<ul>
-<li>TLS client certificate authentication.</li>
-<li>Client session affinity</li>
-<li>Backend weights</li>
-<li>Proxy protocol</li>
-<li>Rate limiting</li>
-<li>SSL passthrough</li>
-<li>Global / default configuration</li>
-<li>HSTS preload support (in any case, rewrite the HSTS support as it will be
-  removed from TS core in some later release)</li>
-<li>Custom error bodies</li>
-<li>Support <a href="http://www.libslz.org/">libslz</a> as an alternative to zlib.</li>
-<li>Wildcard cache purging and/or cache tags.</li>
-<li>Clustering (HTCP)</li>
-<li>Modify response headers (<code>header-{add,replace}-Name</code>)</li>
-<li>Incoming XFF</li>
-<li>Health check</li>
-</ul>
 <h2 id="known-bugs">Known bugs</h2>
 <ul>
 <li>A Traffic Server bug
@@ -321,7 +275,9 @@ list or not, please
 <ul>
 <li>Feature: the <code>tls-minimum-version</code> annotation was implemented.</li>
 <li>Feature: the global ConfigMap was implemented.</li>
-<li>Feature: the <code>tls-certificates</code> configmap option was implemented.</li>
+<li>Feature: the <code>tls-certificates</code> ConfigMap option was implemented.</li>
+<li>Feature: built-in TS healthchecks were implemented.</li>
+<li>Feature: the <code>domain-access-list</code> ConfigMap option was implemented.</li>
 <li>Bug fix: a request for <code>/</code> on an Ingress which had <code>rewrite-target</code> set on
     its default path would crash.</li>
 <li>Bug fix: annotations which are host-specific rather than path-specific
@@ -515,5 +471,5 @@ of California, based on code written by Guido van Rossum.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-06-30 12:32:48
+Build Date UTC : 2017-06-30 21:03:33
 -->
