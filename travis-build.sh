@@ -37,7 +37,7 @@ tests/e2erun.sh
 printf 'travis_fold:end:test-e2e\r'
 
 # If this is a release, push the Docker image to Docker Hub.
-if [ "$TRAVIS_PULL_REQUEST" = "false" ];
+if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
 	printf 'travis_fold:start:release\r'
 	printf '>>> Creating release.\n\n'
 
