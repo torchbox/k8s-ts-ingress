@@ -89,6 +89,7 @@ TEST(RemapDB, PathLookup)
 	};
 
 	remap_host_t *host = remap_host_new();
+	scoped_c_ptr<remap_host_t *> host_(host, remap_host_free);
 
 	/*
 	 * Add some paths to the database.  We (mis)use rp_app_root to record what
@@ -96,7 +97,7 @@ TEST(RemapDB, PathLookup)
 	 */
 	for (string path: paths) {
 		remap_path_t *rp = remap_host_new_path(host, path.c_str());
-		ASSERT_NE(static_cast<remap_path_t *>(nullptr), rp)
+		ASSERT_TRUE(rp != NULL)
 			<< "creating path [" << path << "]";
 
 		rp->rp_app_root = strdup(path.c_str());
@@ -115,8 +116,6 @@ TEST(RemapDB, PathLookup)
 		rp = remap_host_find_path(host, test.first.c_str(), nullptr);
 		EXPECT_STREQ(test.second.c_str(), rp->rp_app_root);
 	}
-
-	remap_host_free(host);
 }
 
 TEST(RemapDB, HostLookup)
@@ -144,13 +143,20 @@ TEST(RemapDB, HostLookup)
 TEST(RemapDB, Basic)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-basic.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -158,6 +164,7 @@ TEST(RemapDB, Basic)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
@@ -166,24 +173,25 @@ TEST(RemapDB, Basic)
 	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("http", res.rz_proto);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, EmptyPath)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-basic.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -191,6 +199,7 @@ TEST(RemapDB, EmptyPath)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
@@ -199,24 +208,25 @@ TEST(RemapDB, EmptyPath)
 	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("http", res.rz_proto);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, IngressClass1)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-class1.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -224,18 +234,13 @@ TEST(RemapDB, IngressClass1)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
 	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("http", res.rz_proto);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, IngressClass2)
@@ -269,16 +274,21 @@ TEST(RemapDB, IngressClass2)
 TEST(RemapDB, IngressClass3)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-class2.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
 
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
 	cfg_set_ingress_classes(cfg, "nginx");
 
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -286,30 +296,32 @@ TEST(RemapDB, IngressClass3)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
 	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("http", res.rz_proto);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, ForceTLSRedirect)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-force-tls.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -317,30 +329,32 @@ TEST(RemapDB, ForceTLSRedirect)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_SYNTHETIC, ret);
 	const char *s = (const char *)hash_get(res.rz_headers, "Location");
 	EXPECT_STREQ("https://echoheaders.gce.t6x.uk/what/ever", s);
 	EXPECT_EQ(301, res.rz_status);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, ForceTLSRedirectEmptyPath)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-force-tls.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -348,18 +362,13 @@ TEST(RemapDB, ForceTLSRedirectEmptyPath)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_SYNTHETIC, ret);
 	const char *s = (const char *)hash_get(res.rz_headers, "Location");
 	EXPECT_STREQ("https://echoheaders.gce.t6x.uk/", s);
 	EXPECT_EQ(301, res.rz_status);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, AppRoot1)
@@ -448,16 +457,24 @@ TEST(RemapDB, AppRoot3)
 	k8s_config_free(cfg);
 	cluster_free(cluster);
 }
+
 TEST(RemapDB, RewriteTarget)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-rewrite-target.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -465,6 +482,7 @@ TEST(RemapDB, RewriteTarget)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
@@ -472,24 +490,25 @@ TEST(RemapDB, RewriteTarget)
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("app/bar", res.rz_urlpath);
 	EXPECT_STREQ("http", res.rz_proto);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, SecureBackends)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-secure-backends.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -497,26 +516,27 @@ TEST(RemapDB, SecureBackends)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
+
 	ASSERT_EQ(RR_OK, ret);
 	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("https", res.rz_proto);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthAddressPermit)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-address.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	struct sockaddr_in sin;
@@ -526,6 +546,8 @@ TEST(RemapDB, AuthAddressPermit)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -534,18 +556,13 @@ TEST(RemapDB, AuthAddressPermit)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
 	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("http", res.rz_proto);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthAddressDeny)
@@ -585,9 +602,14 @@ TEST(RemapDB, AuthAddressDeny)
 TEST(RemapDB, AuthBasicPermit)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-basic.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	struct sockaddr_in sin;
@@ -597,6 +619,8 @@ TEST(RemapDB, AuthBasicPermit)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -608,18 +632,13 @@ TEST(RemapDB, AuthBasicPermit)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
 	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("http", res.rz_proto);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthBasicDenyNoCredentials)
@@ -695,9 +714,14 @@ TEST(RemapDB, AuthBasicDenyInvalidCredentials)
 TEST(RemapDB, AuthAllPermit)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-auth-all.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	struct sockaddr_in sin;
@@ -707,6 +731,8 @@ TEST(RemapDB, AuthAllPermit)
 
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -717,18 +743,13 @@ TEST(RemapDB, AuthAllPermit)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
 	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
 	EXPECT_EQ(8080, res.rz_target->rt_port);
 	EXPECT_STREQ("http", res.rz_proto);
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, AuthAllDenyNoCredentials)
@@ -840,13 +861,20 @@ TEST(RemapDB, AuthAllDenyInvalidAddress)
 TEST(RemapDB, QueryString)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-basic.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -855,30 +883,32 @@ TEST(RemapDB, QueryString)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
 
 	/* Make sure pick_target returns the right host */
 	EXPECT_STREQ(res.rz_query, "a=1&b=2&c=3");
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, QueryStringIgnore)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-ignore-params.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -887,30 +917,32 @@ TEST(RemapDB, QueryStringIgnore)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
 
 	/* Make sure pick_target returns the right host */
 	EXPECT_STREQ(res.rz_query, "quux=4&xyzzy=5");
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, QueryStringWhitelist)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-whitelist-params.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -919,30 +951,32 @@ TEST(RemapDB, QueryStringWhitelist)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
 
 	/* Make sure pick_target returns the right host */
 	EXPECT_STREQ(res.rz_query, "quux=4&xyzzy=5");
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, QueryStringIgnoreAndWhitelist)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-ignore-whitelist-params.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -951,31 +985,33 @@ TEST(RemapDB, QueryStringIgnoreAndWhitelist)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
 
 	/* Make sure pick_target returns the right host */
 	EXPECT_STREQ(res.rz_query, "quux=4&xyzzy=5");
-
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }
 
 TEST(RemapDB, CacheKey)
 {
 	cluster_t *cluster = load_test_ingress(
 			"tests/ingress-ignore-whitelist-params.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
 	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
 	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
 	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
 
 	/* Build a request */
 	remap_request_t req;
 	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
 	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
 	req.rr_proto = strdup("http");
 	req.rr_host = strdup("echoheaders.gce.t6x.uk");
@@ -984,6 +1020,7 @@ TEST(RemapDB, CacheKey)
 
 	remap_result_t res;
 	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
 
 	int ret = remap_run(db, &req, &res);
 	ASSERT_EQ(RR_OK, ret);
@@ -999,11 +1036,5 @@ TEST(RemapDB, CacheKey)
 	string actual = string(cachekey, keysize);
 	EXPECT_EQ(expected.size(), keysize);
 	EXPECT_EQ(expected, actual);
-
 	free(cachekey);
-	remap_request_free(&req);
-	remap_result_free(&res);
-	remap_db_free(db);
-	k8s_config_free(cfg);
-	cluster_free(cluster);
 }

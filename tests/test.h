@@ -26,6 +26,20 @@ extern int ts_api_errors;
 #include	<string>
 
 json_object *test_load_json(std::string const& fname);
+
+template<typename T>
+struct scoped_c_ptr {
+	typedef void (*free_fn_t) (T);
+
+	scoped_c_ptr(T ptr, free_fn_t fn) : ptr(ptr), free_fn(fn) {}
+
+	~scoped_c_ptr() {
+		free_fn(ptr);
+	}
+
+	T ptr;
+	free_fn_t free_fn;
+};
 #endif
 
 #endif  /* !TEST_H */

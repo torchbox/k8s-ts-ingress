@@ -42,10 +42,10 @@ TEST(API, Ingress) {
 	ASSERT_TRUE(obj != NULL);
 
 	ingress_t *ing = ingress_make(obj);
-	ASSERT_TRUE(ing != NULL);
-
 	json_object_put(obj);
-	obj = NULL;
+	ASSERT_TRUE(ing != NULL);
+	scoped_c_ptr<ingress_t *> ing_(ing, ingress_free);
+
 
 	EXPECT_STREQ("default", ing->in_namespace);
 	EXPECT_STREQ("echoheaders", ing->in_name);
@@ -76,7 +76,6 @@ TEST(API, Ingress) {
 	EXPECT_STREQ("echoheaders", path->ip_service_name);
 	EXPECT_STREQ("http", path->ip_service_port);
 
-	ingress_free(ing);
 	EXPECT_EQ(0, ts_api_errors);
 }
 
@@ -87,10 +86,10 @@ TEST(API, Service) {
 	ASSERT_TRUE(obj != NULL);
 
 	service_t *svc = service_make(obj);
-	ASSERT_TRUE(svc != NULL);
-
 	json_object_put(obj);
-	obj = NULL;
+
+	ASSERT_TRUE(svc != NULL);
+	scoped_c_ptr<service_t *> svc_(svc, service_free);
 
 	EXPECT_STREQ("echoheaders", svc->sv_name);
 	EXPECT_STREQ("default", svc->sv_namespace);
@@ -121,7 +120,6 @@ TEST(API, Service) {
 	service_port_t *port2 = service_find_port(svc, "80", SV_P_TCP);
 	EXPECT_EQ(port, port2);
 
-	service_free(svc);
 	EXPECT_EQ(0, ts_api_errors);
 }
 
@@ -265,8 +263,9 @@ TEST(API, Endpoints) {
 	ASSERT_TRUE(obj != NULL);
 
 	endpoints_t *eps = endpoints_make(obj);
-	ASSERT_TRUE(eps != NULL);
 	json_object_put(obj);
+	ASSERT_TRUE(eps != NULL);
+	scoped_c_ptr<endpoints_t *> eps_(eps, endpoints_free);
 
 	EXPECT_STREQ("default", eps->ep_namespace);
 	EXPECT_STREQ("echoheaders", eps->ep_name);
@@ -292,7 +291,6 @@ TEST(API, Endpoints) {
 		i++;
 	EXPECT_EQ(i, 1);
 
-	endpoints_free(eps);
 	EXPECT_EQ(0, ts_api_errors);
 }
 
@@ -303,8 +301,9 @@ TEST(API, Endpoints2) {
 	ASSERT_TRUE(obj != NULL);
 
 	endpoints_t *eps = endpoints_make(obj);
-	ASSERT_TRUE(eps != NULL);
 	json_object_put(obj);
+	ASSERT_TRUE(eps != NULL);
+	scoped_c_ptr<endpoints_t *> eps_(eps, endpoints_free);
 
 	EXPECT_STREQ("kube-lego", eps->ep_namespace);
 	EXPECT_STREQ("kube-lego-nginx", eps->ep_name);
@@ -326,6 +325,5 @@ TEST(API, Endpoints2) {
 		i++;
 	EXPECT_EQ(i, 1);
 
-	endpoints_free(eps);
 	EXPECT_EQ(0, ts_api_errors);
 }

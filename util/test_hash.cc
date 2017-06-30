@@ -19,6 +19,7 @@
 #include	"hash.h"
 
 #include	"gtest/gtest.h"
+#include	"tests/test.h"
 
 using std::vector;
 using std::map;
@@ -60,6 +61,8 @@ TEST(Hash, SetGet)
 	char	*s;
 
 		hs = hash_new(size, NULL);
+		scoped_c_ptr<hash_t> hs_(hs, hash_free);
+
 		populate_hash(hs);
 
 		s = static_cast<char *>(hash_get(hs, "foo"));
@@ -73,8 +76,6 @@ TEST(Hash, SetGet)
 		s = static_cast<char *>(hash_get(hs, "quux"));
 		ASSERT_NE(s, static_cast<char *>(NULL));
 		EXPECT_STREQ("quux key", s);
-
-		hash_free(hs);
 	}
 }
 
@@ -119,6 +120,8 @@ TEST(Hash, Iterate)
 		};
 
 		hs = hash_new(size, NULL);
+		scoped_c_ptr<hash_t> hs_(hs, hash_free);
+
 		populate_hash(hs);
 
 		memset(&iterstate, 0, sizeof(iterstate));
@@ -133,8 +136,6 @@ TEST(Hash, Iterate)
 		EXPECT_EQ(i, 0);
 
 		EXPECT_EQ(expected, actual);
-
-		hash_free(hs);
 	}
 }
 
@@ -148,6 +149,8 @@ void			*v = NULL;
 int			 i = 0;
 
 	hs = hash_new(10, NULL);
+	scoped_c_ptr<hash_t> hs_(hs, hash_free);
+
 	hash_setn(hs, "", 0, HASH_PRESENT);
 
 	memset(&iterstate, 0, sizeof(iterstate));
@@ -155,6 +158,4 @@ int			 i = 0;
 	ASSERT_EQ(i, 1);
 	EXPECT_EQ(klen, 0u);
 	EXPECT_EQ(v, HASH_PRESENT);
-
-	hash_free(hs);
 }
