@@ -581,7 +581,7 @@ size_t		 buflen;
 
 	buflen += 2 + pathlen + 2 + querylen;
 
-	p = buf = malloc(buflen);
+	buf = p = malloc(buflen);
 
 	*p++ = protolen;
 	memcpy(p, req->rr_proto, protolen);
