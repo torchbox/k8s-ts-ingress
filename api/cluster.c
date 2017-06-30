@@ -139,6 +139,7 @@ cluster_free(cluster_t *cs)
 {
 	TSDebug("kubernetes", "cluster_free: %p", cs);
 	hash_free(cs->cs_namespaces);
+	cluster_config_free(cs->cs_config);
 	pthread_rwlock_destroy(&cs->cs_lock);
 	free(cs);
 }
