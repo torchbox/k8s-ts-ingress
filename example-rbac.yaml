@@ -20,6 +20,7 @@ rules:
   - namespaces
   - replicationcontrollers
   - endpoints
+  - configmaps
   verbs:
   - get
   - list
