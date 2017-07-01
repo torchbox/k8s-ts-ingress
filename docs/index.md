@@ -58,6 +58,8 @@ For more detailed installation instructions, see the documentation for
     * Feature: the `tls-certificates` ConfigMap option was implemented.
     * Feature: built-in TS healthchecks were implemented.
     * Feature: the `domain-access-list` ConfigMap option was implemented.
+    * Improvement: the Docker image now sends log output to stdout, as
+        expected in Docker.
     * Bug fix: a request for `/` on an Ingress which had `rewrite-target` set on
         its default path would crash.
     * Bug fix: annotations which are host-specific rather than path-specific
