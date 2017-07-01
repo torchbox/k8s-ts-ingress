@@ -241,13 +241,17 @@ TSMLoc		 aenc;
 int		 has_gzip = 0, has_br = 0, has_deflate = 0;
 
 	aenc = TSMimeHdrFieldFind(reqp, hdr, "Accept-Encoding", -1);
-	if (!aenc)
+	if (!aenc) {
+		TSDebug("kubernetes", "request_can_compress: no Accept-Encoding");
 		return COMP_NONE;
+	}
 
 	for (int i = 1, end = TSMimeHdrFieldValuesCount(reqp, hdr, aenc);
 	     i <= end; ++i) {
 
 		cs = TSMimeHdrFieldValueStringGet(reqp, hdr, aenc, end - i, &len);
+		TSDebug("kubernetes", "request_can_compress: client will accept"
+			" %.*s", i, cs);
 
 		if ((len == 4 && memcmp(cs, "gzip", 4) == 0)
 		    || (len >= 4 && memcmp(cs, "gzip;", 5) == 0))
@@ -258,11 +262,14 @@ int		 has_gzip = 0, has_br = 0, has_deflate = 0;
 			has_deflate = 1;
 
 		if ((len == 2 && memcmp(cs, "br", 2) == 0)
-		    || (len >= 2 && memcmp(cs, "br;", 2) == 0))
+		    || (len >= 2 && memcmp(cs, "br;", 3) == 0))
 			has_br = 1;
 	}
 
 	TSHandleMLocRelease(reqp, hdr, aenc);
+
+	TSDebug("kubernetes", "request_can_compress: has_br=%d has_deflate=%d "
+		"has_gzip=%d", has_br, has_deflate, has_gzip);
 
 	/*
 	 * We ignore the browser's preference here and just prefer br if
@@ -290,7 +297,7 @@ int		 len;
 char		*s, *p;
 const char	*cs;
 
-	/* 
+	/*
 	 * If the response already has a Content-Encoding header, it's not
 	 * cacheable.
 	 */
@@ -523,7 +530,7 @@ int64_t		 avail, toread;
 		state->cs_output_len += written;
 	}
 
-	if (toread) 
+	if (toread)
 		TSContCall(TSVIOContGet(state->cs_input_vio), TS_EVENT_VCONN_WRITE_READY,
 			   state->cs_input_vio);
 	else {
@@ -627,7 +634,7 @@ comp_state_t	*state = rctx->rq_comp_state;
 		TSHttpTxnTransformedRespCache(txn, 0);
 		TSHttpTxnUntransformedRespCache(txn, 1);
 
-		rctx->rq_compress_transform = 
+		rctx->rq_compress_transform =
 			TSTransformCreate(transform_event, txn);
 		TSContDataSet(rctx->rq_compress_transform, state);
 		TSHttpTxnHookAdd(txn, TS_HTTP_RESPONSE_TRANSFORM_HOOK,
@@ -667,7 +674,7 @@ int		 cache_status = -1;
 		TSHttpTxnTransformedRespCache(txn, 0);
 		TSHttpTxnUntransformedRespCache(txn, 1);
 
-		rctx->rq_compress_transform = 
+		rctx->rq_compress_transform =
 			TSTransformCreate(transform_event, txn);
 		TSContDataSet(rctx->rq_compress_transform, state);
 		TSHttpTxnHookAdd(txn, TS_HTTP_RESPONSE_TRANSFORM_HOOK,
@@ -695,6 +702,9 @@ int		 type;
 	TSHttpTxnClientReqGet(txn, &reqp, &hdr);
 	type = request_can_compress(reqp, hdr);
 	TSHandleMLocRelease(reqp, TS_NULL_MLOC, hdr);
+
+	TSDebug("kubernetes", "tsi_compress: request_can_compressed said %d",
+		type);
 
 	if (type == COMP_NONE)
 		return;
