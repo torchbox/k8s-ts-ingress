@@ -278,10 +278,10 @@ int		 has_gzip = 0, has_br = 0, has_deflate = 0;
 	 */
 	if (has_br)
 		return COMP_BROTLI;
-	if (has_deflate)
-		return COMP_DEFLATE;
 	if (has_gzip)
 		return COMP_GZIP;
+	if (has_deflate)
+		return COMP_DEFLATE;
 	return COMP_NONE;
 }
 

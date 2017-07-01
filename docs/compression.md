@@ -1,13 +1,20 @@
 # HTTP compression
 
 HTTP compression allows the response body of an HTTP transation to be compressed
-to reduce its size, saving bandwidth and decreasing page load times.  Both the
-gzip and Brotli algorithms are supported; gzip is the most common and
-widely-supported algorithm, while Brotli is a newer algorithm specifically
-designed to perform well for typical HTTP content (like HTML).
+to reduce its size, saving bandwidth and decreasing page load times.  The gzip,
+deflate and brotli algorithms are supported.
 
-SDCH (an experimental delta-compression algorithm) and deflate (an uncommon
-gzip-like format) are not supported.
+gzip and deflate are almost identical; since deflate doesn't include a checksum,
+it is slightly faster than gzip.  However, some common web browsers implement a
+broken version of deflate, so gzip will be preferred over deflate if the client
+requests both.
+
+Brotli is a newer algorithm specifically designed to perform well for typical
+HTTP content (like HTML), but is much slower than gzip for modest gains in
+compression ratio.  (It is designed for content to be pre-compressed rather
+than compressed on demand.)
+
+SDCH (an experimental delta-compression algorithm) is not supported.
 
 HTTP compression is enabled by default.  To disable compression on an Ingress,
 set the `ingress.kubernetes.io/compress-enable` annotation to `"false"`:
