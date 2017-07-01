@@ -72,6 +72,7 @@ cluster_config_t	*cc;
 	cc->cc_http2 = 1;
 	/* Consider changing this to TLS 1.1 at some point */
 	cc->cc_tls_minimum_version = IN_TLS_VERSION_1_0_VALUE;
+	cc->cc_healthcheck = strdup("/__trafficserver_alive");
 
 	TAILQ_INIT(&cc->cc_certs);
 	TAILQ_INIT(&cc->cc_domains);
@@ -202,12 +203,11 @@ cluster_config_t	*cc;
 		if (*cc->cc_healthcheck != '/')
 			TSError("kubernetes: invalid healthcheck-path \"%s\"",
 				s);
-		else
+		else {
+			free(cc->cc_healthcheck);
 			cc->cc_healthcheck = strdup(s);
+		}
 	}
-
-	if (cc->cc_healthcheck == NULL)
-		cc->cc_healthcheck = strdup("/__trafficserver_alive");
 
 	/* domain-access-list */
 	if ((s = hash_get(cm->cm_data, "domain-access-list")) != NULL) {
