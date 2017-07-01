@@ -54,7 +54,7 @@ spec:
 
       containers:
       - name: trafficserver
-        image: docker.io/torchbox/k8s-ts-ingress:1.0.0-alpha9
+        image: docker.io/torchbox/k8s-ts-ingress:v1.0.0-alpha9
         imagePullPolicy: IfNotPresent
 
         # Load the configuration map.
