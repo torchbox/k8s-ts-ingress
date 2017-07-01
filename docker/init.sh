@@ -38,6 +38,4 @@ __EOF__
 echo "CONFIG proxy.config.proxy_name STRING $(hostname)" \
     >>/usr/local/etc/trafficserver/records.config
 
-chown -R nobody:nogroup /var/log/trafficserver /var/lib/trafficserver
-
-exec /usr/local/bin/traffic_cop -o
+exec /usr/local/bin/traffic_server

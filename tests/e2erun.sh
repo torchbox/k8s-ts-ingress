@@ -29,7 +29,7 @@ download_hyperkube() {
 	if [ -e "$HYPERKUBE" ]; then
 		return 0
 	fi
-	
+
 	echo '>>> Downloading hyperkube'
 	curl -Lo$HYPERKUBE https://storage.googleapis.com/kubernetes-release/release/v${E2E_KUBERNETES_VERSION}/bin/linux/amd64/hyperkube
 	chmod 755 $HYPERKUBE
@@ -78,8 +78,13 @@ start_ts() {
 	idir=$(pwd)/_test/ts-install-${E2E_TS_VERSION}
 	printf 'starting traffic_server: '
 	cp tests/e2e-kubernetes.config $idir/etc/trafficserver/kubernetes.config
-	cp tests/records.config $idir/etc/trafficserver/records.config
 	cp tests/plugin.config $idir/etc/trafficserver/plugin.config
+	cp docker/records.config $idir/etc/trafficserver/records.config
+
+	PROXY_CONFIG_HTTP_SERVER_PORTS='58080 58443:ssl'
+	export PROXY_CONFIG_HTTP_SERVER_PORTS
+#echo 'CONFIG proxy.config.http.server_ports STRING 58080 58443:ssl' \
+#		>>$idir/etc/trafficserver/records.config
 
 	# Make sure the cache is empty before starting the test.
 	$idir/bin/traffic_server -Cclear_cache >>$TESTDIR/log 2>&1 || true
