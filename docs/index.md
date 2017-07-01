@@ -52,7 +52,9 @@ For more detailed installation instructions, see the documentation for
 
 ## Release history
 
-* 1.0.0-alpha9 (unreleased):
+* 1.0.0-alpha9:
+    * Incompatible change: the Docker image now listens on ports 80 and 443 by
+        default, instead of 7080 and 7443.
     * Feature: the `tls-minimum-version` annotation was implemented.
     * Feature: the global ConfigMap was implemented.
     * Feature: the `tls-certificates` ConfigMap option was implemented.
