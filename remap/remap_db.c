@@ -56,6 +56,7 @@ remap_db_free(remap_db_t *db)
 		return;
 
 	hash_free(db->rd_hosts);
+	free(db->rd_healthcheck);
 	free(db);
 }
 

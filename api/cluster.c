@@ -102,6 +102,7 @@ cluster_domain_t	*dom, *domtmp;
 		free(dom);
 	}
 
+	free(cc->cc_healthcheck);
 	free(cc);
 }
 
