@@ -271,13 +271,24 @@ to manage a virtual IP address on your cluster.</p>
 <h2 id="release-history">Release history</h2>
 <ul>
 <li>
-<p>1.0.0-alpha9 (unreleased):</p>
+<p>1.0.0-alpha10 (unreleased):</p>
 <ul>
+<li>Bug fix: if a domain was specified in <code>domain-access-list</code>, a later match
+    for <code>*</code> or the same domain would be ignored.</li>
+</ul>
+</li>
+<li>
+<p>1.0.0-alpha9:</p>
+<ul>
+<li>Incompatible change: the Docker image now listens on ports 80 and 443 by
+    default, instead of 7080 and 7443.</li>
 <li>Feature: the <code>tls-minimum-version</code> annotation was implemented.</li>
 <li>Feature: the global ConfigMap was implemented.</li>
 <li>Feature: the <code>tls-certificates</code> ConfigMap option was implemented.</li>
 <li>Feature: built-in TS healthchecks were implemented.</li>
 <li>Feature: the <code>domain-access-list</code> ConfigMap option was implemented.</li>
+<li>Improvement: the Docker image now sends log output to stdout, as
+    expected in Docker.</li>
 <li>Bug fix: a request for <code>/</code> on an Ingress which had <code>rewrite-target</code> set on
     its default path would crash.</li>
 <li>Bug fix: annotations which are host-specific rather than path-specific
@@ -471,5 +482,5 @@ of California, based on code written by Guido van Rossum.</p>
 
 <!--
 MkDocs version : 0.15.3
-Build Date UTC : 2017-07-01 14:58:58
+Build Date UTC : 2017-07-02 07:22:47
 -->
