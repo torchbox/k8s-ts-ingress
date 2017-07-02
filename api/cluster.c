@@ -330,7 +330,8 @@ cluster_domain_t	*cd;
 			if (hash_get(cd->da_namespaces, "*") == HASH_PRESENT)
 				return 1;
 
-			return hash_get(cd->da_namespaces, ns) == HASH_PRESENT;
+			if (hash_get(cd->da_namespaces, ns) == HASH_PRESENT)
+				return 1;
 		}
 	}
 

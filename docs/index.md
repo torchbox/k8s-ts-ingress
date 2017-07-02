@@ -52,6 +52,10 @@ For more detailed installation instructions, see the documentation for
 
 ## Release history
 
+* 1.0.0-alpha10 (unreleased):
+    * Bug fix: if a domain was specified in `domain-access-list`, a later match
+        for `*` or the same domain would be ignored.
+
 * 1.0.0-alpha9:
     * Incompatible change: the Docker image now listens on ports 80 and 443 by
         default, instead of 7080 and 7443.
