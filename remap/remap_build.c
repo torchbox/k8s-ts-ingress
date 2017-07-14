@@ -91,6 +91,9 @@ build_ingress_rule(remap_db_t *db, cluster_t *cs, namespace_t *ns,
 remap_host_t	*rh;
 size_t		 i;
 
+	if (!rule->ir_host)
+		return;
+
 	if (!cluster_domain_for_ns(cs, rule->ir_host, ns->ns_name)) {
 		TSError("kubernetes: ignoring Ingress %s host %s since "
 			"namespace %s does not have access to this domain",
