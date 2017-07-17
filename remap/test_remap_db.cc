@@ -210,6 +210,43 @@ TEST(RemapDB, EmptyPath)
 	EXPECT_STREQ("http", res.rz_proto);
 }
 
+TEST(RemapDB, EmptyHost)
+{
+	cluster_t *cluster = load_test_ingress("tests/ingress-no-host.json");
+	scoped_c_ptr<cluster_t *> cluster_(cluster, cluster_free);
+
+	k8s_config_t *cfg = k8s_config_new();
+	scoped_c_ptr<k8s_config_t *> cfg_(cfg, k8s_config_free);
+
+	remap_db_t *db = remap_db_from_cluster(cfg, cluster);
+	ASSERT_TRUE(db != nullptr);
+	scoped_c_ptr<remap_db_t *> db_(db, remap_db_free);
+
+	/* Build a request */
+	remap_request_t req;
+	memset(&req, 0, sizeof(req));
+	scoped_c_ptr<remap_request_t *> req_(&req, remap_request_free);
+
+	req.rr_hdrfields = hash_new(127, (hash_free_fn)remap_hdrfield_free);
+	req.rr_proto = strdup("http");
+	req.rr_host = strdup("echoheaders.whatever");
+	req.rr_path = NULL;
+
+	remap_result_t res;
+	memset(&res, 0, sizeof(res));
+	scoped_c_ptr<remap_result_t *> res_(&res, remap_result_free);
+
+	int ret = remap_run(db, &req, &res);
+	ASSERT_EQ(RR_ERR_NO_HOST, ret);
+
+#if 0	/* Until null host is supported */
+	/* Make sure pick_target returns the right host */
+	EXPECT_STREQ("172.28.35.130", res.rz_target->rt_host);
+	EXPECT_EQ(8080, res.rz_target->rt_port);
+	EXPECT_STREQ("http", res.rz_proto);
+#endif
+}
+
 TEST(RemapDB, IngressClass1)
 {
 	cluster_t *cluster = load_test_ingress("tests/ingress-class1.json");
