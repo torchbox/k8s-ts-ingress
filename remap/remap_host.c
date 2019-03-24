@@ -145,6 +145,8 @@ const char	*s;
 			rh->rh_tls_version = IN_TLS_VERSION_1_1_VALUE;
 		else if (strcmp(s, IN_TLS_VERSION_1_2) == 0)
 			rh->rh_tls_version = IN_TLS_VERSION_1_2_VALUE;
+		else if (strcmp(s, IN_TLS_VERSION_1_3) == 0)
+			rh->rh_tls_version = IN_TLS_VERSION_1_3_VALUE;
 	} else
 		rh->rh_tls_version = cs->cs_config->cc_tls_minimum_version;
 

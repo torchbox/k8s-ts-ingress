@@ -89,7 +89,7 @@ metadata:
     ingress.kubernetes.io/tls-minimum-version: "1.1"
 ```
 
-Accepted values are `"1.0"`, `"1.1"` and `"1.2"`.  TLS 1.3 is not supported.
+Accepted values are `"1.0"`, `"1.1"`, `"1.2"` and `"1.3"`
 
 Due to limitations in OpenSSL and Traffic Server, this will not work correctly
 if you have configured TLS certificates in `ssl_multicert.config`.
@@ -100,6 +100,7 @@ environment variables:
 * `PROXY_CONFIG_SSL_TLSV1=0`: disable TLS 1.0
 * `PROXY_CONFIG_SSL_TLSV1_1=0`: disable TLS 1.1
 * `PROXY_CONFIG_SSL_TLSV1_2=0`: disable TLS 1.2
+* `PROXY_CONFIG_SSL_TLSV1_3=0`: disable TLS 1.3
 
 ## Configuring detault TLS certificates
 

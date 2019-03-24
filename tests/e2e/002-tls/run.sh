@@ -36,6 +36,11 @@ output=$(curl 2>&1 -kvisS --tlsv1.2 --resolve tls10.echoheaders.test:58443:127.0
 		https://tls10.echoheaders.test:58443/)
 expect_output 'HTTP/[012.]* 200'
 
+printf '.'
+output=$(curl 2>&1 -kvisS --tlsv1.3 --resolve tls10.echoheaders.test:58443:127.0.0.1 \
+		https://tls10.echoheaders.test:58443/)
+expect_output 'HTTP/[012.]* 200'
+
 # Test minimum TLS 1.1.
 printf '.'
 output=$(curl 2>&1 -kvisS --tlsv1.0 --resolve tls11.echoheaders.test:58443:127.0.0.1 \
@@ -50,6 +55,11 @@ expect_output 'HTTP/[012.]* 200'
 
 printf '.'
 output=$(curl 2>&1 -kvisS --tlsv1.2 --resolve tls11.echoheaders.test:58443:127.0.0.1 \
+		https://tls11.echoheaders.test:58443/)
+expect_output 'HTTP/[012.]* 200'
+
+printf '.'
+output=$(curl 2>&1 -kvisS --tlsv1.3 --resolve tls11.echoheaders.test:58443:127.0.0.1 \
 		https://tls11.echoheaders.test:58443/)
 expect_output 'HTTP/[012.]* 200'
 
@@ -69,6 +79,35 @@ expect_output -v 'HTTP/[012.]* 200'
 printf '.'
 output=$(curl 2>&1 -kvisS --tlsv1.2 --resolve tls12.echoheaders.test:58443:127.0.0.1 \
 		https://tls12.echoheaders.test:58443/)
+expect_output 'HTTP/[012.]* 200'
+
+printf '.'
+output=$(curl 2>&1 -kvisS --tlsv1.3 --resolve tls12.echoheaders.test:58443:127.0.0.1 \
+		https://tls12.echoheaders.test:58443/)
+expect_output 'HTTP/[012.]* 200'
+
+# Test minimum TLS 1.3.
+printf '.'
+output=$(curl 2>&1 -kvisS --tlsv1.0 --resolve tls13.echoheaders.test:58443:127.0.0.1 \
+		https://tls13.echoheaders.test:58443/)
+expect_output 'alert handshake failure'
+expect_output -v 'HTTP/[012.]* 200'
+
+printf '.'
+output=$(curl 2>&1 -kvisS --tlsv1.1 --resolve tls13.echoheaders.test:58443:127.0.0.1 \
+		https://tls13.echoheaders.test:58443/)
+expect_output 'alert handshake failure'
+expect_output -v 'HTTP/[012.]* 200'
+
+printf '.'
+output=$(curl 2>&1 -kvisS --tlsv1.2 --resolve tls13.echoheaders.test:58443:127.0.0.1 \
+		https://tls13.echoheaders.test:58443/)
+expect_output 'alert handshake failure'
+expect_output -v 'HTTP/[012.]* 200'
+
+printf '.'
+output=$(curl 2>&1 -kvisS --tlsv1.3 --resolve tls13.echoheaders.test:58443:127.0.0.1 \
+		https://tls13.echoheaders.test:58443/)
 expect_output 'HTTP/[012.]* 200'
 
 # Test default TLS.

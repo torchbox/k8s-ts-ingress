@@ -117,6 +117,8 @@ service_port_t	*service_find_port(const service_t *, const char *name,
 #define	IN_TLS_VERSION_1_1_VALUE	0x0101
 #define	IN_TLS_VERSION_1_2		"1.2"
 #define	IN_TLS_VERSION_1_2_VALUE	0x0102
+#define	IN_TLS_VERSION_1_3		"1.3"
+#define	IN_TLS_VERSION_1_3_VALUE	0x0103
 #define	IN_APP_ROOT			A_INGRESS "app-root"
 #define	IN_REWRITE_TARGET		A_INGRESS "rewrite-target"
 #define	IN_AUTH_TYPE			A_INGRESS "auth-type"
