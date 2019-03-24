@@ -190,6 +190,8 @@ cluster_config_t	*cc;
 			cc->cc_tls_minimum_version = IN_TLS_VERSION_1_1_VALUE;
 		else if (strcmp(s, IN_TLS_VERSION_1_2) == 0)
 			cc->cc_tls_minimum_version = IN_TLS_VERSION_1_2_VALUE;
+		else if (strcmp(s, IN_TLS_VERSION_1_3) == 0)
+			cc->cc_tls_minimum_version = IN_TLS_VERSION_1_3_VALUE;
 		else
 			TSError("kubernetes: invalid tls-minimum-version: %s "
 				"in configmap", s);
