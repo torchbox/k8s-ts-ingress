@@ -32,7 +32,7 @@ supported by most Ingress controllers; those beginning with
   in the request to the backend name (e.g., the pod name), instead of the
   original request host.
 
-* `ingress.kubernetes.io/read-response-timeout": set the time in seconds that
+* `ingress.kubernetes.io/read-response-timeout`: set the time in seconds that
   TS will wait for for the response from the origin.  If this timeout is
   exceeded, an HTTP 504 error will be returned to the client.
 
